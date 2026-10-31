@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Method · {{ site.name }}{% endblock %}
+{% block main %}
+<main id="main" class="wrap">
+  <div class="page-head">
+    <h1 class="page-title">Method</h1>
+    <p class="page-lede">A short brief every morning on what affects the Port of Rotterdam, written for the people who plan cargo through it.</p>
+  </div>
+
+  <div class="prose">
+    <section aria-labelledby="what">
+      <h2 id="what">What this is</h2>
+      <p>Haven Daily collects port and logistics news each morning, keeps what matters for Rotterdam, and turns it into at most five items, most severe first. Each item says what happened, links to the original source and gives an interpretation of the impact for a planner. On quiet days the brief is shorter. It is never padded.</p>
+      <p><em>Haven</em> means port in Dutch and a safe place in English.</p>
+    </section>
+
+    <section aria-labelledby="steps">
+      <h2 id="steps">How a brief is made</h2>
+      <ol class="steps">
+        <li><strong>06:30 Amsterdam time.</strong> A scheduled job collects new items from the sources, reads the port status values and records about 12 minutes of ship positions.</li>
+        <li><strong>Filter.</strong> Items about the Port of Rotterdam and the routes, carriers and hinterland links that serve it are kept. The rest are dropped.</li>
+        <li><strong>Summarise.</strong> An AI model writes a two-line summary, a planner impact and a severity for each kept item, following the rules below. It may only use facts from the source.</li>
+        <li><strong>Review.</strong> The brief opens as a pull request on GitHub. {{ site.author.split(" ")[0] }} can approve it, edit it or remove items.</li>
+        <li><strong>08:00 publish.</strong> If nobody has reviewed it by then, it is published automatically and the page says so. A day is never skipped.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="severity">
+      <h2 id="severity">Severity rules</h2>
+      <dl class="rules">
+        <div><dt><span class="swatch num-high"></span><span class="sev sev-high">High</span></dt><dd>Directly affects Rotterdam operations and has a timeframe. Example: a strike at a terminal this week.</dd></div>
+        <div><dt><span class="swatch num-medium"></span><span class="sev sev-medium">Medium</span></dt><dd>Affects a European route, carrier or hinterland connection that serves Rotterdam.</dd></div>
+        <div><dt><span class="swatch num-low"></span><span class="sev sev-low">Low</span></dt><dd>Background trend or long-term news.</dd></div>
+      </dl>
+      <p>The impact for planners is always an interpretation, which is why it is set in a different typeface. When the source does not support one, the item says <em>Not enough information</em> instead of guessing.</p>
+    </section>
+
+    <section aria-labelledby="thresholds">
+      <h2 id="thresholds">Port status thresholds</h2>
+      <p class="draft">{{ m.icon("triangle-alert") }}<span><strong>Draft.</strong> These rules are not final. They will be set from public sources when the status line is built.</span></p>
+      <div class="table-scroll" role="region" aria-labelledby="thresholds" tabindex="0">
+        <table>
+          <thead>
+            <tr><th scope="col">Indicator</th><th scope="col">Normal</th><th scope="col">Watch</th><th scope="col">Alert</th><th scope="col">Source</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Weather warnings</th><td>No warning for the Rotterdam region</td><td>Code yellow</td><td>Code orange or red</td><td>KNMI</td></tr>
+            <tr><th scope="row">Rhine water level</th><td>Above the watch level</td><td>Below the watch level (to be set)</td><td>Below the alert level (to be set)</td><td>Public water-level data, Kaub and Lobith</td></tr>
+            <tr><th scope="row">Strike flag</th><td>No strike in today's items</td><td>Strike announced for Rotterdam</td><td>Strike affecting Rotterdam today</td><td>Today's items</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>No data</strong> means the source did not answer or returned nothing usable. A missing value is never estimated.</p>
+    </section>
+
+    <section aria-labelledby="chart">
+      <h2 id="chart">The chart</h2>
+      <ul>
+        <li>The land and water are drawn from OpenStreetMap data. They are prepared once by a script, so the daily build does not depend on a map service. Roads, railways and storage tanks are drawn as texture, not as a road map.</li>
+        <li>The fine lines in the water are decoration: each one is a fixed distance from the shore. They are not depth contours and say nothing about where ships can sail.</li>
+        <li>Ship positions come from a short daily AIS snapshot of the port area. Only seagoing cargo ships are shown (container ships, tankers and bulk carriers), not barges, tugs or pilot boats.</li>
+        <li>Destinations are typed in by ship crews and are often messy, for example <span class="ais-text">ANTWERP&gt;HAMBURG</span> or blank. The page shows a cleaned destination next to the original text, and <em>Unknown</em> when it is unclear.</li>
+        <li>Numbered squares on the chart are today's items. Ships at a terminal named in an item are drawn in that item's colour.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="sources">
+      <h2 id="sources">Sources and copyright</h2>
+      <ul>
+        <li>Every item links to its original source. Summaries are short and written in our own words, with no long quotes.</li>
+        <li>Dutch articles get an English summary and a <em>Read in English</em> link that opens the original through Google Translate. Translated articles are never stored or republished here.</li>
+        <li>Paywalled sources appear as a headline and link only.</li>
+        <li>Each source's terms and robots.txt are respected. Sources that do not allow automated access are not used.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="maker">
+      <h2 id="maker">Who makes this</h2>
+      <p>Haven Daily is a personal portfolio project by {{ site.author }}, a second-year BBA International Business (Supply Chain Management) student at Rotterdam University of Applied Sciences. It is built with Python, Jinja2, Leaflet and GitHub Actions.</p>
+      {% if site.linkedin_url %}<p><a href="{{ site.linkedin_url }}">{{ site.author }} on LinkedIn</a></p>{% endif %}
+      <p>It is not affiliated with the Port of Rotterdam Authority or any company in the port.</p>
+    </section>
+  </div>
+</main>
+{% endblock %}

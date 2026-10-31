@@ -1,0 +1,118 @@
+{# Reusable pieces of the page. Note: always write brief["items"], not brief.items,
+   because .items is also the name of a Python dict method.
+   Elements with class "needs-map" only show once the chart has loaded (map.js);
+   "no-map" elements are their plain-text stand-ins. #}
+
+{% macro icon(name, label=none) -%}
+<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"{% if label %} role="img" aria-label="{{ label }}"{% else %} aria-hidden="true"{% endif %}>{{ icons[name] | safe }}</svg>
+{%- endmacro %}
+
+{# Logo: the letters H and D in the International Code of Signals. #}
+{% macro flags() -%}
+<svg class="flags" viewBox="0 0 51 24" aria-hidden="true" focusable="false">
+  <rect class="flag-white" x="0.5" y="0.5" width="23" height="23"/>
+  <rect class="flag-red" x="12" y="0.5" width="11.5" height="23"/>
+  <rect class="flag-edge" x="0.5" y="0.5" width="23" height="23"/>
+  <rect class="flag-yellow" x="27.5" y="0.5" width="23" height="23"/>
+  <rect class="flag-blue" x="27.5" y="6.25" width="23" height="11.5"/>
+</svg>
+{%- endmacro %}
+
+{# The numbered square used for an item in the list and on the chart. #}
+{% macro num(rank, severity) -%}
+<span class="num num-{{ severity }}" aria-hidden="true">{{ rank }}</span>
+{%- endmacro %}
+
+{% macro level(key, label) -%}
+<span class="lvl lvl-{{ key }}">{{ icon(level_icons[key]) }}{{ label }}</span>
+{%- endmacro %}
+
+{# Ship symbols as drawn on the chart, for the legend: turned to point right. #}
+{% macro ship_symbol(type, status="moored", linked=false) -%}
+<svg class="ship-symbol ship ship-{{ status }}{% if linked %} sev-high{% endif %}" viewBox="-19 -5 33 10" aria-hidden="true" focusable="false"><g transform="rotate(90)">
+  {%- if status == "underway" %}<path class="wake" d="M-1.6,12.5L-3.6,19M1.6,12.5L3.6,19"/>{% endif -%}
+  <path class="hull" d="{{ ship_hull }}"/><path class="deck" d="{{ ship_decks[type] }}"/></g></svg>
+{%- endmacro %}
+
+{% macro dial(ind) -%}
+<li class="dial">
+  <p class="dial-label">{{ icon(ind.icon) }}{{ ind.label }}</p>
+  <div class="dial-reading">
+    <div>
+      {% if ind.value is none %}
+      <p class="dial-value is-text is-missing">No data</p>
+      {% else %}
+      <p class="dial-value{% if not ind.is_number %} is-text{% endif %}">{{ ind.display_value }}{% if ind.unit %}<span class="unit">{{ ind.unit }}</span>{% endif %}</p>
+      {% endif %}
+      {% if ind.place %}<p class="dial-place">{{ ind.place }}</p>{% endif %}
+    </div>
+    {% if ind.gauge_pct is not none %}
+    <div class="gauge" style="--level: {{ ind.gauge_pct }}%" role="img" aria-label="Gauge: {{ ind.display_value }} {{ ind.unit }} on a scale of 0 to {{ ind.gauge_max }} {{ ind.unit }}"><span class="gauge-water"></span></div>
+    {% endif %}
+  </div>
+  <p class="dial-status">{{ level(ind.level_key, ind.level_label) }}{% if ind.change %}<span>{{ ind.change }}</span>{% endif %}</p>
+  {% if ind.note %}<p class="dial-note">{{ ind.note }}</p>{% endif %}
+  <p class="dial-meta">
+    {% if ind.observed_at %}<span>Read at <time datetime="{{ ind.observed_at }}">{{ ind.observed_at | clock }}</time></span>{% endif %}
+    <a href="{{ ind.source_url }}">{{ ind.source_name }}{% if ind.is_external %}{{ icon("external") }}{% endif %}</a>
+  </p>
+</li>
+{%- endmacro %}
+
+{% macro news_item(item, rank) -%}
+<li class="item" id="item-{{ rank }}" data-rank="{{ rank }}"{% if item.map %} data-place="{{ item.map.label }}"{% endif %}>
+  <article aria-labelledby="item-{{ rank }}-title">
+    <p class="item-top">
+      {{ num(rank, item.severity) }}
+      <span class="sev sev-{{ item.severity }}"><span class="visually-hidden">Severity: </span>{{ item.severity }}</span>
+      <span class="item-meta">
+        <span>{{ item.source }}</span>
+        <span>{{ language_names[item.language] }}</span>
+        {% if item.published %}<time datetime="{{ item.published }}">{{ item.published | clock }}</time>{% endif %}
+      </span>
+    </p>
+    <h3 class="item-title" id="item-{{ rank }}-title"><a href="{{ item.url }}">{{ item.headline }}</a></h3>
+    {% if item.summary %}
+    <p class="item-summary">{{ item.summary }}</p>
+    {% elif item.access == "headline-only" %}
+    <p class="item-summary is-empty">Headline only. This source is paywalled, so there is no summary.</p>
+    {% else %}
+    <p class="item-summary is-empty">No summary available.</p>
+    {% endif %}
+    <div class="item-impact">
+      <p class="impact-label">Impact for planners <em>interpretation</em></p>
+      {% if item.impact %}
+      <p class="impact-text">{{ item.impact }}</p>
+      {% else %}
+      <p class="impact-text is-empty">Not enough information in the source to judge the impact.</p>
+      {% endif %}
+      {% if item.affects %}<p class="affects"><strong>Affects</strong> {{ item.affects | join(" · ") }}</p>{% endif %}
+    </div>
+    <p class="item-actions">
+      {% if item.map %}
+      <button type="button" class="chart-button needs-map" data-action="show-item" data-rank="{{ rank }}" aria-pressed="false">{{ icon("map-pin") }}Show on chart</button>
+      {% else %}
+      <span class="no-place needs-map">No single place on the chart</span>
+      {% endif %}
+      <a href="{{ item.url }}">Read original{% if item.language != "en" %} ({{ language_names[item.language] }}){% endif %}{{ icon("external") }}</a>
+      {% if item.translate_url %}<a href="{{ item.translate_url }}">{{ icon("languages") }}Read in English{{ icon("external") }}</a>{% endif %}
+    </p>
+  </article>
+</li>
+{%- endmacro %}
+
+{# Five slots, one per possible item: a day's severity at a glance. #}
+{% macro severity_strip(brief) -%}
+<span class="strip" role="img" aria-label="{{ brief['items'] | length }} items{% for s in severities if brief.counts[s] %}, {{ brief.counts[s] }} {{ s }}{% endfor %}">
+  {% for item in brief["items"] %}<span class="slot num-{{ item.severity }}">{{ loop.index }}</span>{% endfor %}
+  {% for _ in range(max_items - brief["items"] | length) %}<span class="slot slot-empty"></span>{% endfor %}
+</span>
+{%- endmacro %}
+
+{% macro status_marks(brief) -%}
+<span class="status-marks">
+  {% for ind in brief.status %}
+  <span class="mark mark-{{ ind.level_key }}" title="{{ ind.label }}: {{ ind.level_label }}">{{ icon(level_icons[ind.level_key]) }}<span class="visually-hidden">{{ ind.label }}: {{ ind.level_label }}.</span></span>
+  {% endfor %}
+</span>
+{%- endmacro %}

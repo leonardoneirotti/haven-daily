@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Archive · {{ site.name }}{% endblock %}
+{% block main %}
+<main id="main" class="wrap">
+  <div class="page-head">
+    <h1 class="page-title">Archive</h1>
+    <p class="page-lede">Every brief so far. Each day keeps its own page and chart, exactly as published.</p>
+  </div>
+  {% for month, briefs in months %}
+  <section class="month" aria-labelledby="month-{{ loop.index }}">
+    <h2 id="month-{{ loop.index }}">{{ month }}</h2>
+    <ol class="days">
+      {% for brief in briefs %}
+      {% set items = brief["items"] %}
+      <li>
+        <a class="day-row" href="{{ root }}days/{{ brief.date }}.html">
+          <span class="day-when">
+            <span class="day-date">{{ brief.day | short_date }}</span>
+            <span class="day-edition">No. {{ "%03d" % brief.edition }}</span>
+          </span>
+          {{ m.severity_strip(brief) }}
+          <span class="day-top{% if not items %} is-quiet{% endif %}">{% if items %}{{ items[0].headline }}{% else %}Nothing significant{% endif %}</span>
+          <span class="day-status">{{ m.status_marks(brief) }}<span class="day-ships">{% if brief.ships %}{{ brief.ships.count }} ships{% else %}No AIS{% endif %}</span></span>
+        </a>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endfor %}
+</main>
+{% endblock %}

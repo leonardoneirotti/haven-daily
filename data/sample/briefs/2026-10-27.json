@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-27",
+  "sample": true,
+  "built_at": "2026-10-27T06:32:00+01:00",
+  "published_at": "2026-10-27T07:40:00+01:00",
+  "review": "reviewed",
+  "status": [
+    {
+      "key": "weather",
+      "label": "Weather warnings",
+      "icon": "wind",
+      "value": "Code yellow · fog",
+      "place": "Rotterdam region",
+      "level": "amber",
+      "observed_at": "2026-10-27T06:12:00+01:00",
+      "source_name": "Sample source",
+      "source_url": "https://example.com/weather"
+    },
+    {
+      "key": "rhine",
+      "label": "Rhine water level",
+      "icon": "waves",
+      "value": 104,
+      "unit": "cm",
+      "place": "Kaub gauge",
+      "level": "amber",
+      "gauge_max": 300,
+      "observed_at": "2026-10-27T06:15:00+01:00",
+      "source_name": "Sample source",
+      "source_url": "https://example.com/rhine-kaub"
+    },
+    {
+      "key": "strike",
+      "label": "Strike flag",
+      "icon": "megaphone",
+      "value": "None reported",
+      "place": "Derived from today's items",
+      "level": "green",
+      "observed_at": "2026-10-27T06:32:00+01:00",
+      "source_name": "Today's items",
+      "source_url": "#items-title"
+    }
+  ],
+  "items": [
+    {
+      "severity": "medium",
+      "headline": "Strike notice at a German North Sea port could divert calls to Rotterdam",
+      "url": "https://example.com/north-sea-strike-notice",
+      "source": "Sample source B",
+      "language": "en",
+      "published": "2026-10-26T19:05:00+01:00",
+      "summary": "A union at a German container port has announced strikes from Monday 2 November. Carriers have not yet said how they will respond.",
+      "impact": "Some carriers may move calls to Rotterdam, which would add volume at deep-sea terminals next week. No effect expected today.",
+      "affects": [
+        "Containers",
+        "Deep-sea calls"
+      ]
+    },
+    {
+      "severity": "low",
+      "headline": "Port area hydrogen pipeline enters its next construction phase",
+      "url": "https://example.com/nl/waterstofleiding",
+      "source": "Sample source A",
+      "language": "nl",
+      "published": "2026-10-26T10:40:00+01:00",
+      "summary": "Construction of a hydrogen pipeline in the port area has moved to its next phase, according to the project company. Completion is planned for 2028.",
+      "impact": "Long-term infrastructure news. No effect on cargo flows this week.",
+      "affects": [
+        "Energy"
+      ]
+    }
+  ],
+  "build": {
+    "sources_checked": 9,
+    "items_collected": 37,
+    "items_kept": 2,
+    "failures": [
+      {
+        "source": "AIS snapshot",
+        "error": "Connection closed after 2 minutes. The map shows no ships today."
+      }
+    ]
+  },
+  "ships": null
+}

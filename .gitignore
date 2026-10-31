@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets: real keys live only in .env locally and in GitHub Actions secrets online
+.env
+.env.*
+!.env.example
+
+# Raw OpenStreetMap downloads used by tools/build_basemap.py (delete one to re-download)
+data/basemap/osm-cache.json
+data/basemap/osm-detail-cache.json
+
+# Built pages. GitHub Actions rebuilds and publishes them.
+site/

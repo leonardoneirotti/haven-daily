@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{% if is_index %}{{ site.name }}{% else %}{{ brief.day | long_date }} · {{ site.name }}{% endif %}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ root }}static/vendor/leaflet/leaflet.css">
+{% endblock %}
+{% block topbar_note %}<p class="topbar-note">{{ brief.day | short_date }} · No. {{ "%03d" % brief.edition }}</p>{% endblock %}
+{% block main %}
+{% set items = brief["items"] %}
+{% set ships = brief.ships %}
+<main id="main">
+  {# The stage: the chart fills the screen; on wide screens the news panel sits over its western (open sea) side. #}
+  <section class="stage" aria-labelledby="brief-title">
+    <div class="chart" id="chart">
+      <h2 class="visually-hidden">Chart of the port</h2>
+      <div class="chart-frame">
+        <div id="port-map" class="chart-map" role="region" aria-label="Chart of the Port of Rotterdam{% if ships %} with {{ ships.count }} ships{% endif %}{% if brief.map.callouts %} and today's numbered items{% endif %}. Everything on the chart is also listed on this page."></div>
+        <script type="application/json" id="map-data">{{ brief.map | tojson }}</script>
+        {% if ships %}
+        <div class="chart-filter needs-map" role="group" aria-label="Show ships">
+          <button type="button" data-ship-filter="all" aria-pressed="true">All <span>{{ ships.count }}</span></button>
+          {% for kind, count in ships.by_type.items() if count %}
+          <button type="button" data-ship-filter="{{ kind }}" aria-pressed="false">{{ ship_type_plurals[kind] }} <span>{{ count }}</span></button>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="chart-note">No ship positions for this day. The AIS snapshot failed.</p>
+        {% endif %}
+        <div class="chart-focus" id="chart-focus" hidden>
+          <p class="chart-focus-text" id="chart-focus-text"></p>
+          <button type="button" data-action="overview">{{ m.icon("expand") }}Overview</button>
+        </div>
+        <p class="visually-hidden" id="chart-announcer" aria-live="polite"></p>
+      </div>
+      <div class="chart-legend">
+        <span>{{ m.ship_symbol("container") }}Container</span>
+        <span>{{ m.ship_symbol("tanker") }}Tanker</span>
+        <span>{{ m.ship_symbol("bulk") }}Bulk</span>
+        <span>{{ m.ship_symbol("container", "underway") }}Under way</span>
+        <span>{{ m.ship_symbol("container", "anchored") }}At anchor</span>
+        {% if ships and ships.linked %}<span>{{ m.ship_symbol("container", "moored", true) }}At a terminal in the news</span>{% endif %}
+        {% if brief.map.callouts %}<span><span class="legend-num" aria-hidden="true">1</span>Item</span>{% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <header class="panel-head">
+        <p class="kicker">
+          <span>Morning brief · No. {{ "%03d" % brief.edition }}</span>
+          {% if not is_latest %}<a href="{{ root }}index.html">Archived. Go to today</a>{% endif %}
+        </p>
+        <h1 id="brief-title"><span>{{ brief.day.strftime("%A") }}</span> {{ brief.day | date_only }}</h1>
+        <p class="publication">
+          Built {{ brief.built_at | clock }} ·
+          {% if brief.review == "reviewed" %}reviewed, published {{ brief.published_at | clock }}{% else %}<span class="is-auto">published {{ brief.published_at | clock }}, not reviewed</span>{% endif %}
+          · Amsterdam time
+        </p>
+      </header>
+      {% if items %}
+      <ol class="panel-items" aria-label="Today's items">
+        {% for item in items %}
+        <li>
+          <a class="panel-item" href="#item-{{ loop.index }}" data-rank="{{ loop.index }}"{% if item.map %} data-action="show-item"{% endif %}>
+            {{ m.num(loop.index, item.severity) }}
+            <span class="panel-text">
+              <span class="panel-meta"><span class="sev sev-{{ item.severity }}">{{ item.severity }}</span>{% if item.affects %}<span>{{ item.affects[0] }}</span>{% endif %}</span>
+              <span class="panel-title">{{ item.headline }}</span>
+              {% if item.summary %}<span class="panel-summary">{{ item.summary }}</span>{% endif %}
+            </span>
+          </a>
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <p class="panel-quiet">Nothing significant {% if is_latest %}today{% else %}on this day{% endif %}.</p>
+      {% endif %}
+      <ul class="panel-status" aria-label="Port status">
+        {% for ind in brief.status %}
+        <li>
+          <span class="mini-label">{{ m.icon(ind.icon) }}{{ ind.label }}</span>
+          <span class="mini-value lvl-{{ ind.level_key }}">{{ m.icon(level_icons[ind.level_key]) }}{% if ind.value is none %}No data{% else %}{{ ind.display_value }}{% if ind.unit %} {{ ind.unit }}{% endif %}{% endif %}<span class="visually-hidden">, {{ ind.level_label }}</span></span>
+        </li>
+        {% endfor %}
+        <li>
+          <span class="mini-label">{{ m.icon("ship") }}Ships in the port area</span>
+          <span class="mini-value">{% if ships %}{{ ships.count }}{% else %}No data{% endif %}</span>
+        </li>
+      </ul>
+      <a class="panel-more" href="#brief">{{ m.icon("arrow-down") }}Full brief and port status</a>
+    </div>
+  </section>
+
+  <div class="wrap brief-layout" id="brief">
+    <section class="brief-col" aria-labelledby="items-title">
+      <h2 id="items-title" class="section-title">The brief</h2>
+      {% if items %}
+      <p class="brief-intro">{{ items | length }} {{ "item" if items | length == 1 else "items" }}, most severe first.<span class="needs-map"> "Show on chart" moves the chart at the top of the page.</span></p>
+      <ol class="items">
+        {% for item in items %}
+        {{ m.news_item(item, loop.index) }}
+        {% endfor %}
+      </ol>
+      {% else %}
+      <div class="quiet">
+        <h3>Nothing significant {% if is_latest %}today{% else %}on this day{% endif %}.</h3>
+        <p>{{ brief.build.sources_checked or "All" }} sources were checked and nothing met the bar for a planner brief. The port status still applies.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <section class="status" aria-labelledby="status-title">
+      <div class="status-head">
+        <h2 id="status-title">Port status</h2>
+        <a href="{{ root }}about.html#thresholds">How the colours are set</a>
+      </div>
+      <ul class="dials">
+        {% for ind in brief.status %}
+        {{ m.dial(ind) }}
+        {% endfor %}
+        <li class="dial">
+          <p class="dial-label">{{ m.icon("ship") }}Ships in the port area</p>
+          <div class="dial-reading">
+            <div>
+              {% if ships %}
+              <p class="dial-value">{{ ships.count }}</p>
+              <p class="dial-place">Seagoing cargo ships, AIS snapshot</p>
+              {% else %}
+              <p class="dial-value is-text is-missing">No data</p>
+              <p class="dial-place">The AIS snapshot failed</p>
+              {% endif %}
+            </div>
+          </div>
+          {% if ships %}
+          <p class="dial-status">
+            <button type="button" class="link-button needs-map" data-action="show-ships" data-status="anchored">{{ m.icon("anchor") }}{{ ships.at_anchor }} at anchor</button>
+            <span class="no-map">{{ ships.at_anchor }} at anchor</span>
+            <button type="button" class="link-button needs-map" data-action="show-ships" data-status="underway">{{ ships.underway }} under way</button>
+            <span class="no-map">{{ ships.underway }} under way</span>
+          </p>
+          <p class="dial-meta"><span>Snapshot <time datetime="{{ ships.snapshot_start }}">{{ ships.snapshot_start | clock }}</time>–<time datetime="{{ ships.snapshot_end }}">{{ ships.snapshot_end | clock }}</time></span><span>{{ ships.source_name }}</span></p>
+          {% endif %}
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  {% if ships %}
+  <section class="wrap ship-list" aria-labelledby="ships-title">
+    <details>
+      <summary><h2 id="ships-title">All {{ ships.count }} ships in the snapshot</h2><span>As sent over AIS. Select a name to find the ship on the chart.</span></summary>
+      <div class="table-scroll" tabindex="0" role="region" aria-labelledby="ships-title">
+        <table>
+          <thead>
+            <tr><th scope="col">Ship</th><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Area</th><th scope="col">Destination</th><th scope="col">AIS text</th><th scope="col">Flag</th><th scope="col" class="num-col">Length</th></tr>
+          </thead>
+          <tbody>
+            {% for ship in ships.vessels %}
+            <tr{% if ship.news_severity %} class="is-linked"{% endif %}>
+              <th scope="row">
+                <button type="button" class="link-button needs-map" data-action="show-ship" data-ship="{{ ship.name }}">{{ ship.name }}</button>
+                <span class="no-map">{{ ship.name }}</span>
+                {% if ship.news_item %}<a href="#item-{{ ship.news_item }}" class="ship-news">item {{ ship.news_item }}</a>{% endif %}
+              </th>
+              <td>{{ ship.type_label }}</td>
+              <td>{{ ship.status_label }}{% if ship.status == "underway" %}, {{ ship.speed_kn }} kn{% endif %}</td>
+              <td>{{ ship.area }}</td>
+              <td>{{ ship.destination or "Unknown" }}</td>
+              <td class="ais-text">{{ ship.destination_raw or "(blank)" }}</td>
+              <td>{{ ship.flag_name }}</td>
+              <td class="num-col">{{ ship.length_m }} m</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+  {% endif %}
+
+  <section class="wrap notes" aria-labelledby="build-title">
+    <h2 id="build-title">How this brief was made</h2>
+    <div class="notes-body">
+      <dl class="stats">
+        {% if brief.build.sources_checked is not none %}<div><dt>Sources checked</dt><dd>{{ brief.build.sources_checked }}</dd></div>{% endif %}
+        {% if brief.build.items_collected is not none %}<div><dt>Items collected</dt><dd>{{ brief.build.items_collected }}</dd></div>{% endif %}
+        {% if brief.build.items_kept is not none %}<div><dt>Kept as relevant</dt><dd>{{ brief.build.items_kept }}</dd></div>{% endif %}
+        <div><dt>Shown (max {{ max_items }})</dt><dd>{{ items | length }}</dd></div>
+      </dl>
+      {% if brief.build.failures %}
+      <ul class="failures">
+        {% for failure in brief.build.failures %}
+        <li>{{ m.icon("triangle-alert") }}<span><strong>{{ failure.source }}:</strong> {{ failure.error }}</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="all-ok">{{ m.icon("circle-check") }}<span>All sources responded.</span></p>
+      {% endif %}
+    </div>
+  </section>
+
+  <div class="wrap">
+    <nav class="day-nav" aria-label="Other days">
+      {% if older %}<a href="{{ root }}days/{{ older.date }}.html">{{ m.icon("arrow-left") }}<span>{{ older.day | short_date }}</span></a>{% else %}<span></span>{% endif %}
+      <a href="{{ root }}archive.html">All briefs</a>
+      {% if newer %}<a class="day-nav-newer" href="{{ root }}days/{{ newer.date }}.html"><span>{{ newer.day | short_date }}</span>{{ m.icon("arrow-right") }}</a>{% else %}<span></span>{% endif %}
+    </nav>
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script src="{{ root }}static/vendor/leaflet/leaflet.js"></script>
+<script src="{{ root }}static/basemap.js"></script>
+<script src="{{ root }}static/map.js"></script>
+{% endblock %}

@@ -1,0 +1,3 @@
+# Only for tools/build_basemap.py. The daily build needs requirements.txt alone.
+-r requirements.txt
+shapely>=2.0,<3
