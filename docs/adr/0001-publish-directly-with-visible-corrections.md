@@ -7,7 +7,7 @@ date: 2026-10-31
 
 The original plan put a human review between the AI and the public page: a 06:30 job opened a pull request, the owner could approve or edit it from their phone, and an 08:00 job auto-merged it if they hadn't. We dropped that. One scheduled job (~06:45 Amsterdam) now builds the brief, commits it straight to `main` and deploys it, **unreviewed**. Mistakes are fixed afterwards, and every fix to a published brief must add a dated correction note (`corrections: [{at, note}]`) that the page shows as "Corrected HH:MM" (hard rule 11). The page never changes silently.
 
-*Owner's reason for dropping the review window: not recorded yet. Add it here in one sentence.*
+**Why:** the owner is usually not awake before 08:00, so the review step would almost never have been used. It only added complexity: two jobs, a race between a late review and the 08:00 auto-merge, and summer/winter time handling for both.
 
 ## Considered options
 
