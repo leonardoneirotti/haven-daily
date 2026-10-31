@@ -93,3 +93,17 @@ Commercial, paid, B2B: Yusen Logistics "Supply Chain Disruption Radar" (2026), S
 - Test every candidate source in `SOURCES.md` before building on it.
 - Choose the AI model/API for summaries and check monthly cost (expected to be low for a daily run; verify current pricing).
 - First LinkedIn post: one concrete flagged item, what the tool said, and what I'd do as a planner.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues for leonardoneirotti/haven-daily, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
