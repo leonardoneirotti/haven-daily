@@ -241,7 +241,14 @@ Rules and limits:
 ```
 haven/                 Python package
   render.py            brief JSON -> static HTML (Jinja2)
+  config.py            reads and checks config/*.toml (§5.2.1)
+  clock.py             "today"/"now" in Amsterdam time, clock injectable for tests
+  env.py               loads a local .env (names only, never values)
   (collect.py, filter.py, summarise.py, status.py, ais.py — to build)
+config/
+  sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
+  filter.toml          off-topic word lists per language (§5.4), empty to start
+tests/                 pytest; run with `python -m pytest` (settings in pytest.ini)
 templates/             base.html, day.html, archive.html, about.html, _macros.html
 static/
   style.css            the whole design (tokens at the top)
@@ -259,8 +266,8 @@ data/status/           every status reading, one .json file per day (§6.1)
 design/logo-concepts/  generated logo explorations
 site/                  output, not committed (Actions builds it)
 CLAUDE.md, SOURCES.md, BUILD_PLAN.md, README.md
-requirements.txt       jinja2>=3.1,<4
-requirements-dev.txt   + shapely>=2.0,<3 (only for the basemap tool)
+requirements.txt       jinja2>=3.1,<4, tzdata (time zone rules; Windows has none built in)
+requirements-dev.txt   + pytest, + shapely>=2.0,<3 (only for the basemap tool)
 .gitignore             .venv/, __pycache__/, *.pyc, osm caches, site/
 ```
 
@@ -271,10 +278,27 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m haven.render            # -> site/index.html
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest                  # all tests
 .\.venv\Scripts\python.exe tools\build_basemap.py      # only to rebuild the map
 ```
 
 **Relative links everywhere** (`root` = `""` or `"../"`) so the site works under GitHub Pages' `/<repo>/` path.
+
+### 5.2.1 Config files and helpers (built 1 Nov 2026, issue #4)
+
+- **Config is TOML in `config/`**, read with Python's built-in `tomllib` (no extra dependency). `haven/config.py` checks every file and stops with a message naming the file, the source and the problem (unknown verdict, missing URL, duplicate id, …), so a typo can't silently drop a source.
+- **`tests/test_repo_config.py` keeps `config/sources.toml` and `SOURCES.md` in step**: same sources, verdicts and URLs, and only Port Authority news and ECT auto-keep (§4). Change both together.
+- **"Today" is the Amsterdam date** (`haven/clock.py`, `zoneinfo("Europe/Amsterdam")`), as the guard in §5.1.1 needs. Tested around midnight UTC and on both 2026 clock-change days.
+
+*Claude's defaults, not yet confirmed by the owner:*
+- `sources.toml` lists **news sources only**. The status-line endpoints (MeteoAlarm, PEGELONLINE, Rijkswaterstaat) are a different kind of source (no use/headline-only verdict, no items) and get their config when the status step is built.
+- **Dropped sources are listed** with a one-line `note` (why), for the record; they need no URL, access type or language and are never fetched.
+- A source has a **list of `urls`**, because Nieuwsblad Transport has two feeds (`/havens/feed/` and `/tag/rotterdam/feed/`, `SOURCES.md`). The collector will merge them and drop duplicates.
+- **Off-topic word lists are per language** (`en`, `nl`): Dutch headlines need Dutch words. An empty word is rejected (it would match every headline).
+- **Unknown fields are an error**, not ignored, so `auto_kep = true` can't quietly turn auto-keep off.
+- The clock helper **refuses a datetime without a timezone** instead of guessing which zone it is in.
+- **`.env` is read by a small standard-library loader** (`haven/env.py`), not python-dotenv: the format is only `NAME=value` lines. Variables already set win (so GitHub Actions secrets are never replaced), an empty value counts as not set (a fresh copy of `.env.example` means "no key"), and errors give the line number, never the line.
+- **`tzdata` is a runtime dependency**: on Windows, `zoneinfo` has no time zone rules without it (found while building this; the Linux runner has them built in).
 
 ### 5.3 Renderer responsibilities (`haven/render.py`)
 

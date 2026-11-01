@@ -1,0 +1,10 @@
+# Haven Daily: word lists for the rule stage of the relevance filter (spec §5.4).
+#
+# An item whose headline matches a word in the list for its source's language
+# is dropped as off-topic before any AI check (recorded as stage "rules").
+# Empty to start: words are added while tuning, after the first runs
+# (build plan step 10). Read and checked by haven/config.py.
+
+[off_topic]
+en = []
+nl = []

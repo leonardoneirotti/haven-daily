@@ -1,0 +1,173 @@
+# Haven Daily: news sources the collector reads (spec §4, SOURCES.md).
+#
+# Keep this file and SOURCES.md in step: tests/test_repo_config.py fails if
+# names, verdicts or URLs differ. Read and checked by haven/config.py.
+#
+# Fields
+#   id         short unique name, used in data files and error messages
+#   name       as written in SOURCES.md
+#   verdict    "use" (headline + link + own-words summary)
+#              "headline-only" (headline + link; article text never goes to an AI, hard rule 12)
+#              "drop" (listed for the record, never fetched)
+#   urls       one or more feed/page addresses (required unless dropped)
+#   access     "rss" or "html" (required unless dropped)
+#   language   two-letter code of the source's text: "en" or "nl" (required unless dropped)
+#   auto_keep  true = skips the AI relevance check (spec §5.4); default false
+#   note       optional, for people only
+
+# --- use ----------------------------------------------------------------------
+
+[[source]]
+id = "port-authority-news"
+name = "Port of Rotterdam Authority news & press releases"
+verdict = "use"
+urls = ["https://www.portofrotterdam.com/en/news-and-press-releases"]
+access = "html"
+language = "en"
+auto_keep = true
+note = "The /en/rss.xml feed is stale; read the HTML list."
+
+[[source]]
+id = "pin-notices"
+name = "PIN notices to shipping"
+verdict = "use"
+urls = ["https://pin.portofrotterdam.com/rss.xml"]
+access = "rss"
+language = "en"
+note = "40-60 notices a week, mostly noise: goes through the AI check. Feed keeps only ~10 items (gap detection, spec §5.8)."
+
+[[source]]
+id = "contargo-news"
+name = "Contargo business news"
+verdict = "use"
+urls = ["https://www.contargo.net/en/business/business-news"]
+access = "html"
+language = "en"
+
+[[source]]
+id = "ect-news"
+name = "ECT news"
+verdict = "use"
+urls = ["https://www.ect.nl/en/news-feed"]
+access = "html"
+language = "en"
+auto_keep = true
+note = "The /en/rss.xml feed is stale; read the HTML list."
+
+[[source]]
+id = "kn-seanews"
+name = "Kuehne+Nagel SeaNews"
+verdict = "use"
+urls = ["https://mykn.kuehne-nagel.com/news"]
+access = "html"
+language = "en"
+note = "Rotterdam paragraph of the weekly port update only. Terms not found yet: check before launch (spec §11)."
+
+# --- headline-only --------------------------------------------------------------
+
+[[source]]
+id = "nl-times"
+name = "NL Times"
+verdict = "headline-only"
+urls = ["https://nltimes.nl/tags/port-rotterdam"]
+access = "html"
+language = "en"
+note = "Blocks AI crawlers. Port tag page, not the site-wide feed (rolls over)."
+
+[[source]]
+id = "nieuwsblad-transport"
+name = "Nieuwsblad Transport"
+verdict = "headline-only"
+urls = ["https://www.nt.nl/havens/feed/", "https://www.nt.nl/tag/rotterdam/feed/"]
+access = "rss"
+language = "nl"
+note = "Paywalled, blocks AI crawlers, ai-train=no. Ignore the body text in the feed."
+
+[[source]]
+id = "portseurope"
+name = "PortsEurope"
+verdict = "headline-only"
+urls = ["https://www.portseurope.com/category/rotterdam/feed/"]
+access = "rss"
+language = "en"
+note = "Subscription site, blocks AI crawlers."
+
+[[source]]
+id = "loadstar"
+name = "The Loadstar"
+verdict = "headline-only"
+urls = ["https://theloadstar.com/feed/"]
+access = "rss"
+language = "en"
+note = "Main feed only (robots.txt disallows tag/category pages)."
+
+[[source]]
+id = "rtv-rijnmond"
+name = "RTV Rijnmond"
+verdict = "headline-only"
+urls = ["https://www.rijnmond.nl/rss/nieuws"]
+access = "rss"
+language = "nl"
+note = "Blocks ClaudeBot and ~130 other bots. Terms not found yet: check before launch (spec §11)."
+
+# --- drop (never fetched) ----------------------------------------------------------
+
+[[source]]
+id = "google-news"
+name = "Google News RSS"
+verdict = "drop"
+note = "robots.txt disallows /rss/; feed terms: personal feed reader, non-commercial use only."
+
+[[source]]
+id = "nos"
+name = "NOS"
+verdict = "drop"
+note = "Terms art. 6.1 forbid automated access by bots without permission; art. 7 limits RSS to private use."
+
+[[source]]
+id = "dutchnews"
+name = "DutchNews.nl"
+verdict = "drop"
+note = "robots.txt disallows /feed/."
+
+[[source]]
+id = "lloyds-list"
+name = "Lloyd's List"
+verdict = "drop"
+note = "robots.txt disallows /rss/."
+
+[[source]]
+id = "rwg"
+name = "RWG"
+verdict = "drop"
+note = "Terms: no use without prior written permission."
+
+[[source]]
+id = "joc"
+name = "JOC"
+verdict = "drop"
+note = "No Rotterdam items."
+
+[[source]]
+id = "apmt-maasvlakte-2"
+name = "APM Terminals Maasvlakte II"
+verdict = "drop"
+note = "Private API only."
+
+[[source]]
+id = "tradewinds"
+name = "TradeWinds"
+verdict = "drop"
+note = "No official feed; blocks AI crawlers."
+
+[[source]]
+id = "tradlinx"
+name = "Tradlinx"
+verdict = "drop"
+note = "Korean only."
+
+[[source]]
+id = "port-performance"
+name = "Port Performance"
+verdict = "drop"
+note = "No public API or licence."
