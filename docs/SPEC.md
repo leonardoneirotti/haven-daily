@@ -313,6 +313,13 @@ python -m venv .venv
 - Build the chart payload (`brief.map`, embedded as JSON in the page): `view_home`, `view_compact`, `ship_shapes`, `callouts`, `ships`, `ships_source`.
 - Jinja2 with `StrictUndefined` (a template typo fails the build). Write `brief["items"]`, never `brief.items` (dict method clash).
 - Icons: inline Lucide SVG paths (ISC licence) in a Python dict.
+- Publication line (§2.3) from `built_at` + `corrections` (`publication_line()`, tested); a missing `corrections` field counts as `[]`. Correction notes are listed under "How this brief was made", oldest first. *(Built 1 Nov 2026, issue #5.)*
+
+*Claude's defaults for the publication line, not yet confirmed by the owner (issue #5):*
+- The "latest" correction is the one with the **latest `at` time**, not the last one in the list, so a hand edit that adds a note in the wrong place still shows the right time.
+- Times are **converted to Amsterdam time** before showing HH:MM (the line says "Amsterdam time"); a timestamp **without a timezone is refused**, like the clock helper (§5.2.1).
+- A correction made **on a later day** than the build shows its date too: "Corrected 30 Oct 10:02", so a fix a week later doesn't look like a same-morning one.
+- With corrections, the publication line ends with a **"See corrections" link** to the notes under "How this brief was made".
 
 ### 5.4 Relevance filter (decided 31 Oct 2026)
 
@@ -797,7 +804,7 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 
 ## 11. Open items and before launch
 
-- **Code still on the old review model:** `templates/day.html` (reviewed / "not reviewed" line → "Published · Corrected" line), `templates/about.html` (06:30 / Review / 08:00 steps), `haven/render.py` (`review`, `published_at` defaults → `corrections` default `[]`), `README.md` (field table), `BUILD_PLAN.md` (step 9 still describes the 06:30 PR / 08:00 auto-merge), sample briefs. Update when the publishing workflow is built.
+- ~~Code still on the old review model~~ **Done 1 Nov 2026 (issue #5):** renderer, day and Method templates, README field table, `BUILD_PLAN.md` step 9 and the sample briefs now use `built_at` + `corrections` (the 29 Oct sample has one correction).
 - Check `havendaily.nl` availability; buy once the first version works.
 - Test every candidate source (§4) before building on it.
 - Summariser model: run the Haiku 5.5 vs Sonnet 5.5 comparison on the first real run, write `docs/model-comparison.md` (§5.5).

@@ -2,8 +2,12 @@
   "date": "2026-10-29",
   "sample": true,
   "built_at": "2026-10-29T06:31:00+01:00",
-  "published_at": "2026-10-29T07:12:00+01:00",
-  "review": "reviewed",
+  "corrections": [
+    {
+      "at": "2026-10-29T09:14:00+01:00",
+      "note": "Item 1: the strike started at 06:00, not 05:00. Summary corrected."
+    }
+  ],
   "status": [
     {
       "key": "weather",

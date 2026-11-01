@@ -2,6 +2,8 @@
 
 Open this folder in Claude Code. It reads `CLAUDE.md` automatically. Then use these prompts one at a time, and check each result before moving on.
 
+**The build phases now live in GitHub issues** (#3–#42, labels `v1`, `v2`, `later`, in build order with "blocked by" links). This list is the original outline; where it differs, the issues and `docs/SPEC.md` win.
+
 ## Version 1 — daily brief
 
 1. "Read CLAUDE.md and SOURCES.md. Set up the Python project: folder structure, a config file listing sources, storage for items and status values, and a README. Explain the structure in a few lines."
@@ -12,7 +14,7 @@ Open this folder in Claude Code. It reads `CLAUDE.md` automatically. Then use th
 6. "Run everything once on today's items and show me the output before building any page."
 7. "Build the status line v1: weather warnings, Rhine water level, strike flag. Store values daily. No data = 'no data'."
 8. "Render the static site: today's page (status line + max 5 items by severity), one page per day, an archive page, an About/Method page with severity rules and status thresholds, and the footer from CLAUDE.md. Clean, readable on mobile."
-9. "Set up GitHub Pages and GitHub Actions: ~06:30 Amsterdam time build today's page and open a pull request; ~08:00 auto-merge it if I haven't. API keys only in GitHub secrets. Notify me via GitHub on failures."
+9. "Set up GitHub Pages and GitHub Actions: one scheduled job at ~06:45 Amsterdam time that runs the pipeline, commits `data/` to main and deploys the site (no PR). Keys only in secrets. Notify on failures."
 10. "Let it run for a few days, then help me tune the filter and severity rules."
 
 ## Version 2 — ship map
