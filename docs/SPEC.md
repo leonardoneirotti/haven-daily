@@ -246,6 +246,7 @@ haven/                 Python package
   env.py               loads a local .env (names only, never values)
   storage.py           daily files in data/: write once, read one day or the last N days (§6.1)
   fetch.py             polite HTTP layer every collector uses: user agent, robots.txt, AI opt-outs, delays (§5.8)
+  feeds.py             RSS collectors: common item shape, headline-only text never read, PIN gap check (§5.8)
   (collect.py, filter.py, summarise.py, status.py, ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
@@ -340,6 +341,7 @@ Question it answers per item: *is this relevant to a logistics planner working w
 **Stage 1: rules (free, predictable)**
 - Drop duplicates of items already stored in the last ~14 days.
 - Drop items published more than ~48 h before the run.
+  - **Items with no readable date** (§5.8): kept only if their link wasn't seen in the last 14 days. *(Decided by the owner, 1 Nov 2026, issue #12.)* *Claude's reading, not yet confirmed by the owner:* "kept" means not dropped for age; the word lists and stage 2 still apply, and the 14-day link check is the same as the duplicate check above.
 - Drop items matching an off-topic word list (e.g. football, crime unrelated to port operations, housing). The word lists live in the config file so they can be tuned without touching code.
 - **Auto-keep** items from the Rotterdam-specific sources listed in §4 (Port Authority news, ECT): they skip stage 2.
 
@@ -465,6 +467,24 @@ Stored on the item as `strike.match` (`same` / `new` / `unsure`) and `strike.str
 
 Checked once against the real robots.txt files (1 Nov 2026, robots.txt only): all five `use` sources are allowed for us and show no opt-out; NL Times (blocks Claude-Web), Nieuwsblad Transport and PortsEurope (`ai-train=no`) and RTV Rijnmond (blocks ClaudeBot) are detected as opt-outs; The Loadstar's robots.txt has no AI rules (it stays headline-only under its RSS terms, §4).
 
+**Feed collectors (`haven/feeds.py`, built 1 Nov 2026, issue #9).** One function, `collect_feed(source, fetcher, previous_run)`, reads every feed URL of an RSS source (PIN notices, Nieuwsblad Transport, PortsEurope, The Loadstar, RTV Rijnmond) into the **common item shape**: source id, headline, url, published (Amsterdam time), language, access (`full` / `headline-only`). It returns the items plus failures (`{"source": <name>, "error": <one line>}`) for `build.failures`; a broken feed (HTTP error, timeout, robots block, not RSS, bad XML) is a failure, never an exception. **Headline-only:** only headline, link and date are read; the feed's body text is never parsed and no article page is fetched. **`use` (PIN):** the feed's `description` is kept as a plain-text snippet **in memory only** for the relevance filter; `Item.record()` (what goes to `data/items/`) never contains it and `repr()` doesn't show it. Nieuwsblad Transport's two feeds are merged, the same link counted once. Tested on feeds we wrote ourselves (invented headlines, hard rule 13). `python -m haven.feeds` reads the real feeds once and prints headlines and links only.
+
+*Proposed by Claude, confirmed by the owner (1 Nov 2026, PR #53):*
+- **PIN gap check = "oldest dated notice in today's feed is newer than `previous_run`"**, where `previous_run` is when the previous morning run read the feeds. Equal = no gap. No previous run known (first run) = no check. Undated notices are ignored; no dated notice at all = no check. The collect step supplies `previous_run`, so **each run stores the time it read the feeds** (owner's decision, 1 Nov 2026, added to issue #11); the previous brief's `built_at` would be a few minutes too late and could hide a gap.
+- **The failure line reads "PIN notices to shipping: some notices may have been missed (feed rolled over)"** (source name + the spec's message), the same `{source, error}` shape as every other failure.
+- **Dates:** `<pubDate>` (RFC 822), else `<dc:date>` (ISO 8601), stored as ISO 8601 in Amsterdam time, whole seconds. A date **without a timezone is read as UTC** (RFC 5322 does the same for "-0000"; an unknown zone name such as "CET" is treated that way too, so it can be an hour off). An unreadable or missing date = `null`; the item is **still collected**; the filter then keeps it only if its link wasn't seen in the last 14 days (§5.4, owner's decision 1 Nov 2026, issue #12).
+- **Snippet:** HTML tags removed, entities decoded, whitespace collapsed, **at most 1,000 characters** (enough for the AI check, which reads headline + snippet only, §5.4, and keeps its cost low).
+- **Headlines** are cleaned the same way (HTML tags and double-escaped entities like `&amp;#8217;` come out right).
+- **Entries without a headline or an http(s) link are skipped**, with one failure line per feed saying how many, so a feed that changed format shows up the same morning. A `<guid>` is used as the link only if it is a permalink.
+- **Links:** relative links made absolute, `#fragment` removed. No other clean-up (no tracking-parameter stripping): duplicates are found by exact link.
+- **RSS 2.0 only.** An Atom feed, an HTML page (e.g. a bot-check page) or RSS without `<channel>` is a failure naming what was found. All five feeds are RSS 2.0 (checked 1 Nov 2026).
+- **XML with the standard library** (`xml.etree.ElementTree`), no new dependency; a feed that **declares its own XML entities is refused** (real feeds don't need them; it's how a small file is made to expand into a huge one).
+- **An unexpected error in our own parsing is caught too** and recorded as `"<url>: unexpected error (<type>: <message>)"`, so a bug on one odd feed can't stop the morning run (hard rule 9). The message is visible on the page, so the bug isn't hidden.
+- **The AI opt-out note** from the fetcher goes into that source's failures, without repeating the source name (the page already shows it).
+- **Stored item fields** (`Item.record()`): `source` (id), `headline`, `url`, `published`, `language`, `access`. The collect step (issue #11) adds the filter decision and later steps the AI output (§6.1).
+
+Live smoke run (1 Nov 2026, from a desktop): all five feeds read with no failures: PIN 10 items, Nieuwsblad Transport 19 (two feeds merged), PortsEurope 10, The Loadstar 10, RTV Rijnmond 50.
+
 **Article text (hard rule 13).** For **use** sources the collector opens the article page and passes up to ~6,000 characters to the summariser **in memory**; the text is then discarded. Headline-only sources: no article page is fetched at all. `data/items/` stores headline, URL, dates, source, language, filter decision and AI output, **never article text or feed snippets**.
 
 **Feeds that roll over before 06:45**
@@ -581,7 +601,7 @@ Next to the brief, the pipeline keeps the raw material, so nothing it saw is los
 
 | File | Contents |
 |---|---|
-| `data/items/YYYY-MM-DD.jsonl` | **JSON Lines**: one line per item collected that morning, kept *and* dropped, with its filter decision (`"filter": {kept, stage, reason}`, §5.4). Other fields: decided with the collector. |
+| `data/items/YYYY-MM-DD.jsonl` | **JSON Lines**: one line per item collected that morning, kept *and* dropped, with its filter decision (`"filter": {kept, stage, reason}`, §5.4). Collected fields (§5.8, issue #9; confirmed by the owner 1 Nov 2026, PR #53): `source` (id), `headline`, `url`, `published`, `language`, `access`. |
 | `data/status/YYYY-MM-DD.json` | Every status reading taken that morning (value, level, observed time, source), including failed readings as `null`. |
 
 Rules:
