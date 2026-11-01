@@ -341,7 +341,7 @@ Question it answers per item: *is this relevant to a logistics planner working w
 **Stage 1: rules (free, predictable)**
 - Drop duplicates of items already stored in the last ~14 days.
 - Drop items published more than ~48 h before the run.
-  - **Items with no readable date** (§5.8): kept only if their link wasn't seen in the last 14 days. *(Decided by the owner, 1 Nov 2026, issue #12.)* *Claude's reading, not yet confirmed by the owner:* "kept" means not dropped for age; the word lists and stage 2 still apply, and the 14-day link check is the same as the duplicate check above.
+  - **Items with no readable date** (§5.8): kept only if their link wasn't seen in the last 14 days. *(Decided by the owner, 1 Nov 2026, issue #12.)* *Claude's reading, confirmed by the owner (1 Nov 2026):* "kept" means not dropped for age; the word lists and stage 2 still apply, and the 14-day link check is the same as the duplicate check above.
 - Drop items matching an off-topic word list (e.g. football, crime unrelated to port operations, housing). The word lists live in the config file so they can be tuned without touching code.
 - **Auto-keep** items from the Rotterdam-specific sources listed in §4 (Port Authority news, ECT): they skip stage 2.
 
