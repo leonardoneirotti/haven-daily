@@ -94,7 +94,7 @@ def store_brief(tmp_path, day, build):
 def run(tmp_path, sources, results, today=TODAY):
     collectors = FakeCollectors(results)
     fetcher, _ = fetcher_for()
-    result = run_collect(sources, fetcher, today=today, data_dir=tmp_path, now=lambda: NOW, collect_source=collectors)
+    result = run_collect(sources, fetcher, today=today, data_dir=tmp_path, now=lambda: NOW, collector=collectors)
     return result, collectors
 
 

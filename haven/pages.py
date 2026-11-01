@@ -42,10 +42,8 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 
 from haven.clock import AMSTERDAM
 from haven.config import Source
-from haven.feeds import SNIPPET_MAX, FeedResult, Item
+from haven.feeds import ARTICLE_TEXT_MAX, SNIPPET_MAX, FeedResult, Item
 from haven.fetch import Fetcher, FetchError
-
-ARTICLE_TEXT_MAX = 6000  # characters of article text kept in memory for the summariser (spec §5.8)
 
 KN_SOURCE_ID = "kn-seanews"
 KN_WEEKLY_PREFIX = "port operational updates"  # headline of K+N's weekly roundup, lower case
