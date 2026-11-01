@@ -21,7 +21,7 @@ static/basemap.js         port land shapes + place names (generated, see below)
 static/vendor/leaflet/    Leaflet 1.9.4, self-hosted
 tools/build_basemap.py    builds the basemap from OpenStreetMap (run once)
 data/basemap/             basemap output as GeoJSON
-data/sample/briefs/       three SAMPLE briefs (fake content, clearly marked on every page)
+data/sample/briefs/       four SAMPLE briefs (fake content, clearly marked on every page)
 site/                     output, not committed (GitHub Actions will build it)
 ```
 
@@ -62,11 +62,11 @@ It downloads coastlines and water areas, and separately roads, railways, breakwa
 | `corrections[]` | `{at, note}` for every hand-made fix after publishing, `[]` if none. The page shows "Corrected HH:MM" (latest one) and lists every note under "How this brief was made" |
 | `sample` | `true` shows the "Sample data" note |
 | `status[]` | Status indicators: `key`, `label`, `icon`, `value` (number, text or `null` = no data), `unit`, `place`, `level` (`green`/`amber`/`red`/`null`), `observed_at`, `source_name`, `source_url`, optional `gauge_max`, `note` |
-| `items[]` | `severity` (`high`/`medium`/`low`), `headline`, `url`, `source`, `language`, `published`, `summary`, `impact` (`null` = "Not enough information"), `affects[]`, optional `access: "headline-only"` for paywalled sources, optional `map: {lat, lon, label}` to pin the item on the chart |
+| `items[]` | `severity` (`high`/`medium`/`low`, or `null` = unrated: the AI failed, headline + link only), `headline`, `url`, `source`, `language`, `published`, `summary`, `impact` (`null` = "Not enough information"), `affects[]`, optional `access: "headline-only"` for paywalled sources, optional `map: {lat, lon, label}` to pin the item on the chart |
 | `ships` | AIS snapshot, or `null` when it failed: `snapshot_start`, `snapshot_end`, `source_name`, `vessels[]` with `name`, `type` (`container`/`tanker`/`bulk`), `flag`, `lat`, `lon`, `heading`, `status` (`underway`/`moored`/`anchored`), `speed_kn`, `length_m`, `area`, `destination_raw` (as typed on board), `destination` (cleaned, `null` = unknown), optional `news_item` (item number) |
-| `build` | `sources_checked`, `items_collected`, `items_kept`, `failures[]` (`source`, `error`) |
+| `build` | `sources_checked`, `items_collected`, `items_kept`, `failures[]` (`source`, `error`), optional `ai_unavailable: true` on a reduced brief (shows "The AI step was unavailable this morning") |
 
-The renderer sorts items by severity, keeps at most 5, works out "change since yesterday" from the previous brief, builds the "Read in English" link for non-English items and prepares the chart data.
+The renderer sorts items by severity (unrated last), keeps at most 5, works out "change since yesterday" from the previous brief, builds the "Read in English" link for non-English items and prepares the chart data.
 
 ## Design decisions (short version)
 
