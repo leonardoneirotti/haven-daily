@@ -314,3 +314,21 @@ def test_broken_line_in_items_file_names_file_and_line(tmp_path):
     path.write_bytes(b'{"headline": "A"}\n{"headline": \n')
     with pytest.raises(storage.StorageError, match=r"2026-11-02\.jsonl, line 2"):
         storage.read("items", DAY, tmp_path)
+
+
+# --- first day with a file (issue #11: K+N 14-day check) ----------------------------------
+
+
+def test_first_day_is_the_oldest_day_with_a_file(tmp_path):
+    assert storage.first_day("items", data_dir=tmp_path) is None  # nothing written yet
+    storage.write("items", date(2026, 11, 5), [], data_dir=tmp_path)
+    storage.write("items", date(2026, 11, 3), [item()], data_dir=tmp_path)
+    storage.write("status", date(2026, 10, 1), {"x": 1}, data_dir=tmp_path)  # other kinds don't count
+    (tmp_path / "items" / "notes.txt").write_text("hand-made file", encoding="utf-8")
+    (tmp_path / "items" / "2026-13-40.jsonl").write_text("", encoding="utf-8")  # not a real date
+    assert storage.first_day("items", data_dir=tmp_path) == date(2026, 11, 3)
+
+
+def test_first_day_checks_the_kind(tmp_path):
+    with pytest.raises(ValueError):
+        storage.first_day("ships", data_dir=tmp_path)

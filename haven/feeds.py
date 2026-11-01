@@ -12,6 +12,9 @@ language and access ("full" or "headline-only"). What may be kept depends on the
 - **full** (`use` sources): the feed's `description` is kept as a short plain-text
   `snippet` **in memory only**, for the relevance filter (spec §5.4). `Item.record()`, the
   dict that goes into data/items/, never contains it, and `repr()` doesn't show it.
+  PIN's description is the whole notice, not a teaser, so it is also kept (up to 6,000
+  characters, in memory only) as the item's `article_text` for the summariser: no notice
+  page needs to be opened (`FULL_TEXT_FEEDS`, issue #11).
 
 A `use` source that opts out of AI use this morning (robots.txt, `haven/fetch.py`) is read
 as headline-only, with a note in the failures so the owner updates SOURCES.md.
@@ -45,6 +48,10 @@ from haven.fetch import Fetcher, FetchError
 PIN_SOURCE_ID = "pin-notices"
 GAP_MESSAGE = "some notices may have been missed (feed rolled over)"
 SNIPPET_MAX = 1000  # characters of feed text kept in memory for the relevance filter
+ARTICLE_TEXT_MAX = 6000  # characters of article text kept in memory for the summariser (spec §5.8)
+# Feeds whose description is the whole text, not a teaser (checked 1 Nov 2026): the article text
+# comes from the feed, so no article page is opened for them (spec §5.8, issue #11).
+FULL_TEXT_FEEDS = frozenset({PIN_SOURCE_ID})
 
 _DC = "{http://purl.org/dc/elements/1.1/}"
 _ENTITY_DECLARATION = re.compile(rb"<!ENTITY", re.IGNORECASE)
@@ -68,6 +75,7 @@ class Entry:
     url: str
     published: str | None  # ISO 8601 in Amsterdam time, or None if the feed gives no readable date
     snippet: str | None = field(default=None, repr=False)
+    text: str | None = field(default=None, repr=False)  # the whole description, up to ARTICLE_TEXT_MAX
 
 
 @dataclass(frozen=True)
@@ -163,6 +171,7 @@ def collect_feed(source: Source, fetcher: Fetcher, previous_run: datetime | None
                     language=source.language,
                     access="full" if full else "headline-only",
                     snippet=entry.snippet if full else None,
+                    article_text=entry.text if full and source.id in FULL_TEXT_FEEDS else None,
                 )
             )
 
@@ -213,10 +222,12 @@ def parse_feed(body: bytes, feed_url: str, with_snippet: bool) -> ParsedFeed:
         if not headline or not url:
             skipped += 1
             continue
-        snippet = None
+        snippet = text = None
         if with_snippet:
-            snippet = _plain(element.findtext("description") or "")[:SNIPPET_MAX].rstrip() or None
-        entries.append(Entry(headline=headline, url=url, published=_published(element), snippet=snippet))
+            description = _plain(element.findtext("description") or "")
+            snippet = description[:SNIPPET_MAX].rstrip() or None
+            text = description[:ARTICLE_TEXT_MAX].rstrip() or None
+        entries.append(Entry(headline=headline, url=url, published=_published(element), snippet=snippet, text=text))
     return ParsedFeed(entries=entries, skipped=skipped)
 
 

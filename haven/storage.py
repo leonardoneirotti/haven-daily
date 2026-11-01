@@ -121,6 +121,23 @@ def read_recent(kind: str, before: date, days: int, data_dir: Path = DATA_DIR) -
     return found
 
 
+def first_day(kind: str, data_dir: Path = DATA_DIR) -> date | None:
+    """The oldest day that has a `kind` file, or None if there is none yet.
+
+    For items this is the day of the first collect run (the K+N 14-day check, spec §5.8).
+    Files whose name isn't a real date (a hand-made note) are ignored.
+    """
+    if kind not in _EXTENSIONS:
+        raise ValueError(f"unknown kind {kind!r} (allowed: {', '.join(_EXTENSIONS)})")
+    days = []
+    for file in (Path(data_dir) / kind).glob(f"*{_EXTENSIONS[kind]}"):
+        try:
+            days.append(date.fromisoformat(file.name.removesuffix(_EXTENSIONS[kind])))
+        except ValueError:
+            continue
+    return min(days, default=None)
+
+
 # --- checks and format --------------------------------------------------------
 
 
