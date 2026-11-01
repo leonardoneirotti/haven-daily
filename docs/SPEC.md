@@ -265,7 +265,8 @@ data/items/            every collected item, one .jsonl file per day (§6.1)
 data/status/           every status reading, one .json file per day (§6.1)
 design/logo-concepts/  generated logo explorations
 site/                  output, not committed (Actions builds it)
-CLAUDE.md, SOURCES.md, BUILD_PLAN.md, README.md
+CLAUDE.md, SOURCES.md, README.md
+BUILD_PLAN.md          pointer only: the plan is the GitHub issues + §10
 requirements.txt       jinja2>=3.1,<4, tzdata (time zone rules; Windows has none built in)
 requirements-dev.txt   + pytest, + shapely>=2.0,<3 (only for the basemap tool)
 .gitignore             .venv/, __pycache__/, *.pyc, osm caches, site/
@@ -315,7 +316,7 @@ python -m venv .venv
 - Icons: inline Lucide SVG paths (ISC licence) in a Python dict.
 - Publication line (§2.3) from `built_at` + `corrections` (`publication_line()`, tested); a missing `corrections` field counts as `[]`. Correction notes are listed under "How this brief was made", oldest first. *(Built 1 Nov 2026, issue #5.)*
 
-*Claude's defaults for the publication line, not yet confirmed by the owner (issue #5):*
+*Proposed by Claude, confirmed by the owner (1 Nov 2026, PR #49):*
 - The "latest" correction is the one with the **latest `at` time**, not the last one in the list, so a hand edit that adds a note in the wrong place still shows the right time.
 - Times are **converted to Amsterdam time** before showing HH:MM (the line says "Amsterdam time"); a timestamp **without a timezone is refused**, like the clock helper (§5.2.1).
 - A correction made **on a later day** than the build shows its date too: "Corrected 30 Oct 10:02", so a fix a week later doesn't look like a same-morning one.
@@ -804,7 +805,7 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 
 ## 11. Open items and before launch
 
-- ~~Code still on the old review model~~ **Done 1 Nov 2026 (issue #5):** renderer, day and Method templates, README field table, `BUILD_PLAN.md` step 9 and the sample briefs now use `built_at` + `corrections` (the 29 Oct sample has one correction).
+- ~~Code still on the old review model~~ **Done 1 Nov 2026 (issue #5):** renderer, day and Method templates, README field table and the sample briefs now use `built_at` + `corrections` (the 29 Oct sample has one correction; sample build times moved after 06:45). `BUILD_PLAN.md` is now only a pointer to the GitHub issues and §10.
 - Check `havendaily.nl` availability; buy once the first version works.
 - Test every candidate source (§4) before building on it.
 - Summariser model: run the Haiku 5.5 vs Sonnet 5.5 comparison on the first real run, write `docs/model-comparison.md` (§5.5).
