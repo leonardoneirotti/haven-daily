@@ -248,7 +248,8 @@ haven/                 Python package
   fetch.py             polite HTTP layer every collector uses: user agent, robots.txt, AI opt-outs, delays (§5.8)
   feeds.py             RSS collectors: common item shape, headline-only text never read, PIN gap check (§5.8)
   pages.py             HTML list collectors: same item shape, K+N Rotterdam paragraph only (§5.8)
-  (collect.py, filter.py, summarise.py, status.py, ais.py — to build)
+  collect.py           collect step: every source, duplicates, feed read time, K+N 14-day check, article text (§5.8)
+  (filter.py, summarise.py, status.py, ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
   filter.toml          off-topic word lists per language (§5.4), empty to start
@@ -340,7 +341,7 @@ python -m venv .venv
 Question it answers per item: *is this relevant to a logistics planner working with the Port of Rotterdam?* Two stages, cheapest first. Only kept items go on to the summariser.
 
 **Stage 1: rules (free, predictable)**
-- Drop duplicates of items already stored in the last ~14 days.
+- Drop duplicates of items already stored in the last ~14 days. **Done once, in the collect step** (`haven/collect.py`, issue #11, §5.8), not again here: the filter only ever sees new links. So the 14-day link check for undated items (below) is already done by the time they reach the filter; #12 needs no second check.
 - Drop items published more than ~48 h before the run.
   - **The boundary:** an item exactly 48 h old is still kept; it is dropped only when it is *older* than 48 h. A test covers exactly 48 h. *(Decided by the owner, 1 Nov 2026, issue #12.)*
   - **Items with no readable date** (§5.8): kept only if their link wasn't seen in the last 14 days. *(Decided by the owner, 1 Nov 2026, issue #12.)* *Claude's reading, confirmed by the owner (1 Nov 2026):* "kept" means not dropped for age; the word lists and stage 2 still apply, and the 14-day link check is the same as the duplicate check above.
@@ -507,6 +508,25 @@ Live smoke run (1 Nov 2026, from a desktop): all five feeds read with no failure
 
 Live smoke run (1 Nov 2026, from a desktop): all five pages read with no failures: Port Authority 10 items, Contargo 5, ECT 12, Kuehne+Nagel 1 (the 21–27 Oct roundup; Rotterdam paragraph 458 characters, in memory only), NL Times 24. The first run reported two K+N cards "without a headline": the small featured cards use an `h3` with another class; fixed and tested before this PR.
 
+**Collect step (`haven/collect.py`, built 1 Nov 2026, issue #11).** `run_collect(sources, fetcher, today)` reads every `use` and `headline-only` source in config order with its collector (feeds or pages). One source failing never stops the others; even a crash inside a collector becomes a failure line (hard rule 9). It returns **today's new items in memory** plus the failures, `feeds_read_at`, and counts (sources read, items collected, duplicates); nothing is written here. The runner (#22) writes the day's items file once, after the filter and summariser have added their fields, and stores `feeds_read_at` in the brief (`build.feeds_read_at`, §6). `python -m haven.collect [--with-text]` runs it once and prints a table (source, access, published, headline; with `--with-text` only the number of characters of article text); it writes nothing.
+- **Duplicates, once, here:** an item whose link is in `data/items/` of the previous 14 days is not returned; the same link from two sources today counts once.
+- **K+N 14-day check** (owner's decision and details above): one failure line, *"no item collected in the last 14 days (weekly port update renamed, or the collector broken?)"*.
+- **Article text:** `add_article_text(items, sources, fetcher)` opens each `use` item's article page and keeps up to 6,000 characters of its text **in memory** (`Item.article_text`); headline-only items are never opened, and text that is already set (K+N, PIN) is never replaced.
+
+*Claude's defaults, not yet confirmed by the owner (1 Nov 2026, PR for issue #11):*
+- **Article pages are opened only for kept items**: the runner calls `add_article_text` after the relevance filter, which reads headline + snippet only (§5.4). Pages of items that are dropped anyway are never requested: fewer requests to publishers and less third-party text in memory.
+- **PIN's article text comes from its feed**, no notice page is opened: the feed description is the whole notice (checked 1 Nov 2026: 340 characters on the page, 342 in the feed, the same text apart from title and date). `FULL_TEXT_FEEDS` in `haven/feeds.py` lists such feeds; the others' descriptions are teasers and are not used as article text.
+- **Link normalisation for the duplicate check** (`url_key`): ignores `http`/`https`, upper/lower case in the host, a leading `www.`, the default port and a trailing `/`; keeps the path's case and the query string (`?id=123` can name the article). Tracking parameters are not stripped (as decided for the collectors above). Only used for comparing: the stored link is never changed.
+- **The same link from two sources today: the first source in config order wins.**
+- **`feeds_read_at` = the moment the run started reading the sources** (before the first request), not the moment PIN was read: an earlier time can only make the next day's gap check warn more, never less. `previous_run` = the value in the latest brief of the previous 14 days that has a readable one (with timezone); a brief without it is skipped for an older one (same reason); none = no gap check.
+- **Where the article text is read** (checked 1 Nov 2026): Port Authority `div.news-page`, Contargo `main div.text`, ECT the main block's `.field--name-body`; inside it, the paragraphs, list points and headings, without the Port Authority's header block (headline and date) and "more news" box, menus, footers and forms. A test keeps this list and the `use` sources in config in step.
+- **An article that can't be read** (fetch error, container missing = layout changed) is a failure line; **the item stays, without text**. What the summariser does with a `use` item without text is #15's decision.
+- **An article on a site that opts out of AI** (checked per article, since an article can sit on another host than its list) makes that item headline-only for the run, with a note, like the source-level check (hard rule 12).
+- **A broken stored items file** (hand edit) is a failure line, *"Duplicate check: …, line N: not valid JSON …; that day's links are not checked"*, and the run goes on: at worst an item comes back once, visibly.
+- **Stored item fields:** the collect step adds none beyond the six collected fields (§6.1); the feed read time is stored once per run in the brief, not on every item line.
+
+Live smoke run (1 Nov 2026, from a desktop, `--with-text`): 10 sources read, 151 items, 0 duplicates (no stored days yet), **no failures**, repo unchanged after the run. All 38 `use` items got text: Port Authority 10 (median 3,715 characters, longest capped at 6,000), PIN 10 (from the feed, median 684), Contargo 5 (median 539), ECT 12 (median 2,044), K+N 1 (Rotterdam paragraph, 458). All 113 headline-only items: no text.
+
 **Article text (hard rule 13).** For **use** sources the collector opens the article page and passes up to ~6,000 characters to the summariser **in memory**; the text is then discarded. Headline-only sources: no article page is fetched at all. `data/items/` stores headline, URL, dates, source, language, filter decision and AI output, **never article text or feed snippets**.
 
 **Feeds that roll over before 06:45**
@@ -607,6 +627,7 @@ Examples: terminals (ECT Delta, Euromax, RWG, APMT Maasvlakte II…), areas (Maa
 | `items[].access` | `"headline-only"` for paywalled and AI-opt-out sources: `summary` and `impact` are `null`, severity, place, `affects` and `strike` taken from the headline only, shown as "rated from headline only" (§2.1) |
 | `items[].strike` | strike details or `null` (§5.7): `state` `announced`/`ongoing`/`cancelled`, `location`, `affects_rotterdam`, `start`/`end` (dates or `null`, never guessed), `match` `same`/`new`/`unsure`, `strike_id` (assigned by code) |
 | `items[].written_by` | which model wrote the summary and via which API: `{"model": "claude-…", "api": "batch" \| "standard"}` (§5.5) |
+| `build.feeds_read_at` | when this run started reading the sources (ISO 8601, Amsterdam time), from the collect step (§5.8). The next run passes it to the PIN gap check as `previous_run`. Not shown on the page. *(Issue #11.)* |
 | `build.summaries` | how many items were summarised in the batch vs fell back to the standard API with Haiku 5.5 |
 | `build.ai_unavailable` | `true` only on a **reduced brief** (§5.6): the AI was down until the last trigger, so all items are unrated and the page shows *"The AI step was unavailable this morning: headlines only, no summaries."* `false` otherwise; a missing field counts as `false`. *(Name proposed by Claude, confirmed by the owner 1 Nov 2026, PR #50.)* |
 | `items[].map.side` | `"left"` puts the label left of the number where the right is crowded |
@@ -623,12 +644,12 @@ Next to the brief, the pipeline keeps the raw material, so nothing it saw is los
 
 | File | Contents |
 |---|---|
-| `data/items/YYYY-MM-DD.jsonl` | **JSON Lines**: one line per item collected that morning, kept *and* dropped, with its filter decision (`"filter": {kept, stage, reason}`, §5.4). Collected fields (§5.8, issue #9; confirmed by the owner 1 Nov 2026, PR #53): `source` (id), `headline`, `url`, `published`, `language`, `access`. The HTML lists (issue #10) give the same fields; `published` is a timestamp, a date only (`"2026-10-30"`) when the page gives no time, or `null`. |
+| `data/items/YYYY-MM-DD.jsonl` | **JSON Lines**: one line per item collected that morning, kept *and* dropped, with its filter decision (`"filter": {kept, stage, reason}`, §5.4). Collected fields (§5.8, issue #9; confirmed by the owner 1 Nov 2026, PR #53): `source` (id), `headline`, `url`, `published`, `language`, `access`. The HTML lists (issue #10) give the same fields; `published` is a timestamp, a date only (`"2026-10-30"`) when the page gives no time, or `null`. The collect step (issue #11) adds no further fields; later steps add `filter` (§5.4) and the AI output (§5.5, §5.7, §5.10: e.g. `written_by`, `strike`, `unlisted`; exact names with the summariser, #15). Never `snippet` or `article_text` (in memory only, hard rule 13). |
 | `data/status/YYYY-MM-DD.json` | Every status reading taken that morning (value, level, observed time, source), including failed readings as `null`. |
 
 Rules:
 - **One file per day per kind, written once by the morning job, never rewritten by the pipeline.** A day's file only changes when the owner edits it by hand.
-- Duplicate check: the collector reads the item files of the last ~14 days.
+- Duplicate check: the collect step reads the item files of the previous 14 days (§5.8, issue #11).
 - Why not SQLite: a binary database can't be read in a git diff and gets stored whole again every day. Why not one big JSON file: it's rewritten every day, so diffs get noisy and it gets slower. Size estimate: ~50 KB/day, under 20 MB/year.
 - Later charts: a small script loads all files into SQLite or pandas. The files stay the source of truth.
 

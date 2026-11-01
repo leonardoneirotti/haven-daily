@@ -15,6 +15,7 @@ haven/storage.py          daily files in data/ (items, status, briefs): written 
 haven/fetch.py            polite HTTP for every collector: own user agent, robots.txt, AI opt-outs, delays, one retry
 haven/feeds.py            reads the RSS sources into one item shape; headline-only feed text is never read; PIN gap check
 haven/pages.py            reads the HTML news lists into the same item shape; K+N: only the Rotterdam paragraph of the weekly update
+haven/collect.py          the collect step: every source, 14-day duplicate check, feed read time, article text in memory only
 config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep
 config/filter.toml        off-topic word lists for the relevance filter (empty until tuning)
 tests/                    pytest tests; tests/test_repo_config.py keeps sources.toml and SOURCES.md in step
@@ -68,7 +69,7 @@ It downloads coastlines and water areas, and separately roads, railways, breakwa
 | `status[]` | Status indicators: `key`, `label`, `icon`, `value` (number, text or `null` = no data), `unit`, `place`, `level` (`green`/`amber`/`red`/`null`), `observed_at`, `source_name`, `source_url`, optional `gauge_max`, `note` |
 | `items[]` | `severity` (`high`/`medium`/`low`, or `null` = unrated: the AI failed, headline + link only), `headline`, `url`, `source`, `language`, `published`, `summary`, `impact` (`null` = "Not enough information"), `affects[]`, optional `access: "headline-only"` for paywalled sources, optional `map: {lat, lon, label}` to pin the item on the chart |
 | `ships` | AIS snapshot, or `null` when it failed: `snapshot_start`, `snapshot_end`, `source_name`, `vessels[]` with `name`, `type` (`container`/`tanker`/`bulk`), `flag`, `lat`, `lon`, `heading`, `status` (`underway`/`moored`/`anchored`), `speed_kn`, `length_m`, `area`, `destination_raw` (as typed on board), `destination` (cleaned, `null` = unknown), optional `news_item` (item number) |
-| `build` | `sources_checked`, `items_collected`, `items_kept`, `failures[]` (`source`, `error`), optional `ai_unavailable: true` on a reduced brief (shows "The AI step was unavailable this morning") |
+| `build` | `sources_checked`, `items_collected`, `items_kept`, `failures[]` (`source`, `error`), `feeds_read_at` (when the sources were read; the next run's PIN gap check uses it), optional `ai_unavailable: true` on a reduced brief (shows "The AI step was unavailable this morning") |
 
 The renderer sorts items by severity (unrated last), keeps at most 5, works out "change since yesterday" from the previous brief, builds the "Read in English" link for non-English items and prepares the chart data.
 
