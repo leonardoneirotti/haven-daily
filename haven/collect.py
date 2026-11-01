@@ -46,6 +46,7 @@ from haven.pages import KN_SOURCE_ID, collect_page
 DUPLICATE_DAYS = 14  # stored days whose links count as already seen (spec §5.4, §6.1)
 BRIEF_DAYS = 14  # how far back the previous run's feed read time is looked for
 KN_QUIET_DAYS = 14  # K+N must give an item within this many days (today included)
+UTM_PREFIX = "utm_"  # tracking parameters ignored by the duplicate check (owner's decision, 1 Nov 2026)
 
 DUPLICATE_CHECK = "Duplicate check"  # the `source` of failures in reading stored days
 KN_QUIET = "no item collected in the last 14 days (weekly port update renamed, or the collector broken?)"
@@ -151,19 +152,23 @@ def url_key(url: str) -> str:
     """The form in which two links are compared for the duplicate check.
 
     Ignored, because they don't change which page it is: `http` vs `https`, upper/lower case
-    in the host name, a leading `www.`, the default port, a trailing `/`. (The `#fragment` is
-    already removed by the collectors.) Kept, because they can: the path's case and the query
-    string (`?id=123` names the article on some sites). Tracking parameters are not stripped
-    (spec §5.8). The stored link itself is never changed; this is only for comparing.
+    in the host name, a leading `www.`, the default port, a trailing `/`, the `#fragment`, and
+    `utm_*` tracking parameters (any case). Kept, because they can: the path's case and every
+    other query parameter, as written and in their order (`?id=123` names the article on some
+    sites). The stored link itself is never changed; this is only for comparing.
     """
     parts = urlsplit(url.strip())
+    query = "&".join(
+        part for part in parts.query.split("&")
+        if part and not part.split("=", 1)[0].lower().startswith(UTM_PREFIX)
+    )
     host = (parts.hostname or "").lower().removeprefix("www.")
     try:
         port = parts.port
-    except ValueError:
-        return url.strip()
+    except ValueError:  # a malformed port: compare the link as written, still without fragment
+        return url.strip().split("#", 1)[0]
     key = (host if port in (None, 80, 443) else f"{host}:{port}") + parts.path.rstrip("/")
-    return f"{key}?{parts.query}" if parts.query else key
+    return f"{key}?{query}" if query else key
 
 
 def previous_feeds_read_at(today: date, data_dir=storage.DATA_DIR) -> datetime | None:
