@@ -244,6 +244,7 @@ haven/                 Python package
   config.py            reads and checks config/*.toml (§5.2.1)
   clock.py             "today"/"now" in Amsterdam time, clock injectable for tests
   env.py               loads a local .env (names only, never values)
+  storage.py           daily files in data/: write once, read one day or the last N days (§6.1)
   (collect.py, filter.py, summarise.py, status.py, ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
@@ -573,6 +574,21 @@ Rules:
 - Duplicate check: the collector reads the item files of the last ~14 days.
 - Why not SQLite: a binary database can't be read in a git diff and gets stored whole again every day. Why not one big JSON file: it's rewritten every day, so diffs get noisy and it gets slower. Size estimate: ~50 KB/day, under 20 MB/year.
 - Later charts: a small script loads all files into SQLite or pandas. The files stay the source of truth.
+
+**Storage module (`haven/storage.py`, built 1 Nov 2026, issue #7).** One small module writes and reads all three daily files (`items`, `status`, `briefs`):
+- **Write once:** the file is opened in "create only" mode, so writing a day that already exists fails (`AlreadyWrittenError`) and the file stays as it was. Everything is checked before the file is created, so a refused write leaves no half-written file that would block the retry.
+- **Stable format:** UTF-8, LF line endings, a newline at the end. Same data → byte-identical file.
+- **Hard rule 13 guard:** any field whose name contains the word `text`, `content`, `snippet` or `body` is refused, at any depth, and the error names the field but never repeats its value.
+- **Read helpers:** one day (`None` if the day has no file) and the last N days (newest first, missing days skipped).
+
+*Proposed by Claude, confirmed by the owner (1 Nov 2026, PR #51):*
+- **Keys are sorted alphabetically** in every file. Fully deterministic whatever order the code builds a dict in; the cost is that a brief file starts with `"build"` instead of `"date"`. List order is never changed (collection order is information). `.json` files are indented 2 spaces; `.jsonl` has one object per line.
+- **The last-N-days reader covers the N days *before* the given day, not that day itself**: the collector runs before today's file exists, so `read_recent("items", before=today, days=14)` = the 14 previous days.
+- **`description` is on the guard's word list too**: it's the RSS field that carries feed snippets. Words are matched whole (`article_text`, `contentSnippet` are caught; `context` is not). The guard checks all three kinds, not only items.
+- **A brief's `"date"` must match its file name**, so a brief can't be saved under the wrong day.
+- **A day with no collected items still gets an (empty) items file**: "nothing collected" is recorded, and the day stays write-once.
+- **NaN/Infinity are refused** (not valid JSON); "no data" is `null` (§2.2).
+- Reading tolerates hand edits: CRLF line endings and blank lines in a `.jsonl` file; a broken line is reported with file name and line number.
 
 ---
 
