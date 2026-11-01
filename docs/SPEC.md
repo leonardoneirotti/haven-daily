@@ -60,6 +60,7 @@ Owner: Leonardo Neirotti. Compiled 31 October 2026.*
 - For Dutch items: "Read in English" link.
 - Optional map pin so the item appears on the chart: the AI picks a place from a fixed list, the code adds `lat`, `lon`, `label` (§5.10). "Affects" tags also come from a fixed list (§5.10).
 - Paywalled sources: headline + link only ("Headline only. This source is paywalled, so there is no summary.").
+- **Headline-only items** (paywalled or AI opt-out, §3 rule 12, §4) still get a **severity, rated by the AI from the headline alone**, shown as **"rated from headline only"** next to the severity tag. No summary; impact stays `null` = "Not enough information". If that AI call fails, the item is unrated like any other. *(Decided by the owner, 1 Nov 2026.)*
 
 ### 2.2 Port status line
 
@@ -114,7 +115,7 @@ Each day page also shows: publication line ("Published 06:52 · Amsterdam time",
 9. If one source or step fails, the rest of the page still builds and the failure is shown on the page.
 10. Sample/fake data must be clearly marked on every page ("Sample data. The ships, news and readings on this page are invented to preview the design.").
 11. **A published brief is never changed silently.** Any change to a published brief's content adds an entry to its `corrections` list (§6), shown on the page.
-12. **Respect AI opt-outs.** If a source opts out of AI use (robots.txt blocks AI crawlers such as ClaudeBot/GPTBot, or signals like `ai-train=no`), only its **headline and link** are used, shown like a paywalled item. Its article text is never sent to an AI. The headline may still go through the AI relevance filter. *(Added 31 Oct 2026. Affects NL Times, Nieuwsblad Transport, PortsEurope, The Loadstar, TradeWinds, RTV Rijnmond as tested.)*
+12. **Respect AI opt-outs.** If a source opts out of AI use (robots.txt blocks AI crawlers such as ClaudeBot/GPTBot, or signals like `ai-train=no`), only its **headline and link** are used, shown like a paywalled item. Its article text is never sent to an AI. The headline may still go to the AI, for the relevance filter and to rate severity from the headline alone (§2.1); nothing else from the source does. *(Added 31 Oct 2026; severity from headline added 1 Nov 2026. Affects NL Times, Nieuwsblad Transport, PortsEurope, The Loadstar, TradeWinds, RTV Rijnmond as tested.)*
 13. **No third-party article text in the repo.** No article text or feed snippets are ever committed (the repo is public, so committing them would republish them). Text is fetched and used **in memory only**, for summarising, then discarded. The stored item keeps the URL, so the original can always be reopened. *(Added 31 Oct 2026.)*
 
 ---
@@ -125,7 +126,7 @@ Every candidate was tested for: feed or clean page, how much text, robots.txt, t
 
 **Verdicts**
 - **use** = headline + link + own-words AI summary.
-- **headline-only** = headline + link, shown like a paywalled item, no article text to any AI (the headline may go through the AI relevance filter).
+- **headline-only** = headline + link, shown like a paywalled item, no article text to any AI (the headline may go to the AI for the relevance filter and for a severity "rated from headline only", §2.1).
 - **drop** = not collected.
 
 **News sources**
@@ -333,7 +334,7 @@ The relevance filter (§5.4) uses the standard API: its output is needed before 
 
 ### 5.6 When the AI fails (decided 31 Oct 2026)
 
-**One item fails** (bad or unparseable response, refusal, timeout after the Haiku fallback): the item stays in the brief as **unrated**: headline + link, `severity: null`, no summary, no impact, and it is listed in `build.failures`. The other items continue normally. Unrated items sort after all rated ones and count toward the max of 5. *(Sorting rule: Claude's default, not yet confirmed by the owner.)*
+**One item fails** (bad or unparseable response, refusal, timeout after the Haiku fallback): the item stays in the brief as **unrated**: headline + link, `severity: null`, no summary, no impact, and it is listed in `build.failures`. The other items continue normally. Unrated items sort after all rated ones and count toward the max of 5. *(Sorting rule confirmed by the owner, 31 Oct 2026.)*
 
 **The AI is completely unavailable** (API down, key invalid; filter and summariser both fail):
 1. Treated like a crash: **no brief is written** and the run ends **failed**, so the owner gets a GitHub notification.
@@ -379,7 +380,7 @@ Stored on the item as `strike.match` (`same` / `new` / `unsure`) and `strike.str
 **Safety rule: a false alarm is better than a missed strike.**
 - Only a **confident** match can lower a strike's level. A cancellation clears a strike **only** on `"same"`.
 - On `"unsure"`, the earlier strike stays active, and the status line shows **both items** so the reader can judge ("Strike at Maasvlakte on 5 Nov · NL Times, 2 Nov ↗ · Possibly called off: NT, 4 Nov ↗").
-- An unsure item that would *raise* the level (e.g. `ongoing`) counts as a strike of its own. *(Claude's reading of the same rule, not yet confirmed by the owner.)*
+- An unsure item that would *raise* the level (e.g. `ongoing`) counts as a strike of its own. *(Confirmed by the owner, 31 Oct 2026.)*
 
 **4. Each strike's level, from its newest item** (only strikes with `affects_rotterdam: true`):
 
@@ -500,8 +501,8 @@ Examples: terminals (ECT Delta, Euromax, RWG, APMT Maasvlakte II…), areas (Maa
 | `corrections` | list of `{at, note}`, empty `[]` when the brief was never changed. Added by hand whenever a published brief's content is edited: `at` = time of the fix (Amsterdam), `note` = one line, what changed and why. The page shows "Corrected HH:MM" (latest entry) in the publication line and all notes under "How this brief was made". The morning job always writes `[]`. |
 | `status[].value` | number, text, or `null` = No data |
 | `items[].impact` | `null` → "Not enough information in the source to judge the impact." |
-| `items[].severity` | `"high"` / `"medium"` / `"low"`, or `null` = **unrated** (AI step failed for this item; `summary` and `impact` are `null` too, §5.6) |
-| `items[].access` | `"headline-only"` for paywalled sources |
+| `items[].severity` | `"high"` / `"medium"` / `"low"`, or `null` = **unrated** (AI step failed for this item; `summary` and `impact` are `null` too, §5.6). `null` means **only** "the AI failed". For a headline-only item a non-null severity was rated from the headline alone (§2.1). |
+| `items[].access` | `"headline-only"` for paywalled and AI-opt-out sources: `summary` and `impact` are `null`, severity rated from the headline only and shown as "rated from headline only" (§2.1) |
 | `items[].strike` | strike details or `null` (§5.7): `state` `announced`/`ongoing`/`cancelled`, `location`, `affects_rotterdam`, `start`/`end` (dates or `null`, never guessed), `match` `same`/`new`/`unsure`, `strike_id` (assigned by code) |
 | `items[].written_by` | which model wrote the summary and via which API: `{"model": "claude-…", "api": "batch" \| "standard"}` (§5.5) |
 | `build.summaries` | how many items were summarised in the batch vs fell back to the standard API with Haiku 5.5 |
@@ -775,12 +776,14 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 - Test every candidate source (§4) before building on it.
 - Summariser model: run the Haiku 5.5 vs Sonnet 5.5 comparison on the first real run, write `docs/model-comparison.md` (§5.5).
 - **After the first week of daily runs: check real AI costs** in the Anthropic Console against the §5.4 estimates.
-- **MeteoAlarm daily snapshot:** email **meteoalarm@geosphere.at** asking whether a daily, dated snapshot (06:45, labelled "not live", linking to meteoalarm.org) is allowed, given the ≤ 10 min real-time requirement for operational use. **The owner sends it.** Keep the reply in `docs/permissions/`. If refused: switch to KNMI directly sooner, or weather = "No data".- **Switch weather warnings to KNMI directly** once `KNMI-public-weather-warnings` leaves TEST (check monthly); register a free KNMI key then.
-- **Barge low-water surcharge table:** find whether a barge operator (e.g. Contargo) publishes a Kaub-based low-water surcharge table. If so, use its first step as the Rhine **Watch** level (instead of GlW 77 cm), citing that table on the Method page.
+- **MeteoAlarm daily snapshot:** email **meteoalarm@geosphere.at** asking whether a daily, dated snapshot (06:45, labelled "not live", linking to meteoalarm.org) is allowed, given the ≤ 10 min real-time requirement for operational use. **The owner sends it.** Keep the reply in `docs/permissions/`. If refused: switch to KNMI directly sooner, or weather = "No data".
+- **Switch weather warnings to KNMI directly** once `KNMI-public-weather-warnings` leaves TEST (check monthly); register a free KNMI key then.
+- **Barge low-water surcharge table:** Claude researches (owner's decision, 31 Oct 2026): find whether a barge operator (e.g. Contargo) publishes a Kaub-based low-water surcharge table. If so, use its first step as the Rhine **Watch** level (instead of GlW 77 cm), citing that table on the Method page.
 - **Before launch, find and check the terms of Kuehne+Nagel SeaNews and RTV Rijnmond** (§4). Downgrade K+N to headline-only, or drop either, if their terms forbid our use.
 - **Permission emails to NL Times and RTV Rijnmond:** Claude drafts one short email per publisher (what Haven Daily is, non-commercial portfolio project, what we'd do with their articles: a 2-line own-words AI summary + link, never the text itself, and that we respect their AI opt-out until they say yes). **The owner sends them.** Both stay headline-only (hard rule 12) unless a publisher replies yes in writing; keep the reply in `docs/permissions/`.
 - **Design addition: the unrated item** (§2.1, §5.6). Needs a look for the numbered square (e.g. outlined, no fill, in `--nodata-ink`), an "UNRATED" tag, the card without summary/impact, the reduced-brief note, and the archive strip. Renderer must accept `severity: null`.
 - Finalise Rhine thresholds and weather thresholds from public sources (Method page).
+- **Design usability review before launch** (added 31 Oct 2026): the design looks good but doesn't feel user-friendly enough, and the owner can't yet say why. First find the concrete problems: review the pages as a first-time visitor (a planner and a recruiter, on a phone and on a laptop), list what they understand in 5 seconds and what confuses them, then propose changes. **Nothing is implemented until the owner approves the proposals.** The new logo and the social preview tags come after this review.
 - Self-host the IBM Plex font files (`static/fonts/`) instead of Google Fonts, to avoid sending EU visitors' IP addresses to Google.
 - Check aisstream.io terms for public display.
 - New logo (§7.6) and a social preview image (§7.7); add `og:image` / `og:title` / `og:description` meta tags.
