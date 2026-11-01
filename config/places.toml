@@ -1,0 +1,393 @@
+# Haven Daily: the fixed place list (gazetteer) for map pins (spec §5.10).
+#
+# The summariser picks ONE place id from this list, or "none". The code then adds
+# the coordinates, label and label side to the item (items[].map), so the AI never
+# writes a coordinate. A place it names that is not here is dropped from the item
+# and logged on the item's line in data/items/ ("unlisted"), for the owner to review.
+#
+# Fields:
+#   id     what the AI answers (lowercase letters, digits and -; never "none")
+#   label  shown on the chart, and usable as an "affects" location tag
+#   kind   terminal / area / anchorage / lock / barrier / bridge / fairway
+#   lat, lon  taken ONCE from OpenStreetMap (Overpass, 2 Nov 2026): the centre of the
+#          element named in `osm` (a node's own position). Never from the AI.
+#   side   "right" or "left" of the pin number; "left" where the right is crowded
+#   osm    the OpenStreetMap element the coordinates come from (node/way/relation + id),
+#          so anyone can check it on https://www.openstreetmap.org/<osm>
+# Every place must lie inside the chart sheet (51.74, 3.40, 52.16, 4.62; spec §8.1).
+# Read and checked by haven/config.py; used by haven/places.py.
+# Map data © OpenStreetMap contributors (ODbL).
+
+# ---------- Terminals ----------
+
+[[place]]
+id = "ect-delta"
+label = "ECT Delta"
+kind = "terminal"
+lat = 51.9543
+lon = 4.0293
+side = "right"
+osm = "way/145614140"
+
+[[place]]
+id = "euromax"
+label = "Euromax"
+kind = "terminal"
+lat = 51.9771
+lon = 4.0331
+side = "right"
+osm = "way/597875321"
+
+[[place]]
+id = "rwg"
+label = "RWG"
+kind = "terminal"
+lat = 51.9527
+lon = 3.9850
+side = "left"
+osm = "way/598845434"
+
+[[place]]
+id = "apmt-mv2"
+label = "APMT Maasvlakte II"
+kind = "terminal"
+lat = 51.9505
+lon = 4.0068
+side = "left"
+osm = "way/599016100"
+
+[[place]]
+id = "mot"
+label = "Maasvlakte Olie Terminal"
+kind = "terminal"
+lat = 51.9727
+lon = 4.0624
+side = "right"
+osm = "relation/8404578"
+
+[[place]]
+id = "emo"
+label = "EMO"
+kind = "terminal"
+lat = 51.9411
+lon = 4.0535
+side = "right"
+osm = "way/145473873"
+
+[[place]]
+id = "ebs-europoort"
+label = "EBS Europoort"
+kind = "terminal"
+lat = 51.9508
+lon = 4.1247
+side = "right"
+osm = "way/144699195"
+
+[[place]]
+id = "po-europoort"
+label = "P&O Europoort"
+kind = "terminal"
+lat = 51.9451
+lon = 4.1299
+side = "right"
+osm = "way/144699200"
+
+[[place]]
+id = "stena-hvh"
+label = "Stena Line Hoek van Holland"
+kind = "terminal"
+lat = 51.9713
+lon = 4.1378
+side = "right"
+osm = "relation/14072136"
+
+[[place]]
+id = "cobelfret"
+label = "Cobelfret Rotterdam"
+kind = "terminal"
+lat = 51.8975
+lon = 4.2395
+side = "right"
+osm = "way/134895528"
+
+[[place]]
+id = "rst"
+label = "Rotterdam Shortsea Terminals"
+kind = "terminal"
+lat = 51.8794
+lon = 4.4261
+side = "right"
+osm = "way/152034546"
+
+# ---------- Port areas ----------
+
+[[place]]
+id = "maasvlakte"
+label = "Maasvlakte"
+kind = "area"
+lat = 51.9544
+lon = 4.0198
+side = "right"
+osm = "node/3052388502"
+
+[[place]]
+id = "maasvlakte-2"
+label = "Maasvlakte II"
+kind = "area"
+lat = 51.9552
+lon = 3.9837
+side = "left"
+osm = "relation/12447027"
+
+[[place]]
+id = "europoort"
+label = "Europoort"
+kind = "area"
+lat = 51.9329
+lon = 4.1736
+side = "right"
+osm = "node/3286698078"
+
+[[place]]
+id = "rozenburg"
+label = "Rozenburg"
+kind = "area"
+lat = 51.9056
+lon = 4.2415
+side = "right"
+osm = "node/1580050522"
+
+[[place]]
+id = "botlek"
+label = "Botlek"
+kind = "area"
+lat = 51.8758
+lon = 4.2618
+side = "right"
+osm = "node/5312148539"
+
+[[place]]
+id = "vondelingenplaat"
+label = "Vondelingenplaat"
+kind = "area"
+lat = 51.8869
+lon = 4.3541
+side = "right"
+osm = "node/5312148540"
+
+[[place]]
+id = "pernis"
+label = "Pernis"
+kind = "area"
+lat = 51.8891
+lon = 4.3877
+side = "right"
+osm = "node/2383268554"
+
+[[place]]
+id = "eemhaven"
+label = "Eemhaven"
+kind = "area"
+lat = 51.8866
+lon = 4.4036
+side = "right"
+osm = "way/972049357"
+
+[[place]]
+id = "waalhaven"
+label = "Waalhaven"
+kind = "area"
+lat = 51.8913
+lon = 4.4401
+side = "right"
+osm = "way/782692317"
+
+[[place]]
+id = "hoek-van-holland"
+label = "Hoek van Holland"
+kind = "area"
+lat = 51.9772
+lon = 4.1315
+side = "right"
+osm = "node/732807914"
+
+# ---------- Anchorages (North Sea) ----------
+
+[[place]]
+id = "anchorage-3-east"
+label = "3 East Anchorage"
+kind = "anchorage"
+lat = 52.0182
+lon = 3.5043
+side = "right"
+osm = "way/129970399"
+
+[[place]]
+id = "anchorage-4-west"
+label = "4 West Anchorage"
+kind = "anchorage"
+lat = 51.9016
+lon = 3.5265
+side = "right"
+osm = "way/499613374"
+
+[[place]]
+id = "anchorage-4-east"
+label = "4 East Anchorage"
+kind = "anchorage"
+lat = 51.9377
+lon = 3.7589
+side = "right"
+osm = "relation/10406117"
+
+[[place]]
+id = "anchorage-5-east"
+label = "5 East Anchorage"
+kind = "anchorage"
+lat = 52.1501
+lon = 3.6453
+side = "right"
+osm = "relation/10406116"
+
+[[place]]
+id = "anchorage-emergency"
+label = "Emergency Anchorage"
+kind = "anchorage"
+lat = 52.0295
+lon = 3.9306
+side = "right"
+osm = "way/755193783"
+
+# ---------- Locks ----------
+
+[[place]]
+id = "rozenburgsesluis"
+label = "Rozenburgsesluis"
+kind = "lock"
+lat = 51.8929
+lon = 4.2288
+side = "left"
+osm = "way/455107064"
+
+# ---------- Storm surge barriers ----------
+
+[[place]]
+id = "maeslantkering"
+label = "Maeslantkering"
+kind = "barrier"
+lat = 51.9548
+lon = 4.1632
+side = "right"
+osm = "relation/279919"
+
+[[place]]
+id = "hartelkering"
+label = "Hartelkering"
+kind = "barrier"
+lat = 51.8662
+lon = 4.3068
+side = "left"
+osm = "way/525209739"
+
+# ---------- Bridges (rail and road over the port's waterways) ----------
+
+[[place]]
+id = "botlekbrug"
+label = "Botlekbrug"
+kind = "bridge"
+lat = 51.8713
+lon = 4.3301
+side = "right"
+osm = "relation/18813227"
+
+[[place]]
+id = "calandbrug"
+label = "Calandbrug"
+kind = "bridge"
+lat = 51.9012
+lon = 4.2268
+side = "left"
+osm = "relation/18813485"
+
+# ---------- Fairways (sea approach to the city) ----------
+
+[[place]]
+id = "eurogeul"
+label = "Eurogeul"
+kind = "fairway"
+lat = 52.0092
+lon = 3.7356
+side = "right"
+osm = "node/1333828109"
+
+[[place]]
+id = "maasmond"
+label = "Maasmond"
+kind = "fairway"
+lat = 51.9853
+lon = 4.0664
+side = "right"
+osm = "way/1100926382"
+
+[[place]]
+id = "beerkanaal"
+label = "Beerkanaal"
+kind = "fairway"
+lat = 51.9591
+lon = 4.0850
+side = "right"
+osm = "way/41947487"
+
+[[place]]
+id = "calandkanaal"
+label = "Calandkanaal"
+kind = "fairway"
+lat = 51.9325
+lon = 4.1720
+side = "right"
+osm = "way/41923863"
+
+[[place]]
+id = "nieuwe-waterweg"
+label = "Nieuwe Waterweg"
+kind = "fairway"
+lat = 51.9681
+lon = 4.1272
+side = "left"
+osm = "relation/19274117"
+
+[[place]]
+id = "scheur"
+label = "Scheur"
+kind = "fairway"
+lat = 51.9237
+lon = 4.2430
+side = "right"
+osm = "relation/19268470"
+
+[[place]]
+id = "hartelkanaal"
+label = "Hartelkanaal"
+kind = "fairway"
+lat = 51.9024
+lon = 4.2088
+side = "left"
+osm = "relation/12216200"
+
+[[place]]
+id = "nieuwe-maas"
+label = "Nieuwe Maas"
+kind = "fairway"
+lat = 51.9041
+lon = 4.4686
+side = "right"
+osm = "relation/12711142"
+
+[[place]]
+id = "oude-maas"
+label = "Oude Maas"
+kind = "fairway"
+lat = 51.8474
+lon = 4.4957
+side = "right"
+osm = "relation/12218249"
