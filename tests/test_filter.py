@@ -4,15 +4,18 @@ Every item leaves the rules as **kept**, **dropped** or **to the AI check** (sta
 always with a reason. Rule order, first match wins:
 
 1. older than 48 h            -> dropped  (exactly 48 h is kept; a date-only item is aged
-                                           from the end of its day; no readable date = not
+                                           from the end of its day; a timestamp without a
+                                           timezone is Amsterdam time; no readable date = not
                                            dropped for age)
-2. off-topic word in headline -> dropped  (word lists from config/filter.toml, per language)
-3. auto-keep source           -> kept     (Port Authority news, ECT: skip stage 2)
+2. auto-keep source           -> kept     (Port Authority news, ECT: skip the word lists and
+                                           stage 2; owner's decision, 1 Nov 2026)
+3. off-topic word in headline -> dropped  (word lists from config/filter.toml, per language)
 4. anything else              -> to the AI check
 
 Headlines are invented (hard rule 13). No test touches the network.
 """
 
+from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -74,9 +77,9 @@ TABLE = [
      item(source="port-authority-news", published="2026-10-29T06:00:00+01:00"), DROP, "older than 48 h"),
     ("off-topic word",
      item(headline="Invented football club opens new stadium"), DROP, 'off-topic word "football"'),
-    ("off-topic word, auto-keep source: words come before auto-keep",
+    ("off-topic word, auto-keep source: auto-keep skips the word lists",
      item(source="port-authority-news", headline="Invented housing plan near the old harbour"),
-     DROP, 'off-topic word "housing"'),
+     KEEP, "Rotterdam-specific source (auto-keep)"),
     ("old and off-topic: the first rule gives the reason",
      item(headline="Invented football result", published="2026-10-20T12:00:00+01:00"), DROP, "older than 48 h"),
     ("no date: not dropped for age",
@@ -87,8 +90,8 @@ TABLE = [
      item(published=None, headline="Invented Champions League draw"), DROP, 'off-topic word "Champions League"'),
     ("unreadable date counts as no date",
      item(published="yesterday evening"), TO_AI, "not decided by the rules: goes to the AI check"),
-    ("timestamp without a timezone counts as no date",
-     item(published="2026-10-01T06:00:00"), TO_AI, "not decided by the rules: goes to the AI check"),
+    ("timestamp without a timezone is read as Amsterdam time, so the age rule applies",
+     item(published="2026-10-01T06:00:00"), DROP, "older than 48 h"),
     ("date in the future (clock or feed error): not dropped",
      item(published="2026-11-03T09:00:00+01:00"), TO_AI, "not decided by the rules: goes to the AI check"),
     ("Dutch word list for a Dutch item",
@@ -144,6 +147,33 @@ def test_the_end_of_day_counts_real_hours_across_the_clock_change():
     it = item(published="2026-10-24")
     assert decision_for(it, now=datetime(2026, 10, 26, 23, 0, tzinfo=AMSTERDAM)).outcome == TO_AI
     assert decision_for(it, now=datetime(2026, 10, 26, 23, 0, 1, tzinfo=AMSTERDAM)).outcome == DROP
+
+
+def test_a_timestamp_without_a_timezone_is_read_as_amsterdam_time():
+    # Owner's decision, 1 Nov 2026: 06:45 without a zone = 06:45 Amsterdam = exactly 48 h.
+    assert decision_for(item(published="2026-10-30T06:45:00")).outcome == TO_AI
+    assert decision_for(item(published="2026-10-30T06:44:59")).outcome == DROP
+    # Amsterdam, not UTC: read as UTC, 06:00 would be 07:00 Amsterdam and still be kept.
+    assert decision_for(item(published="2026-10-30T06:00:00")).outcome == DROP
+
+
+def test_a_timestamp_without_a_timezone_uses_summer_time_on_a_summer_date():
+    # 30 Jul 08:00 without a zone = 08:00 CEST (+02:00) = 06:00 UTC; the run is 1 Aug 08:00 CEST.
+    run = datetime(2026, 8, 1, 8, 0, tzinfo=AMSTERDAM)
+    assert decision_for(item(published="2026-07-30T08:00:00"), now=run).outcome == TO_AI
+    assert decision_for(item(published="2026-07-30T07:59:59"), now=run).outcome == DROP
+
+
+def test_an_auto_keep_source_skips_the_word_lists_but_not_the_age_rule():
+    # Owner's decision, 1 Nov 2026.
+    words = FilterConfig(off_topic={"en": ("football",)})
+    recent = item(source="port-authority-news", headline="Invented football pitch on the Maasvlakte")
+    old = replace(recent, published="2026-10-29T06:00:00+01:00")
+    other_source = replace(recent, source="contargo-news")
+    assert decision_for(recent, config=words).outcome == KEEP
+    assert decision_for(old, config=words) == decision_for(old, config=FilterConfig(off_topic={}))
+    assert decision_for(old, config=words).reason == "older than 48 h"
+    assert decision_for(other_source, config=words).reason == 'off-topic word "football"'
 
 
 def test_a_run_time_without_a_timezone_is_refused():
