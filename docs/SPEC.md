@@ -290,14 +290,18 @@ python -m venv .venv
 - **`tests/test_repo_config.py` keeps `config/sources.toml` and `SOURCES.md` in step**: same sources, verdicts and URLs, and only Port Authority news and ECT auto-keep (§4). Change both together.
 - **"Today" is the Amsterdam date** (`haven/clock.py`, `zoneinfo("Europe/Amsterdam")`), as the guard in §5.1.1 needs. Tested around midnight UTC and on both 2026 clock-change days.
 
-*Claude's defaults, not yet confirmed by the owner:*
+*Proposed by Claude, confirmed by the owner (1 Nov 2026, PR #47):*
 - `sources.toml` lists **news sources only**. The status-line endpoints (MeteoAlarm, PEGELONLINE, Rijkswaterstaat) are a different kind of source (no use/headline-only verdict, no items) and get their config when the status step is built.
 - **Dropped sources are listed** with a one-line `note` (why), for the record; they need no URL, access type or language and are never fetched.
 - A source has a **list of `urls`**, because Nieuwsblad Transport has two feeds (`/havens/feed/` and `/tag/rotterdam/feed/`, `SOURCES.md`). The collector will merge them and drop duplicates.
 - **Off-topic word lists are per language** (`en`, `nl`): Dutch headlines need Dutch words. An empty word is rejected (it would match every headline).
 - **Unknown fields are an error**, not ignored, so `auto_kep = true` can't quietly turn auto-keep off.
-- The clock helper **refuses a datetime without a timezone** instead of guessing which zone it is in.
 - **`.env` is read by a small standard-library loader** (`haven/env.py`), not python-dotenv: the format is only `NAME=value` lines. Variables already set win (so GitHub Actions secrets are never replaced), an empty value counts as not set (a fresh copy of `.env.example` means "no key"), and errors give the line number, never the line.
+
+*Claude's default, not yet confirmed by the owner:*
+- The clock helper **refuses a datetime without a timezone** instead of guessing which zone it is in.
+
+*Technical necessity (not a choice):*
 - **`tzdata` is a runtime dependency**: on Windows, `zoneinfo` has no time zone rules without it (found while building this; the Linux runner has them built in).
 
 ### 5.3 Renderer responsibilities (`haven/render.py`)
