@@ -4,3 +4,5 @@ beautifulsoup4>=4.12,<5
 # Time zone rules for zoneinfo ("today" in Amsterdam, haven/clock.py). Linux has
 # them built in; Windows doesn't, so without this the code fails on a laptop.
 tzdata>=2024.1
+# Claude API (Anthropic's official SDK, MIT): the relevance filter's AI check (haven/filter.py).
+anthropic>=2.3,<3
