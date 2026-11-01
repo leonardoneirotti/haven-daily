@@ -36,6 +36,10 @@ _Avoid_: Category, keyword, topic
 An item the relevance filter judged relevant (kept) or not (dropped) to a Rotterdam logistics planner. Dropped items are still stored.
 _Avoid_: Filtered, rejected, accepted
 
+**Auto-keep source**:
+A Rotterdam-specific source (Port Authority news, ECT) whose items the relevance filter keeps without the AI check, unless an earlier rule (age, off-topic word) drops them.
+_Avoid_: Trusted source, whitelist
+
 **Unrated item**:
 A kept item that appears with headline and link only, because no severity, summary or impact could be produced for it.
 _Avoid_: Unknown, unclassified, failed item

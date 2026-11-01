@@ -249,10 +249,11 @@ haven/                 Python package
   feeds.py             RSS collectors: common item shape, headline-only text never read, PIN gap check (§5.8)
   pages.py             HTML list collectors: same item shape, K+N Rotterdam paragraph only (§5.8)
   collect.py           collect step: every source, duplicates, feed read time, K+N 14-day check, article text (§5.8)
-  (filter.py, summarise.py, status.py, ais.py — to build)
+  filter.py            relevance filter: stage 1 rules (§5.4); stage 2 AI check to build (#13)
+  (summarise.py, status.py, ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
-  filter.toml          off-topic word lists per language (§5.4), empty to start
+  filter.toml          off-topic word lists per language (§5.4), small starter lists (football)
 tests/                 pytest; run with `python -m pytest` (settings in pytest.ini)
 templates/             base.html, day.html, archive.html, about.html, _macros.html
 static/
@@ -348,6 +349,22 @@ Question it answers per item: *is this relevant to a logistics planner working w
   - **Items with a date but no time** (Contargo, ECT, §5.8: `published` = `"2026-10-30"`): age counted from the **end of that day** (midnight at the start of the next day, Amsterdam time), so they are never dropped too early. *(Decided by the owner, 1 Nov 2026, issue #12.)*
 - Drop items matching an off-topic word list (e.g. football, crime unrelated to port operations, housing). The word lists live in the config file so they can be tuned without touching code.
 - **Auto-keep** items from the Rotterdam-specific sources listed in §4 (Port Authority news, ECT): they skip stage 2.
+
+**Rules module (`haven/filter.py`, built 1 Nov 2026, issue #12).** `apply_rules(items, sources, config, now)` gives every item one outcome with a reason: **kept** (auto-keep source), **dropped**, or **to the AI check** (stage 2, #13). The rules run in this order and the first that hits gives the reason:
+1. older than 48 h → dropped, `"older than 48 h"`;
+2. a word from the off-topic list of the item's language in the headline → dropped, `off-topic word "<word>"`;
+3. auto-keep source → kept, `"Rotterdam-specific source (auto-keep)"`;
+4. anything else → to the AI check, `"not decided by the rules: goes to the AI check"`.
+
+Kept and dropped items get `Item.filter` = `{"kept", "stage": "rules", "reason"}`, which `Item.record()` adds to the stored line; items for the AI check get theirs from stage 2. Ages are compared in UTC, so the clock change can't shift the 48 h by an hour (tested on 25 Oct 2026). Live smoke run (1 Nov 2026, 18:18, in memory, nothing written): 151 items → 1 kept (auto-keep), 104 dropped as older than 48 h, 46 to the AI check (38 of them RTV Rijnmond, 7 of those football).
+
+*Claude's defaults, not yet confirmed by the owner (1 Nov 2026, issue #12):*
+- **Age and words come before auto-keep**, so a three-day-old Port Authority story is dropped, and a word on the list drops it from every source, auto-keep too.
+- **The age is counted to the moment the sources were read** (`feeds_read_at` from the collect step, passed by the runner #22), not to the end of the run: an earlier moment can only keep an item longer.
+- **A timestamp without a timezone, an unreadable date or a date in the future** is not dropped for age (the first two count as "no readable date", §5.8; a future date is a feed or clock error, not an old item).
+- **Words are matched in the headline only** (not the snippet, which headline-only items don't have), ignoring case, as **whole words**, phrases allowed; a **`*` at the end** matches any ending ("voetbal*" → "voetbalclub"), because Dutch writes compounds as one word. `*` anywhere else is a config error. A `*` at the start ("*voetbal" for "profvoetballer") is not supported, to keep matching predictable.
+- **Starter lists: football only** (`football`, `Eredivisie`, `Feyenoord`; Dutch also `voetbal*`, `Excelsior`, `Sparta`): the most frequent noise in the live RTV Rijnmond headlines, and words that can't be about the port (the Feijenoord district is spelled differently). **Crime and housing stay with the AI check**: a word can't tell "stabbing in the city centre" from "drugs found in a container". A repo test checks that no list word hits an invented port headline.
+- **A source not in the config** is never auto-kept (its items go to the AI check).
 
 **Stage 2: AI check (borderline items only)**
 - Model: the cheapest suitable one, **Claude Haiku 5.5** (`claude-haiku-5-5`, $0.10 / $0.50 per million input/output tokens, Anthropic price list as of Oct 2026), low effort.
@@ -646,7 +663,7 @@ Next to the brief, the pipeline keeps the raw material, so nothing it saw is los
 
 | File | Contents |
 |---|---|
-| `data/items/YYYY-MM-DD.jsonl` | **JSON Lines**: one line per item collected that morning, kept *and* dropped, with its filter decision (`"filter": {kept, stage, reason}`, §5.4). Collected fields (§5.8, issue #9; confirmed by the owner 1 Nov 2026, PR #53): `source` (id), `headline`, `url`, `published`, `language`, `access`. The HTML lists (issue #10) give the same fields; `published` is a timestamp, a date only (`"2026-10-30"`) when the page gives no time, or `null`. The collect step (issue #11) adds no further fields; later steps add `filter` (§5.4) and the AI output (§5.5, §5.7, §5.10: e.g. `written_by`, `strike`, `unlisted`; exact names with the summariser, #15). Never `snippet` or `article_text` (in memory only, hard rule 13). |
+| `data/items/YYYY-MM-DD.jsonl` | **JSON Lines**: one line per item collected that morning, kept *and* dropped, with its filter decision (`"filter": {kept, stage, reason}`, §5.4). Collected fields (§5.8, issue #9; confirmed by the owner 1 Nov 2026, PR #53): `source` (id), `headline`, `url`, `published`, `language`, `access`. The HTML lists (issue #10) give the same fields; `published` is a timestamp, a date only (`"2026-10-30"`) when the page gives no time, or `null`. The collect step (issue #11) adds no further fields; the relevance filter adds `filter` (§5.4; `{kept, stage, reason}`, set by the rules for items they keep or drop, issue #12, and by the AI check for the rest, #13) and later steps the AI output (§5.5, §5.7, §5.10: e.g. `written_by`, `strike`, `unlisted`; exact names with the summariser, #15). Never `snippet` or `article_text` (in memory only, hard rule 13). |
 | `data/status/YYYY-MM-DD.json` | Every status reading taken that morning (value, level, observed time, source), including failed readings as `null`. |
 
 Rules:
