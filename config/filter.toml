@@ -1,10 +1,18 @@
 # Haven Daily: word lists for the rule stage of the relevance filter (spec §5.4).
 #
-# An item whose headline matches a word in the list for its source's language
-# is dropped as off-topic before any AI check (recorded as stage "rules").
-# Empty to start: words are added while tuning, after the first runs
-# (build plan step 10). Read and checked by haven/config.py.
+# An item whose headline contains a word from the list for its source's language
+# is dropped as off-topic before any AI check (recorded as stage "rules", reason
+# 'off-topic word "<word>"'). Matching ignores upper/lower case and finds whole
+# words only ("sport" doesn't match "transport"). A word may be a phrase
+# ("Champions League"). A * at the end matches any ending: "voetbal*" also finds
+# "voetbalclub" (Dutch compound words). Applies to every source, auto-keep too.
+#
+# Start small: only words that can't be about the port. Crime, housing and the
+# like stay with the AI check, because a word can't tell a port story from
+# another one. Add words while tuning (build plan step 10).
+# Read and checked by haven/config.py; used by haven/filter.py.
 
 [off_topic]
-en = []
-nl = []
+# Football: the clubs' names and the sport (most frequent noise on RTV Rijnmond).
+en = ["football", "Eredivisie", "Feyenoord"]
+nl = ["voetbal*", "Eredivisie", "Feyenoord", "Excelsior", "Sparta"]
