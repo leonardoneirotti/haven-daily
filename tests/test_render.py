@@ -84,7 +84,7 @@ def make_brief(**fields):
 
 def render_day(tmp_path, brief):
     briefs_dir = tmp_path / "briefs"
-    briefs_dir.mkdir()
+    briefs_dir.mkdir(parents=True)
     (briefs_dir / f"{brief['date']}.json").write_text(json.dumps(brief), encoding="utf-8")
     render.render_site(briefs_dir, tmp_path / "site")
     return (tmp_path / "site" / "days" / f"{brief['date']}.html").read_text(encoding="utf-8")

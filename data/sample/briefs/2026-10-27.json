@@ -56,6 +56,17 @@
       ]
     },
     {
+      "severity": null,
+      "headline": "Rail freight operator warns of slower Betuweroute services after signal fault",
+      "url": "https://example.com/betuweroute-signal-fault",
+      "source": "Sample source C",
+      "language": "en",
+      "published": "2026-10-27T05:55:00+01:00",
+      "summary": null,
+      "impact": null,
+      "affects": []
+    },
+    {
       "severity": "low",
       "headline": "Port area hydrogen pipeline enters its next construction phase",
       "url": "https://example.com/nl/waterstofleiding",
@@ -72,11 +83,15 @@
   "build": {
     "sources_checked": 9,
     "items_collected": 37,
-    "items_kept": 2,
+    "items_kept": 3,
     "failures": [
       {
         "source": "AIS snapshot",
         "error": "Connection closed after 2 minutes. The map shows no ships today."
+      },
+      {
+        "source": "Summariser",
+        "error": "No valid answer for one item, also after the Haiku fallback. It is shown unrated: headline and link only."
       }
     ]
   },

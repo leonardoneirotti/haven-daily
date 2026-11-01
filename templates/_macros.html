@@ -18,7 +18,8 @@
 </svg>
 {%- endmacro %}
 
-{# The numbered square used for an item in the list and on the chart. #}
+{# The numbered square used for an item in the list and on the chart.
+   severity is a severity key: high / medium / low / unrated (outlined, no fill). #}
 {% macro num(rank, severity) -%}
 <span class="num num-{{ severity }}" aria-hidden="true">{{ rank }}</span>
 {%- endmacro %}
@@ -63,8 +64,8 @@
 <li class="item" id="item-{{ rank }}" data-rank="{{ rank }}"{% if item.map %} data-place="{{ item.map.label }}"{% endif %}>
   <article aria-labelledby="item-{{ rank }}-title">
     <p class="item-top">
-      {{ num(rank, item.severity) }}
-      <span class="sev sev-{{ item.severity }}"><span class="visually-hidden">Severity: </span>{{ item.severity }}</span>
+      {{ num(rank, item.severity_key) }}
+      <span class="sev sev-{{ item.severity_key }}"><span class="visually-hidden">Severity: </span>{{ item.severity_key }}</span>
       <span class="item-meta">
         <span>{{ item.source }}</span>
         <span>{{ language_names[item.language] }}</span>
@@ -72,6 +73,11 @@
       </span>
     </p>
     <h3 class="item-title" id="item-{{ rank }}-title"><a href="{{ item.url }}">{{ item.headline }}</a></h3>
+    {% if item.severity is none %}
+    {# Unrated: the AI failed for this item, so there is nothing to interpret (spec §5.6). #}
+    <p class="item-summary is-empty">Headline only. The AI step failed for this item, so there is no summary, impact or severity. Read the original for the details.</p>
+    {% if item.affects %}<p class="affects"><strong>Affects</strong> {{ item.affects | join(" · ") }}</p>{% endif %}
+    {% else %}
     {% if item.summary %}
     <p class="item-summary">{{ item.summary }}</p>
     {% elif item.access == "headline-only" %}
@@ -88,6 +94,7 @@
       {% endif %}
       {% if item.affects %}<p class="affects"><strong>Affects</strong> {{ item.affects | join(" · ") }}</p>{% endif %}
     </div>
+    {% endif %}
     <p class="item-actions">
       {% if item.map %}
       <button type="button" class="chart-button needs-map" data-action="show-item" data-rank="{{ rank }}" aria-pressed="false">{{ icon("map-pin") }}Show on chart</button>
@@ -103,10 +110,17 @@
 
 {# Five slots, one per possible item: a day's severity at a glance. #}
 {% macro severity_strip(brief) -%}
-<span class="strip" role="img" aria-label="{{ brief['items'] | length }} items{% for s in severities if brief.counts[s] %}, {{ brief.counts[s] }} {{ s }}{% endfor %}">
-  {% for item in brief["items"] %}<span class="slot num-{{ item.severity }}">{{ loop.index }}</span>{% endfor %}
+<span class="strip" role="img" aria-label="{{ brief['items'] | length }} items{% for s in severity_keys if brief.counts[s] %}, {{ brief.counts[s] }} {{ s }}{% endfor %}">
+  {% for item in brief["items"] %}<span class="slot num-{{ item.severity_key }}">{{ loop.index }}</span>{% endfor %}
   {% for _ in range(max_items - brief["items"] | length) %}<span class="slot slot-empty"></span>{% endfor %}
 </span>
+{%- endmacro %}
+
+{# Shown on a reduced brief: the AI was down all morning (spec §5.6). #}
+{% macro reduced_note(brief) -%}
+{% if brief.build.ai_unavailable %}
+<p class="reduced-note">{{ icon("triangle-alert") }}<span>The AI step was unavailable this morning: headlines only, no summaries.</span></p>
+{% endif %}
 {%- endmacro %}
 
 {% macro status_marks(brief) -%}

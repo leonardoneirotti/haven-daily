@@ -226,6 +226,15 @@ html:not(.has-map) .needs-map,
 .num-high { background: var(--high); color: var(--on-high); }
 .num-medium { background: var(--medium); color: var(--on-medium); }
 .num-low { background: var(--low); color: var(--on-low); }
+/* Unrated (the AI failed for the item): outlined, no fill, in the "No data" grey of the
+   status line. Empty vs filled is the shape cue, so it never relies on colour alone.
+   An inset outline keeps the square the same size as the filled ones. */
+.num-unrated {
+  background: transparent;
+  color: var(--nodata-ink);
+  outline: 2px solid var(--nodata-ink);
+  outline-offset: -2px;
+}
 
 .sev {
   font-size: 0.75rem;
@@ -238,6 +247,7 @@ html:not(.has-map) .needs-map,
 .sev-high { color: var(--high-ink); }
 .sev-medium { color: var(--medium-ink); }
 .sev-low { color: var(--low-ink); }
+.sev-unrated { color: var(--nodata-ink); }
 
 .lvl {
   display: inline-flex;
@@ -955,6 +965,7 @@ html:not(.has-map) .needs-map,
 
 .pop-news.sev-high { border-left-color: var(--high); color: var(--on-cta); }
 .pop-news.sev-medium { border-left-color: var(--medium); color: var(--on-cta); }
+.pop-news.sev-unrated { border-left-color: var(--nodata-ink); color: var(--on-cta); }
 
 /* Place names: water in italic (the chart convention), land in spaced mono capitals
    like a map overlay, the city in condensed capitals */
@@ -1111,6 +1122,11 @@ html:not(.has-map) .needs-map,
   position: relative;
   box-shadow: 0 0 0 2px var(--bg);
   transition: transform 0.2s;
+}
+
+/* On the chart an unrated square sits on the page colour, so lines and ships don't show through it */
+.callout .num-unrated {
+  background: var(--bg);
 }
 
 .callout.is-hover .num,
@@ -1641,7 +1657,8 @@ td.ais-text {
 .corrections li,
 .failures li,
 .all-ok,
-.draft {
+.draft,
+.reduced-note {
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
@@ -1649,15 +1666,27 @@ td.ais-text {
 }
 
 .failures li,
-.draft { color: var(--medium-ink); }
+.draft,
+.reduced-note { color: var(--medium-ink); }
 .all-ok { color: var(--ok-ink); }
 
 .corrections .icon,
 .failures .icon,
 .all-ok .icon,
-.draft .icon {
+.draft .icon,
+.reduced-note .icon {
   position: relative;
   top: 0.15em;
+}
+
+/* "The AI step was unavailable this morning": under the publication line and above the brief */
+.panel-head .reduced-note {
+  margin-top: 0.6rem;
+  font-size: 0.875rem;
+}
+
+.brief-col .reduced-note {
+  margin-top: 1rem;
 }
 
 .day-nav {
