@@ -242,6 +242,19 @@ def test_a_broken_stored_day_is_a_failure_and_the_other_days_still_count(tmp_pat
     assert broken.name in failure["error"] and "line 2" in failure["error"]
 
 
+def test_a_broken_stored_items_file_is_never_overwritten_or_deleted(tmp_path):
+    """Owner's decision (1 Nov 2026): the run only reads stored days; the owner repairs them by hand."""
+    broken = storage.path("items", TODAY - timedelta(days=1), tmp_path)
+    broken.parent.mkdir(parents=True)
+    content = b'{"url": "https://a.test/news/2"}\r\n{not json\r\n'  # exact bytes of a hand edit, CRLF included
+    broken.write_bytes(content)
+    before = sorted(p.name for p in broken.parent.iterdir())
+    run(tmp_path, [src("a"), KN], {"a": ok(item("a", 2), item("a", 3))})
+    assert broken.exists()
+    assert broken.read_bytes() == content
+    assert sorted(p.name for p in broken.parent.iterdir()) == before  # nothing added, renamed or removed
+
+
 # --- feed read time and previous_run (PIN gap check) -------------------------------------
 
 
@@ -262,6 +275,31 @@ def test_no_earlier_brief_means_no_previous_run(tmp_path):
     assert previous_feeds_read_at(TODAY, data_dir=tmp_path) is None
     _, collectors = run(tmp_path, [src("a")], {})
     assert collectors.calls == [("a", None)]
+
+
+PIN = Source(id=PIN_SOURCE_ID, name="PIN notices to shipping", verdict="use", urls=("https://pin.test/rss.xml",),
+             access="rss", language="en")
+def gap_skipped():
+    return {"source": "PIN notices to shipping", "error": collect.GAP_CHECK_SKIPPED}
+
+
+def test_a_skipped_gap_check_is_recorded_as_a_note(tmp_path):
+    """Owner's decision (1 Nov 2026): no feed read time in 14 days of briefs -> say the check was skipped."""
+    store_brief(tmp_path, TODAY - timedelta(days=1), {"sources_checked": 9})  # a brief, but without the time
+    result, _ = run(tmp_path, [src("a"), PIN], {})
+    assert gap_skipped() in result.failures
+    assert "\n" not in collect.GAP_CHECK_SKIPPED
+
+
+def test_no_gap_note_when_a_previous_read_time_is_known(tmp_path):
+    store_brief(tmp_path, TODAY - timedelta(days=1), {"feeds_read_at": "2026-11-19T06:45:10+01:00"})
+    result, _ = run(tmp_path, [src("a"), PIN], {})
+    assert gap_skipped() not in result.failures
+
+
+def test_no_gap_note_while_pin_is_not_collected(tmp_path):
+    result, _ = run(tmp_path, [src("a"), replace(PIN, verdict="drop")], {})
+    assert gap_skipped() not in result.failures
 
 
 def test_a_brief_without_a_read_time_is_skipped_for_an_older_one(tmp_path):
@@ -441,6 +479,25 @@ def test_an_article_page_whose_layout_changed_is_a_failure_and_the_item_stays():
     fetcher, _ = fetcher_for({ECT_ARTICLE: html(page("<div class='redesign'><p>Invented</p></div>"))})
     result = add_article_text([use_item("ect-news", ECT_ARTICLE)], SOURCES, fetcher)
     assert result.items[0].article_text is None
+    assert result.failures == [{"source": "ECT news", "error": f"{ECT_ARTICLE}: {collect.NO_ARTICLE_TEXT}"}]
+
+
+@pytest.mark.parametrize(
+    "container",
+    [
+        '<div class="block-system-main-block"><div class="field--name-body"></div></div>',  # empty
+        '<div class="block-system-main-block"><div class="field--name-body"><p>  </p><p>&nbsp;</p></div></div>',  # whitespace
+        '<div class="block-system-main-block"><div class="field--name-body"><nav><p>Invented menu</p></nav>'
+        "<figure><p>Invented caption</p></figure></div></div>",  # only parts that are skipped
+        '<div class="block-system-main-block"><div class="field--name-body"><span>Invented loose text</span></div></div>',
+    ],
+)
+def test_a_container_with_no_readable_text_is_a_failed_read_and_the_item_stays(container):
+    """Owner's decision (1 Nov 2026): matched but empty counts as a failed read (decision 7)."""
+    fetcher, _ = fetcher_for({ECT_ARTICLE: html(page(container))})
+    result = add_article_text([use_item("ect-news", ECT_ARTICLE)], SOURCES, fetcher)
+    [kept] = result.items
+    assert kept.article_text is None and kept.access == "full"
     assert result.failures == [{"source": "ECT news", "error": f"{ECT_ARTICLE}: {collect.NO_ARTICLE_TEXT}"}]
 
 
