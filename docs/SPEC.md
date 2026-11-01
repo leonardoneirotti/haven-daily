@@ -245,6 +245,7 @@ haven/                 Python package
   clock.py             "today"/"now" in Amsterdam time, clock injectable for tests
   env.py               loads a local .env (names only, never values)
   storage.py           daily files in data/: write once, read one day or the last N days (§6.1)
+  fetch.py             polite HTTP layer every collector uses: user agent, robots.txt, AI opt-outs, delays (§5.8)
   (collect.py, filter.py, summarise.py, status.py, ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
@@ -449,6 +450,20 @@ Stored on the item as `strike.match` (`same` / `new` / `unsure`) and `strike.str
 - User agent: `HavenDaily/1.0 (+<Method page URL>)`.
 - robots.txt is checked **on every run**: if a site adds a block, the collector stops fetching it automatically and records it in `build.failures`.
 - A few seconds between requests to the same host (more if a `Crawl-delay` says so), timeouts on every request, at most one retry.
+
+**Fetcher module (`haven/fetch.py`, built 1 Nov 2026, issue #8).** Every collector fetches through one `Fetcher`, made once per run, so robots.txt is read fresh each morning and once per host. A page that robots.txt disallows is never requested; the failure (one line, `"<url>: <problem>"`) goes to `build.failures`. Redirects are followed by the fetcher itself, so each hop is checked against robots.txt too. **AI opt-out (hard rule 12):** a `use` source whose robots.txt blocks a named AI crawler for the source's pages, or has a `Content-Signal` with `ai-train=no` or `ai-input=no`, is headline-only for that run, with a note naming the source and the reason so the owner updates `SOURCES.md`. The network, clock and sleep are injected: tests use fakes and never touch the internet or really wait.
+
+*Proposed by Claude, not yet confirmed by the owner (issue #8):*
+- **robots.txt is parsed by our own small parser (RFC 9309), not `urllib.robotparser`.** The standard-library parser takes the *first* matching rule instead of the *longest*, ignores `*` and `$`, and matches agent names as substrings. Tested 1 Nov 2026: with `Allow: /` before `Disallow: /feed/` it allows `/feed/`, and it allows `/user/42` under `Disallow: /user/*`, which would break hard rule 4.
+- **HTTP through the standard library (`urllib.request`)**, no new dependency: we only need GET with headers and a timeout. `requests`/`httpx` would add packages for nothing the fetcher uses. The transport is one function, so it can be swapped later.
+- **Numbers:** at least **3 s** between requests to one host (longer if `Crawl-delay` says so), **20 s** timeout per request. A `Crawl-delay` above **60 s** is not waited out: the host is not fetched and the failure is recorded, so one site can't stall the morning job.
+- **robots.txt missing (4xx) = everything allowed; server error, 429 or no connection = nothing fetched from that host** (both as RFC 9309 says).
+- **The one retry** is only for timeouts, network errors, 5xx and 429, after the normal host delay. A 403/404 is not retried (it won't change a few seconds later).
+- **What counts as an AI opt-out:** a robots.txt group that **names** an AI crawler (ClaudeBot, Claude-User, Claude-SearchBot, Claude-Web, anthropic-ai, GPTBot, ChatGPT-User, CCBot, Google-Extended, Applebot-Extended, PerplexityBot, cohere-ai, Bytespider, meta-externalagent) and disallows the source's URL. A crawler only caught by the `*` group doesn't count: a site that blocks everyone except Haven Daily by name has given us permission, not opted out. `ai-input=no` counts as well as `ai-train=no`, because sending text to an AI for a summary is AI input. A `Content-Signal` line anywhere in the file counts (safe side).
+- **The opt-out note goes into `build.failures`** (written there by the collector, issue #11), so it shows on the page and the owner sees it the same morning.
+- **The Method page URL in the user agent** is a constant in `haven/fetch.py` (`https://leonardoneirotti.github.io/haven-daily/about.html`) until the site config exists (issue #28).
+
+Checked once against the real robots.txt files (1 Nov 2026, robots.txt only): all five `use` sources are allowed for us and show no opt-out; NL Times (blocks Claude-Web), Nieuwsblad Transport and PortsEurope (`ai-train=no`) and RTV Rijnmond (blocks ClaudeBot) are detected as opt-outs; The Loadstar's robots.txt has no AI rules (it stays headline-only under its RSS terms, §4).
 
 **Article text (hard rule 13).** For **use** sources the collector opens the article page and passes up to ~6,000 characters to the summariser **in memory**; the text is then discarded. Headline-only sources: no article page is fetched at all. `data/items/` stores headline, URL, dates, source, language, filter decision and AI output, **never article text or feed snippets**.
 
