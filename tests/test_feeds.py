@@ -287,7 +287,7 @@ def test_robots_block_is_a_failure_and_the_feed_is_not_requested():
 
 
 def test_an_unexpected_parser_error_is_still_a_failure(monkeypatch):
-    def explode(body, feed_url):
+    def explode(body, feed_url, with_snippet):
         raise RuntimeError("bug in our own code")
 
     monkeypatch.setattr(feeds, "parse_feed", explode)
@@ -315,9 +315,11 @@ def test_only_rss_sources_that_are_fetched_can_be_collected():
 # --- reading one entry ----------------------------------------------------------------
 
 
-def parse_one(item_xml, feed_url=FEED):
-    [parsed] = parse_feed(rss(item_xml).encode("utf-8"), feed_url)
-    return parsed
+def parse_one(item_xml, feed_url=FEED, with_snippet=True):
+    parsed = parse_feed(rss(item_xml).encode("utf-8"), feed_url, with_snippet=with_snippet)
+    assert parsed.skipped == 0
+    [one] = parsed.entries
+    return one
 
 
 def test_headline_whitespace_and_double_escaped_entities_are_cleaned():
@@ -340,7 +342,13 @@ def test_permalink_guid_is_used_when_there_is_no_link():
 
 def test_guid_that_is_not_a_permalink_is_not_used_as_link():
     item_xml = entry(link=None, extra='<guid isPermaLink="false">12345</guid>')
-    assert parse_feed(rss(item_xml).encode(), FEED) == []
+    parsed = parse_feed(rss(item_xml).encode(), FEED, with_snippet=True)
+    assert (parsed.entries, parsed.skipped) == ([], 1)
+
+
+def test_headline_only_body_text_is_never_even_read():
+    item_xml = entry(extra=f"<description>{SECRET_SNIPPET}</description>")
+    assert parse_one(item_xml, with_snippet=False).snippet is None
 
 
 def test_entries_without_headline_or_usable_link_are_skipped_and_reported():
