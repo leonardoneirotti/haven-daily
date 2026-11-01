@@ -247,6 +247,7 @@ haven/                 Python package
   storage.py           daily files in data/: write once, read one day or the last N days (§6.1)
   fetch.py             polite HTTP layer every collector uses: user agent, robots.txt, AI opt-outs, delays (§5.8)
   feeds.py             RSS collectors: common item shape, headline-only text never read, PIN gap check (§5.8)
+  pages.py             HTML list collectors: same item shape, K+N Rotterdam paragraph only (§5.8)
   (collect.py, filter.py, summarise.py, status.py, ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
@@ -270,7 +271,7 @@ design/logo-concepts/  generated logo explorations
 site/                  output, not committed (Actions builds it)
 CLAUDE.md, SOURCES.md, README.md
 BUILD_PLAN.md          pointer only: the plan is the GitHub issues + §10
-requirements.txt       jinja2>=3.1,<4, tzdata (time zone rules; Windows has none built in)
+requirements.txt       jinja2>=3.1,<4, tzdata (time zone rules; Windows has none built in), beautifulsoup4>=4.12,<5 (HTML lists, §5.8)
 requirements-dev.txt   + pytest, + shapely>=2.0,<3 (only for the basemap tool)
 .gitignore             .venv/, __pycache__/, *.pyc, osm caches, site/
 ```
@@ -485,6 +486,25 @@ Checked once against the real robots.txt files (1 Nov 2026, robots.txt only): al
 
 Live smoke run (1 Nov 2026, from a desktop): all five feeds read with no failures: PIN 10 items, Nieuwsblad Transport 19 (two feeds merged), PortsEurope 10, The Loadstar 10, RTV Rijnmond 50.
 
+**Page collectors (`haven/pages.py`, built 1 Nov 2026, issue #10).** One function, `collect_page(source, fetcher)`, reads the HTML sources (Port Authority news, Contargo, ECT, Kuehne+Nagel SeaNews, NL Times) into the **same `Item` and result shape as the feeds**, so the collect step (#11) treats both alike. Each page has one small parser (a few CSS selectors), listed in `pages.PARSERS`; a test keeps that list and the `html` sources in `config/sources.toml` in step. Headline-only (NL Times, or a `use` source that opts out of AI this morning): only headline, link and date are read, no teaser, no article page. A layout change is a failure, never an exception (hard rule 9). Tested on pages we wrote ourselves with the real tags and classes and invented content (hard rule 13). `python -m haven.pages` reads the real pages once and prints headlines and links only.
+
+**Kuehne+Nagel: the Rotterdam paragraph only.** Of all K+N articles only the weekly roundup ("Port operational updates from around the world …") is collected. Its article page is opened and only the section under the bold **"Rotterdam:"** label is kept, in memory, on the new `Item.article_text` field (and its first 1,000 characters as `snippet` for the relevance filter). Nothing else from the page is passed on, not the intro (which may also mention Rotterdam) and not the other ports. **The collect step (#11) must not replace an `article_text` that is already set**, or it would pass the whole K+N article on. If the terms check (#43) makes K+N headline-only, only `config/sources.toml` and `SOURCES.md` change.
+
+*Claude's defaults, not yet confirmed by the owner (1 Nov 2026, PR for issue #10):*
+- **Parser library: BeautifulSoup (`beautifulsoup4`, MIT, pure Python, plus its `soupsieve` selector package) on Python's built-in `html.parser`.** Five different layouts are easiest to read and fix as CSS selectors (`div.news-item`, `time[datetime]`): when a site changes its layout, the fix is usually one line. Standard library only would mean writing our own HTML tree and matching code for five layouts. `lxml` (faster, C code) isn't needed for five small pages a day. This is the one new runtime dependency.
+- **A date without a time stays a date**: Contargo (`datetime="2026-10-30"`) and ECT ("30 October 2026") give no time of day, so `published` is `"2026-10-30"`, not a made-up midnight. **The 48 h rule (#12) must decide how to age a date-only item**; suggestion: count from the *end* of that day, Amsterdam time, so it is never dropped too early (the 14-day duplicate check stops repeats).
+- **A page timestamp without a timezone is read as Amsterdam time** (HTML `<time>` without a zone means the publisher's local time; for feeds the rule stays UTC, §5.8 above). None of the five pages does this today.
+- **List teasers are kept for `use` sources** as the in-memory `snippet` (Contargo, ECT; at most 1,000 characters), exactly like PIN's feed description; the Port Authority list has none.
+- **Rotterdam paragraph boundaries:** from a bold label (`<strong>`/`<b>`) whose text ends in "Rotterdam" (e.g. "Netherlands Rotterdam:") to the next bold label, a heading, or the end of the label's block (`p`, `li`, `div`), whichever comes first; the label itself is left out; at most 6,000 characters (the article-text limit above). The K+N item's date comes from the article's JSON-LD `datePublished`.
+- **No weekly roundup on the K+N list is not a failure**: it is on the first page only a few days a week. Known limit: if K+N renames the series, K+N goes quiet instead of failing, so the week-one review (#30) should check that K+N gave an item that week.
+- **A roundup without a Rotterdam paragraph is a failure and gives no item** ("no Rotterdam paragraph found in the weekly port update (layout changed?)"): nothing else from the page is ever used instead.
+- **K+N headline-only** (by config or AI opt-out): the weekly roundup's headline and link only; the article is never opened, so the item has no date (the list shows none).
+- **A page with no news cards at all is a failure** ("no news items found on the page (layout changed?)"); none of the five lists is ever empty. Cards without a headline or http(s) link are skipped and counted, as for feeds. Links are made absolute, `#fragment` removed, and the same link twice on a page (e.g. featured and listed) is one item.
+- **Only the first page of each list is read.** It holds 5–24 items, more than a day's news for every source.
+- **An `html` source without a parser** (added to the config, code not written yet) is a failure line, not a crash, and is not fetched.
+
+Live smoke run (1 Nov 2026, from a desktop): all five pages read with no failures: Port Authority 10 items, Contargo 5, ECT 12, Kuehne+Nagel 1 (the 21–27 Oct roundup; Rotterdam paragraph 458 characters, in memory only), NL Times 24. The first run reported two K+N cards "without a headline": the small featured cards use an `h3` with another class; fixed and tested before this PR.
+
 **Article text (hard rule 13).** For **use** sources the collector opens the article page and passes up to ~6,000 characters to the summariser **in memory**; the text is then discarded. Headline-only sources: no article page is fetched at all. `data/items/` stores headline, URL, dates, source, language, filter decision and AI output, **never article text or feed snippets**.
 
 **Feeds that roll over before 06:45**
@@ -601,7 +621,7 @@ Next to the brief, the pipeline keeps the raw material, so nothing it saw is los
 
 | File | Contents |
 |---|---|
-| `data/items/YYYY-MM-DD.jsonl` | **JSON Lines**: one line per item collected that morning, kept *and* dropped, with its filter decision (`"filter": {kept, stage, reason}`, §5.4). Collected fields (§5.8, issue #9; confirmed by the owner 1 Nov 2026, PR #53): `source` (id), `headline`, `url`, `published`, `language`, `access`. |
+| `data/items/YYYY-MM-DD.jsonl` | **JSON Lines**: one line per item collected that morning, kept *and* dropped, with its filter decision (`"filter": {kept, stage, reason}`, §5.4). Collected fields (§5.8, issue #9; confirmed by the owner 1 Nov 2026, PR #53): `source` (id), `headline`, `url`, `published`, `language`, `access`. The HTML lists (issue #10) give the same fields; `published` is a timestamp, a date only (`"2026-10-30"`) when the page gives no time, or `null`. |
 | `data/status/YYYY-MM-DD.json` | Every status reading taken that morning (value, level, observed time, source), including failed readings as `null`. |
 
 Rules:
@@ -890,4 +910,4 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 
 ## 12. Credits
 
-Status data: weather warnings by KNMI via MeteoAlarm (shown: "KNMI", time of issue, link to www.meteoalarm.org, MeteoAlarm's exact disclaimer), Rhine Kaub by WSV / PEGELONLINE (DL-DE→Zero-2.0), Rhine Lobith by Rijkswaterstaat (CC0). Map data © OpenStreetMap contributors (ODbL). Leaflet 1.9.4 (BSD-2). Icons: Lucide (ISC). Fonts: IBM Plex Sans, Sans Condensed, Mono, Serif (SIL Open Font License). Shapely (BSD) for the basemap tool. Jinja2 (BSD).
+Status data: weather warnings by KNMI via MeteoAlarm (shown: "KNMI", time of issue, link to www.meteoalarm.org, MeteoAlarm's exact disclaimer), Rhine Kaub by WSV / PEGELONLINE (DL-DE→Zero-2.0), Rhine Lobith by Rijkswaterstaat (CC0). Map data © OpenStreetMap contributors (ODbL). Leaflet 1.9.4 (BSD-2). Icons: Lucide (ISC). Fonts: IBM Plex Sans, Sans Condensed, Mono, Serif (SIL Open Font License). Shapely (BSD) for the basemap tool. Jinja2 (BSD). Beautiful Soup and soupsieve (MIT).
