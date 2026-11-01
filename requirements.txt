@@ -1,1 +1,4 @@
 jinja2>=3.1,<4
+# Time zone rules for zoneinfo ("today" in Amsterdam, haven/clock.py). Linux has
+# them built in; Windows doesn't, so without this the code fails on a laptop.
+tzdata>=2024.1

@@ -1,3 +1,5 @@
-# Only for tools/build_basemap.py. The daily build needs requirements.txt alone.
 -r requirements.txt
+# Tests: python -m pytest
+pytest>=8.3,<10
+# Only for tools/build_basemap.py. The daily build needs requirements.txt alone.
 shapely>=2.0,<3

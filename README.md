@@ -8,6 +8,12 @@ The **site renderer**: Python turns one JSON "brief" per day into static HTML pa
 
 ```
 haven/render.py           builds the site from brief files
+haven/config.py           reads and checks the config files; a mistake stops the run with a clear message
+haven/clock.py            "today" and "now" in Amsterdam time (a brief belongs to an Amsterdam date)
+haven/env.py              loads API keys from a local .env file (names only in .env.example; never printed)
+config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep
+config/filter.toml        off-topic word lists for the relevance filter (empty until tuning)
+tests/                    pytest tests; tests/test_repo_config.py keeps sources.toml and SOURCES.md in step
 templates/                Jinja2 page templates (base, day, archive, method page, shared macros)
 static/style.css          the whole design: colour and type tokens, light + dark mode
 static/map.js             draws the chart with Leaflet: land, ships, numbered items
@@ -28,6 +34,15 @@ python -m venv .venv
 ```
 
 Then open `site/index.html` in a browser.
+
+Run all tests:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest
+```
+
+For local runs that need API keys: copy `.env.example` to `.env` and fill in the values. `.env` is git-ignored; online, the keys are GitHub Actions secrets.
 
 The basemap is already built. To rebuild it (for example after changing the map area or place names in `tools/build_basemap.py`):
 

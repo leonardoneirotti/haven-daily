@@ -2,6 +2,8 @@
 
 Tested 31 Oct 2026. Verdicts and reasons: `docs/SPEC.md` §4. Full test evidence (quoted robots.txt and terms lines): `docs/source-tests-2026-10-31.md`.
 
+The code reads the news sources from `config/sources.toml`. Change both files together: the tests fail if names, verdicts or URLs differ.
+
 - **use**: headline + link + own-words AI summary.
 - **headline-only**: headline + link, shown like a paywalled item. The article text never goes to an AI (hard rule 12); the headline may go through the AI relevance filter.
 - **auto-keep**: skips the AI relevance check (§5.4).
