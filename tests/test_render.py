@@ -131,7 +131,146 @@ def test_brief_without_corrections_lists_none(tmp_path):
     assert "Corrected" not in notes
 
 
+# --- unrated items and the reduced brief (spec §2.1, §5.6, issue #6) ----------------
+
+
+def item(severity, headline=None, **fields):
+    """A news item; severity None = unrated (the AI failed for it)."""
+    unrated = severity is None
+    base = {
+        "severity": severity,
+        "headline": headline or f"{severity or 'unrated'} item",
+        "url": "https://example.com/news",
+        "source": "Sample source",
+        "language": "en",
+        "published": "2026-10-29T05:10:00+01:00",
+        "summary": None if unrated else "Something happened.",
+        "impact": None if unrated else "Something follows for planners.",
+        "affects": [] if unrated else ["Containers"],
+    }
+    base.update(fields)
+    return base
+
+
+def test_rank_sorts_high_medium_low_then_unrated():
+    items = [item(None, "u"), item("low", "l"), item("high", "h"), item(None, "u2"), item("medium", "m")]
+    assert [i["headline"] for i in render.rank_items(items)] == ["h", "m", "l", "u", "u2"]
+
+
+def test_rank_keeps_source_order_within_a_severity():
+    items = [item(None, "u1"), item("medium", "m1"), item(None, "u2"), item("medium", "m2")]
+    assert [i["headline"] for i in render.rank_items(items)] == ["m1", "m2", "u1", "u2"]
+
+
+def test_unrated_items_count_toward_the_max_and_are_cut_first():
+    items = [item(None, "u1"), item("low", "l1"), item("low", "l2"), item(None, "u2"),
+             item("medium", "m1"), item("high", "h1")]
+    ranked = render.rank_items(items)
+    assert len(ranked) == render.MAX_ITEMS == 5
+    assert [i["headline"] for i in ranked] == ["h1", "m1", "l1", "l2", "u1"]
+
+
+def test_six_rated_items_leave_no_room_for_unrated():
+    items = [item(None, "u")] + [item("low", f"l{n}") for n in range(6)]
+    assert all(i["severity"] == "low" for i in render.rank_items(items))
+
+
+def news_card(html, rank):
+    """One item card in the full brief."""
+    start = html.index(f'id="item-{rank}"')
+    return html[start : html.index("</li>", start)]
+
+
+def test_unrated_card_has_tag_and_outlined_square_but_no_summary_or_impact(tmp_path):
+    html = render_day(tmp_path, make_brief(items=[item("high"), item(None, "Terminal closes gate early")]))
+    card = news_card(html, 2)
+    assert "num-unrated" in card
+    assert "sev-unrated" in card
+    assert "Severity: unrated" in text_of(card)
+    assert "Terminal closes gate early" in card
+    assert "Not enough information" not in card
+    assert "Impact for planners" not in card
+    assert "The AI step failed for this item" in text_of(card)  # says why, instead of a summary
+    assert "-None" not in html  # a null severity never leaks into a class name
+
+
+def test_unrated_item_shows_in_panel_and_archive_strip(tmp_path):
+    brief = make_brief(items=[item("medium"), item(None)])
+    html = render_day(tmp_path, brief)
+    panel = html[html.index('class="panel-items"') : html.index('class="panel-status"')]
+    assert "num-unrated" in panel and "sev-unrated" in panel
+    archive = (tmp_path / "site" / "archive.html").read_text(encoding="utf-8")
+    assert 'class="slot num-unrated"' in archive
+    assert "1 unrated" in archive  # the strip's screen-reader label counts it
+
+
+def test_unrated_item_with_a_place_is_drawn_unrated_on_the_chart():
+    brief = make_brief(items=[item(None, map={"lat": 51.95, "lon": 4.05, "label": "ECT Delta", "side": "right"})])
+    callout = render.prepare_briefs([brief])[0]["map"]["callouts"][0]
+    assert callout["severity"] == "unrated"
+
+
+def test_ship_at_the_terminal_of_an_unrated_item_is_still_linked():
+    ship = {"name": "Test Ship", "type": "container", "flag": "NL", "lat": 51.95, "lon": 4.05, "heading": 0,
+            "status": "moored", "speed_kn": 0, "length_m": 300, "area": "ECT Delta",
+            "destination_raw": "", "destination": None, "news_item": 1}
+    ships = {"snapshot_start": BUILT, "snapshot_end": BUILT, "source_name": "Sample", "vessels": [ship]}
+    brief = render.prepare_briefs([make_brief(items=[item(None)], ships=ships)])[0]
+    assert brief["ships"]["vessels"][0]["news_severity"] == "unrated"
+    assert brief["ships"]["linked"] == 1
+
+
+REDUCED_NOTE = "The AI step was unavailable this morning: headlines only, no summaries."
+
+
+def test_reduced_brief_note_shows_when_the_flag_is_set(tmp_path):
+    build = {"sources_checked": 9, "items_collected": 12, "items_kept": 1, "failures": [], "ai_unavailable": True}
+    html = render_day(tmp_path, make_brief(items=[item(None)], build=build))
+    assert REDUCED_NOTE in text_of(html)
+
+
+def test_reduced_brief_note_hidden_when_the_flag_is_false_or_missing(tmp_path):
+    build = {"sources_checked": 9, "items_collected": 12, "items_kept": 1, "failures": [], "ai_unavailable": False}
+    assert REDUCED_NOTE not in text_of(render_day(tmp_path / "a", make_brief(items=[item(None)], build=build)))
+    assert REDUCED_NOTE not in text_of(render_day(tmp_path / "b", make_brief(items=[item(None)])))
+
+
+def test_reduced_brief_without_items_does_not_claim_nothing_met_the_bar(tmp_path):
+    build = {"sources_checked": 9, "items_collected": 12, "items_kept": 0, "failures": [], "ai_unavailable": True}
+    html = text_of(render_day(tmp_path, make_brief(build=build)))
+    assert REDUCED_NOTE in html
+    assert "nothing met the bar" not in html
+
+
 # --- the sample site ----------------------------------------------------------------
+
+
+def load_samples():
+    return [json.loads(p.read_text(encoding="utf-8")) for p in sorted(SAMPLE_BRIEFS.glob("*.json"))]
+
+
+def test_a_sample_brief_has_an_unrated_item_among_rated_ones():
+    assert any(
+        any(i["severity"] is None for i in b["items"]) and any(i["severity"] for i in b["items"])
+        for b in load_samples()
+    )
+
+
+def test_a_sample_brief_is_reduced_and_all_its_items_are_unrated():
+    reduced = [b for b in load_samples() if b["build"].get("ai_unavailable")]
+    assert len(reduced) == 1
+    brief = reduced[0]
+    assert brief["sample"] is True
+    assert brief["items"] and all(i["severity"] is None for i in brief["items"])
+    strike = next(s for s in brief["status"] if s["key"] == "strike")
+    assert strike["value"] is None and strike["level"] is None  # spec §5.6: strike flag = No data
+
+
+def test_unrated_sample_items_have_no_ai_text():
+    for brief in load_samples():
+        for i in brief["items"]:
+            if i["severity"] is None:
+                assert i["summary"] is None and i["impact"] is None, i["headline"]
 
 
 def test_samples_use_the_new_fields():
@@ -151,6 +290,6 @@ def test_at_least_one_sample_has_a_correction():
 def test_site_renders_from_the_samples(tmp_path):
     # StrictUndefined makes any template typo or missing field fail here.
     count = render.render_site(SAMPLE_BRIEFS, tmp_path / "site")
-    assert count == 3
+    assert count == 4
     for page in ("index.html", "archive.html", "about.html"):
         assert (tmp_path / "site" / page).is_file()
