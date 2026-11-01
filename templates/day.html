@@ -51,15 +51,16 @@
         </p>
         <h1 id="brief-title"><span>{{ brief.day.strftime("%A") }}</span> {{ brief.day | date_only }}</h1>
         <p class="publication">{{ brief.publication }}{% if brief.corrections %} <a href="#corrections">See corrections</a>{% endif %}</p>
+        {{ m.reduced_note(brief) }}
       </header>
       {% if items %}
       <ol class="panel-items" aria-label="Today's items">
         {% for item in items %}
         <li>
           <a class="panel-item" href="#item-{{ loop.index }}" data-rank="{{ loop.index }}"{% if item.map %} data-action="show-item"{% endif %}>
-            {{ m.num(loop.index, item.severity) }}
+            {{ m.num(loop.index, item.severity_key) }}
             <span class="panel-text">
-              <span class="panel-meta"><span class="sev sev-{{ item.severity }}">{{ item.severity }}</span>{% if item.affects %}<span>{{ item.affects[0] }}</span>{% endif %}</span>
+              <span class="panel-meta"><span class="sev sev-{{ item.severity_key }}">{{ item.severity_key }}</span>{% if item.affects %}<span>{{ item.affects[0] }}</span>{% endif %}</span>
               <span class="panel-title">{{ item.headline }}</span>
               {% if item.summary %}<span class="panel-summary">{{ item.summary }}</span>{% endif %}
             </span>
@@ -89,6 +90,7 @@
   <div class="wrap brief-layout" id="brief">
     <section class="brief-col" aria-labelledby="items-title">
       <h2 id="items-title" class="section-title">The brief</h2>
+      {{ m.reduced_note(brief) }}
       {% if items %}
       <p class="brief-intro">{{ items | length }} {{ "item" if items | length == 1 else "items" }}, most severe first.<span class="needs-map"> "Show on chart" moves the chart at the top of the page.</span></p>
       <ol class="items">
@@ -99,7 +101,11 @@
       {% else %}
       <div class="quiet">
         <h3>Nothing significant {% if is_latest %}today{% else %}on this day{% endif %}.</h3>
+        {% if brief.build.ai_unavailable %}
+        <p>Without the AI step only items from the Rotterdam-specific sources can be shown, and they had nothing new. The port status still applies.</p>
+        {% else %}
         <p>{{ brief.build.sources_checked or "All" }} sources were checked and nothing met the bar for a planner brief. The port status still applies.</p>
+        {% endif %}
       </div>
       {% endif %}
     </section>

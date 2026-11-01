@@ -259,7 +259,7 @@ static/
   vendor/leaflet/      Leaflet 1.9.4, self-hosted
 tools/build_basemap.py builds basemap.js from OpenStreetMap (run once)
 data/basemap/          land.geojson + raw Overpass caches (caches git-ignored)
-data/sample/briefs/    3 sample briefs (fake, marked as sample)
+data/sample/briefs/    4 sample briefs (fake, marked as sample; 26 Oct is a reduced brief)
 data/briefs/           real briefs, one per day (what the renderer reads)
 data/items/            every collected item, one .jsonl file per day (§6.1)
 data/status/           every status reading, one .json file per day (§6.1)
@@ -306,7 +306,7 @@ python -m venv .venv
 ### 5.3 Renderer responsibilities (`haven/render.py`)
 
 - Load all brief files, sort by date, number editions (No. 001, 002…).
-- Sort items by severity (high → medium → low), keep max 5.
+- Sort items by severity (high → medium → low → unrated), keep max 5. Unrated items count toward the 5, so they are the first to be cut (§5.6).
 - Compute "change since yesterday" for each status value ("+12 cm since yesterday", "Same as yesterday", "No reading yesterday", "First reading").
 - Map status level `green/amber/red/null` → CSS key `ok/watch/alert/nodata` + label `Normal/Watch/Alert/No data` + icon.
 - Build `translate_url` for non-English items: `https://translate.google.com/translate?sl=<lang>&tl=en&u=<url>`.
@@ -321,6 +321,15 @@ python -m venv .venv
 - Times are **converted to Amsterdam time** before showing HH:MM (the line says "Amsterdam time"); a timestamp **without a timezone is refused**, like the clock helper (§5.2.1).
 - A correction made **on a later day** than the build shows its date too: "Corrected 30 Oct 10:02", so a fix a week later doesn't look like a same-morning one.
 - With corrections, the publication line ends with a **"See corrections" link** to the notes under "How this brief was made".
+
+*Unrated items and the reduced brief (built 1 Nov 2026, issue #6).* `severity: null` gets the CSS key `unrated` everywhere a severity is drawn (panel, full brief, chart callout, ship popup, archive strip, Method page). Items of the same severity keep the order they came in (stable sort). A reduced brief is marked by `build.ai_unavailable: true` (§6) and shows the §5.6 note under the publication line and above the brief.
+
+*Proposed by Claude, confirmed by the owner (1 Nov 2026, PR #50):*
+- **The unrated square is outlined, not filled**, in `--nodata-ink`: the same grey as "No data" on the status line, because both mean "no reading". Empty vs filled is the shape cue, so it doesn't rely on colour; the number inside keeps it distinct from the empty slots in the archive strip. On the chart it sits on the page colour so map lines don't show through.
+- **The unrated card says why it is empty**: *"Headline only. The AI step failed for this item, so there is no summary, impact or severity. Read the original for the details."* No impact block at all (so no "Not enough information", which is only for a rated item with `impact: null`).
+- **A ship at the terminal of an unrated item still counts as linked**, but keeps its normal teal hull (like a low item); its popup button gets a grey edge.
+- **A reduced brief with no items** says *"Without the AI step only items from the Rotterdam-specific sources can be shown, and they had nothing new"* instead of "nothing met the bar", which would be untrue when the filter never ran.
+- The **Method page** lists Unrated under the severity rules and explains the reduced brief in two sentences.
 
 ### 5.4 Relevance filter (decided 31 Oct 2026)
 
@@ -513,6 +522,7 @@ Examples: terminals (ECT Delta, Euromax, RWG, APMT Maasvlakte II…), areas (Maa
   ],
   "build": { "sources_checked": 9, "items_collected": 41, "items_kept": 5,
              "summaries": { "batch": 5, "fallback": 0 },
+             "ai_unavailable": false,
              "failures": [ { "source": "…", "error": "…" } ] },
   "ships": {
     "snapshot_start": "2026-10-29T06:28:00+01:00",
@@ -540,6 +550,7 @@ Examples: terminals (ECT Delta, Euromax, RWG, APMT Maasvlakte II…), areas (Maa
 | `items[].strike` | strike details or `null` (§5.7): `state` `announced`/`ongoing`/`cancelled`, `location`, `affects_rotterdam`, `start`/`end` (dates or `null`, never guessed), `match` `same`/`new`/`unsure`, `strike_id` (assigned by code) |
 | `items[].written_by` | which model wrote the summary and via which API: `{"model": "claude-…", "api": "batch" \| "standard"}` (§5.5) |
 | `build.summaries` | how many items were summarised in the batch vs fell back to the standard API with Haiku 5.5 |
+| `build.ai_unavailable` | `true` only on a **reduced brief** (§5.6): the AI was down until the last trigger, so all items are unrated and the page shows *"The AI step was unavailable this morning: headlines only, no summaries."* `false` otherwise; a missing field counts as `false`. *(Name proposed by Claude, confirmed by the owner 1 Nov 2026, PR #50.)* |
 | `items[].map.side` | `"left"` puts the label left of the number where the right is crowded |
 | `ships` | `null` when the AIS snapshot failed (page says so) |
 | `vessels[].type` | `container` / `tanker` / `bulk` only |
@@ -640,9 +651,9 @@ Principle: **fact vs interpretation in two typefaces** — the impact is the onl
 
 ### 7.5 Components
 
-- **Numbered square** (`.num`): same square in panel, full list, chart and archive strip → the chart works as the index of the brief. High = red with white number, medium = amber with dark number, low = slate.
+- **Numbered square** (`.num`): same square in panel, full list, chart and archive strip → the chart works as the index of the brief. High = red with white number, medium = amber with dark number, low = slate, **unrated = outlined, no fill, grey `--nodata-ink` number** (§5.3).
 - On the chart the high-severity square has a soft "ping" ring animation (transform/opacity only).
-- **Severity tag**: mono uppercase, coloured ink.
+- **Severity tag**: mono uppercase, coloured ink; "UNRATED" in `--nodata-ink`.
 - **Status dial**: label with icon, big condensed value + unit, place, level (icon+word) + change, note, "Read at 06:20 · Source ↗". River gauge = striped board with water level.
 - **Item card (full brief)**: num + severity + source · language · time; condensed headline (link); summary (sans, max 62ch); divider; impact label + serif impact text (max 62ch); Affects; actions: "Show on chart" (outlined button, needs JS), "Read original (Dutch) ↗", "Read in English ↗".
 - **Leaflet controls**: zoom = two separate ivory 32px squares with 6px gap and shadow; above them the **orange "whole port" button** (expand icon); scale bar and attribution in the same corner (bottom-right stack, bottom-up: attribution, scale, zoom, home).
@@ -815,7 +826,7 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 - **Barge low-water surcharge table:** Claude researches (owner's decision, 31 Oct 2026): find whether a barge operator (e.g. Contargo) publishes a Kaub-based low-water surcharge table. If so, use its first step as the Rhine **Watch** level (instead of GlW 77 cm), citing that table on the Method page.
 - **Before launch, find and check the terms of Kuehne+Nagel SeaNews and RTV Rijnmond** (§4). Downgrade K+N to headline-only, or drop either, if their terms forbid our use.
 - **Permission emails to NL Times and RTV Rijnmond:** Claude drafts one short email per publisher (what Haven Daily is, non-commercial portfolio project, what we'd do with their articles: a 2-line own-words AI summary + link, never the text itself, and that we respect their AI opt-out until they say yes). **The owner sends them.** Both stay headline-only (hard rule 12) unless a publisher replies yes in writing; keep the reply in `docs/permissions/`.
-- **Design addition: the unrated item** (§2.1, §5.6). Needs a look for the numbered square (e.g. outlined, no fill, in `--nodata-ink`), an "UNRATED" tag, the card without summary/impact, the reduced-brief note, and the archive strip. Renderer must accept `severity: null`.
+- ~~Design addition: the unrated item~~ **Done 1 Nov 2026 (issue #6):** outlined square, "UNRATED" tag, card without summary/impact, reduced-brief note driven by `build.ai_unavailable`, archive strip; samples: one unrated item on 27 Oct, a reduced brief on 26 Oct. Design choices confirmed by the owner (§5.3).
 - Finalise Rhine thresholds and weather thresholds from public sources (Method page).
 - **Design usability review before launch** (added 31 Oct 2026): the design looks good but doesn't feel user-friendly enough, and the owner can't yet say why. First find the concrete problems: review the pages as a first-time visitor (a planner and a recruiter, on a phone and on a laptop), list what they understand in 5 seconds and what confuses them, then propose changes. **Nothing is implemented until the owner approves the proposals.** The new logo and the social preview tags come after this review.
 - Self-host the IBM Plex font files (`static/fonts/`) instead of Google Fonts, to avoid sending EU visitors' IP addresses to Google.

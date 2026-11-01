@@ -35,6 +35,10 @@ SITE = {
 
 MAX_ITEMS = 5
 SEVERITIES = ("high", "medium", "low")
+# severity null = unrated: the AI failed for that item (spec §2.1, §5.6). It sorts after
+# every rated item and still counts toward MAX_ITEMS. "unrated" is its CSS key.
+UNRATED = "unrated"
+SEVERITY_KEYS = SEVERITIES + (UNRATED,)
 LANGUAGE_NAMES = {"en": "English", "nl": "Dutch", "de": "German"}
 
 # What the chart shows first. Wide screens: the whole port, from the anchorages to
@@ -177,9 +181,17 @@ def translate_url(url: str, source_language: str) -> str:
     return f"https://translate.google.com/translate?{query}"
 
 
+def severity_key(severity: str | None) -> str:
+    """CSS key and sort key for a severity: "high", "medium", "low", or "unrated" for null."""
+    return UNRATED if severity is None else severity
+
+
 def rank_items(items: list[dict]) -> list[dict]:
-    """Most severe first, at most MAX_ITEMS. Quiet days stay short: never pad."""
-    ranked = sorted(items, key=lambda item: SEVERITIES.index(item["severity"]))
+    """Most severe first, unrated last, at most MAX_ITEMS. Quiet days stay short: never pad.
+
+    The sort is stable, so items of the same severity keep the order they came in.
+    """
+    ranked = sorted(items, key=lambda item: SEVERITY_KEYS.index(severity_key(item["severity"])))
     return ranked[:MAX_ITEMS]
 
 
@@ -236,6 +248,7 @@ def prepare_item(item: dict) -> None:
     item.setdefault("published", None)
     item.setdefault("access", "full")  # "headline-only" for paywalled sources
     item.setdefault("map", None)  # {"lat", "lon", "label"} when the item has a place on the map
+    item["severity_key"] = severity_key(item["severity"])
     if item["language"] == "en":
         item["translate_url"] = None
     else:
@@ -255,7 +268,7 @@ def prepare_ships(brief: dict) -> None:
         ship["status_label"] = SHIP_STATUS[ship["status"]]
         ship["flag_name"] = FLAG_NAMES.get(ship["flag"], ship["flag"])
         rank = ship["news_item"]
-        ship["news_severity"] = items[rank - 1]["severity"] if rank and rank <= len(items) else None
+        ship["news_severity"] = items[rank - 1]["severity_key"] if rank and rank <= len(items) else None
     vessels = ships["vessels"]
     ships["count"] = len(vessels)
     ships["by_type"] = {kind: sum(1 for ship in vessels if ship["type"] == kind) for kind in SHIP_TYPES}
@@ -270,7 +283,7 @@ def map_payload(brief: dict) -> dict:
     callouts = [
         {
             "rank": rank,
-            "severity": item["severity"],
+            "severity": item["severity_key"],
             "title": item["headline"],
             **item["map"],
         }
@@ -310,6 +323,8 @@ def prepare_briefs(briefs: list[dict]) -> list[dict]:
         for key in ("sources_checked", "items_collected", "items_kept"):
             build.setdefault(key, None)
         build.setdefault("failures", [])
+        # True only on a reduced brief: the AI was down all morning (spec §5.6).
+        build.setdefault("ai_unavailable", False)
 
         for indicator in brief["status"]:
             prepare_indicator(indicator, previous_status.get(indicator["key"]), number == 1)
@@ -318,7 +333,9 @@ def prepare_briefs(briefs: list[dict]) -> list[dict]:
         brief["items"] = rank_items(brief.get("items", []))
         for item in brief["items"]:
             prepare_item(item)
-        brief["counts"] = {s: sum(1 for item in brief["items"] if item["severity"] == s) for s in SEVERITIES}
+        brief["counts"] = {
+            key: sum(1 for item in brief["items"] if item["severity_key"] == key) for key in SEVERITY_KEYS
+        }
         prepare_ships(brief)
         brief["map"] = map_payload(brief)
     return briefs
@@ -351,7 +368,7 @@ def make_environment() -> Environment:
     env.globals.update(
         site=SITE,
         icons=ICONS,
-        severities=SEVERITIES,
+        severity_keys=SEVERITY_KEYS,
         level_icons=LEVEL_ICONS,
         language_names=LANGUAGE_NAMES,
         ship_type_plurals=SHIP_TYPE_PLURALS,
