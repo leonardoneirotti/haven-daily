@@ -106,6 +106,11 @@ def load_filter(path: Path = CONFIG_DIR / "filter.toml") -> FilterConfig:
             raise ConfigError(f"{where}: must be a list of words, e.g. [\"football\"]")
         if any(not w.strip() for w in words):
             raise ConfigError(f"{where}: contains an empty word, which would match every headline")
+        for word in words:
+            if "*" in word[:-1] or not word.rstrip("*").strip():
+                raise ConfigError(
+                    f"{where}: {word!r}: a * is only allowed once, at the end of a word "
+                    f"(\"voetbal*\" matches voetbalclub)")
         off_topic[language] = tuple(words)
     return FilterConfig(off_topic=off_topic)
 

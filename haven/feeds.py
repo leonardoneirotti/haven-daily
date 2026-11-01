@@ -99,10 +99,14 @@ class Item:
     # collector (the Rotterdam paragraph only, haven/pages.py); the collect step (#11) fills it
     # for the other `use` items and must not replace one that is already set.
     article_text: str | None = field(default=None, repr=False)
+    # The relevance filter's decision, {"kept": bool, "stage": "rules" | "ai", "reason": str}
+    # (spec §5.4). None until a stage has decided: the rules (haven/filter.py) set it for items
+    # they keep or drop; the AI check (#13) for the rest.
+    filter: dict | None = None
 
     def record(self) -> dict:
         """The fields that may be stored in data/items/: everything except snippet and article text."""
-        return {
+        record = {
             "source": self.source,
             "headline": self.headline,
             "url": self.url,
@@ -110,6 +114,9 @@ class Item:
             "language": self.language,
             "access": self.access,
         }
+        if self.filter is not None:
+            record["filter"] = dict(self.filter)
+        return record
 
 
 @dataclass(frozen=True)

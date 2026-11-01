@@ -57,5 +57,24 @@ def test_only_port_authority_news_and_ect_are_auto_keep():
     }
 
 
-def test_filter_config_loads_and_starts_empty():
-    assert load_filter().off_topic == {"en": (), "nl": ()}
+def test_filter_config_has_a_small_list_for_each_source_language():
+    # Issue #12: start the lists small. Every language a fetched source uses has a list.
+    lists = load_filter().off_topic
+    languages = {source.language for source in load_sources() if source.fetched}
+    assert languages <= set(lists)
+    assert all(len(words) <= 10 for words in lists.values())
+
+
+def test_no_off_topic_word_drops_a_port_headline():
+    # Invented headlines about port operations, in both languages: none may hit a word.
+    from haven.filter import off_topic_word
+    lists = load_filter().off_topic
+    port_headlines = {
+        "en": ["Invented strike at a Maasvlakte container terminal", "Invented fog closes the Nieuwe Waterweg",
+               "Invented low Rhine water cuts barge loads", "Invented new quay wall in the Feijenoord district"],
+        "nl": ["Verzonnen staking bij containerterminal op de Maasvlakte", "Verzonnen mist sluit Nieuwe Waterweg",
+               "Verzonnen laag water op de Rijn", "Verzonnen nieuwe kade in Feijenoord"],
+    }
+    for language, headlines in port_headlines.items():
+        for headline in headlines:
+            assert off_topic_word(headline, lists[language]) is None, headline

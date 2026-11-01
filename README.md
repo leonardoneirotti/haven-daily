@@ -16,8 +16,9 @@ haven/fetch.py            polite HTTP for every collector: own user agent, robot
 haven/feeds.py            reads the RSS sources into one item shape; headline-only feed text is never read; PIN gap check
 haven/pages.py            reads the HTML news lists into the same item shape; K+N: only the Rotterdam paragraph of the weekly update
 haven/collect.py          the collect step: every source, 14-day duplicate check, feed read time, article text in memory only
+haven/filter.py           relevance filter, stage 1 rules: older than 48 h, auto-keep, off-topic words, else to the AI check
 config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep
-config/filter.toml        off-topic word lists for the relevance filter (empty until tuning)
+config/filter.toml        off-topic word lists for the relevance filter (small starter lists, tuned after the first runs)
 tests/                    pytest tests; tests/test_repo_config.py keeps sources.toml and SOURCES.md in step
 templates/                Jinja2 page templates (base, day, archive, method page, shared macros)
 static/style.css          the whole design: colour and type tokens, light + dark mode
