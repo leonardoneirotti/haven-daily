@@ -581,7 +581,7 @@ Rules:
 - **Hard rule 13 guard:** any field whose name contains the word `text`, `content`, `snippet` or `body` is refused, at any depth, and the error names the field but never repeats its value.
 - **Read helpers:** one day (`None` if the day has no file) and the last N days (newest first, missing days skipped).
 
-*Claude's defaults, not yet confirmed by the owner (1 Nov 2026, issue #7):*
+*Proposed by Claude, confirmed by the owner (1 Nov 2026, PR #51):*
 - **Keys are sorted alphabetically** in every file. Fully deterministic whatever order the code builds a dict in; the cost is that a brief file starts with `"build"` instead of `"date"`. List order is never changed (collection order is information). `.json` files are indented 2 spaces; `.jsonl` has one object per line.
 - **The last-N-days reader covers the N days *before* the given day, not that day itself**: the collector runs before today's file exists, so `read_recent("items", before=today, days=14)` = the 14 previous days.
 - **`description` is on the guard's word list too**: it's the RSS field that carries feed snippets. Words are matched whole (`article_text`, `contentSnippet` are caught; `context` is not). The guard checks all three kinds, not only items.
