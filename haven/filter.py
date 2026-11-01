@@ -12,17 +12,19 @@ The rules, in this order (first match wins, so the reason is always the first ru
 
 1. **Older than 48 h** -> dropped, reason "older than 48 h". An item exactly 48 h old is kept
    (owner's decision, 1 Nov 2026). A date-only item (`"2026-10-30"`) is aged from the **end** of
-   that day, midnight Amsterdam time, so it is never dropped too early. An item with **no
-   readable date** is never dropped for age: the collect step has already dropped it if its
-   link was seen in the last 14 days (`haven/collect.py`), so it is new.
-2. **Off-topic word in the headline** -> dropped, reason `off-topic word "<word>"`. The word
+   that day, midnight Amsterdam time, so it is never dropped too early. A timestamp without a
+   timezone is read as Amsterdam time. An item with **no readable date** (or a date in the
+   future) is never dropped for age: the collect step has already dropped it if its link was
+   seen in the last 14 days (`haven/collect.py`), so it is new.
+2. **Auto-keep source** (Port Authority news, ECT; `auto_keep` in `config/sources.toml`) ->
+   kept, without the word lists and without the AI check.
+3. **Off-topic word in the headline** -> dropped, reason `off-topic word "<word>"`. The word
    lists are in `config/filter.toml`, one per language; the item's language picks the list.
-3. **Auto-keep source** (Port Authority news, ECT; `auto_keep` in `config/sources.toml`) ->
-   kept, without the AI check.
 4. Anything else -> to the AI check.
 
-Age and words come before auto-keep, so a three-day-old Port Authority story is still dropped,
-and a word the owner adds to the list applies to every source.
+Age comes first, so a three-day-old Port Authority story is still dropped; auto-keep comes
+before the words, so a badly chosen word can't drop a Rotterdam-specific item (both owner's
+decisions, 1 Nov 2026).
 
 Kept and dropped items get their decision on `Item.filter` (`{"kept", "stage": "rules",
 "reason"}`), which goes into the day's items file (§6.1). Items for the AI check get theirs
@@ -95,12 +97,12 @@ def decide(item: Item, source: Source | None, words, now: datetime) -> Decision:
     if start is not None and _utc(now) - _utc(start) > MAX_AGE:
         return Decision(DROP, TOO_OLD)
 
+    if source is not None and source.auto_keep:
+        return Decision(KEEP, AUTO_KEEP)
+
     word = off_topic_word(item.headline, words)
     if word is not None:
         return Decision(DROP, f'off-topic word "{word}"')
-
-    if source is not None and source.auto_keep:
-        return Decision(KEEP, AUTO_KEEP)
 
     return Decision(TO_AI, GOES_TO_AI)
 
@@ -109,11 +111,10 @@ def age_start(published: str | None) -> datetime | None:
     """The moment an item's age is counted from, or None when it has no readable date.
 
     - a timestamp with a timezone: that moment;
+    - a timestamp without a timezone: that time in Amsterdam (owner's decision, 1 Nov 2026);
     - a date only ("2026-10-30"): the end of that day, i.e. midnight at the start of the next
       day, Amsterdam time (owner's decision, 1 Nov 2026);
-    - missing, unreadable, or a timestamp without a timezone: None (like an unreadable date in
-      the collectors, §5.8). Our collectors never write a timestamp without a zone; guessing
-      one could drop an item too early.
+    - missing or unreadable: None (like an unreadable date in the collectors, §5.8).
     """
     if not isinstance(published, str):
         return None
@@ -125,7 +126,7 @@ def age_start(published: str | None) -> datetime | None:
     except ValueError:
         return None
     if moment.tzinfo is None or moment.utcoffset() is None:
-        return None
+        return moment.replace(tzinfo=AMSTERDAM)
     return moment
 
 
