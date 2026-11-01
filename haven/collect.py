@@ -12,6 +12,8 @@
 3. **Feed read time:** the result carries `feeds_read_at`, the moment this run started reading
    the sources. The runner (#22) stores it in the brief as `build.feeds_read_at`; the next run
    reads it back (`previous_feeds_read_at`) and passes it as `previous_run` to the PIN gap check.
+   If no brief of the previous 14 days has it (e.g. the first run), the gap check is skipped
+   and a note says so.
 4. **K+N gone quiet:** if Kuehne+Nagel SeaNews gave no item in 14 days (today plus the 13 days
    before), that is recorded as a failure, so a renamed weekly series can't go unnoticed. The
    check starts 14 days after the first collect run of any source.
@@ -39,7 +41,7 @@ from bs4 import BeautifulSoup
 from haven import clock, storage
 from haven.clock import AMSTERDAM
 from haven.config import Source
-from haven.feeds import ARTICLE_TEXT_MAX, FeedResult, Item, collect_feed
+from haven.feeds import ARTICLE_TEXT_MAX, PIN_SOURCE_ID, FeedResult, Item, collect_feed
 from haven.fetch import Fetcher, FetchError
 from haven.pages import KN_SOURCE_ID, collect_page
 
@@ -52,6 +54,7 @@ DUPLICATE_CHECK = "Duplicate check"  # the `source` of failures in reading store
 KN_QUIET = "no item collected in the last 14 days (weekly port update renamed, or the collector broken?)"
 NO_ARTICLE_TEXT = "article text not found on the page (layout changed?)"
 NO_READER = "no article reader for this source in haven/collect.py, so the article was not opened"
+GAP_CHECK_SKIPPED = "gap check skipped: no brief of the last 14 days records when the feeds were last read"
 
 # Where the article text sits on each `use` source's article pages (checked 1 Nov 2026).
 # PIN (whole notice in its feed) and K+N (Rotterdam paragraph, haven/pages.py) set their text
@@ -114,6 +117,9 @@ def run_collect(
     previous_run = previous_feeds_read_at(today, data_dir)
 
     failures: list[dict] = []
+    pin = next((source for source in sources if source.id == PIN_SOURCE_ID and source.fetched), None)
+    if previous_run is None and pin is not None:  # say so, so a missed rollover isn't silently unchecked
+        failures.append({"source": pin.name, "error": GAP_CHECK_SKIPPED})
     stored = _stored_items(today, data_dir, failures)
     seen = {url_key(line["url"]) for _, lines in stored for line in lines
             if isinstance(line, dict) and isinstance(line.get("url"), str)}
@@ -281,7 +287,8 @@ def article_text(page_html: str, selector: str) -> str | None:
     """The text of the paragraphs, list points and headings inside the article container.
 
     Everything in ARTICLE_SKIP is left out; a block inside another block (`li > p`) is read
-    once. At most ARTICLE_TEXT_MAX characters. None if the container isn't on the page.
+    once. At most ARTICLE_TEXT_MAX characters. None if the container isn't on the page or holds
+    no readable text (empty, whitespace, or only skipped parts): both count as a failed read.
     """
     soup = BeautifulSoup(page_html, "html.parser")
     containers = soup.select(selector)
