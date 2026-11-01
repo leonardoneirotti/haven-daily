@@ -20,6 +20,8 @@ from urllib.parse import urlencode
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
+from haven.clock import AMSTERDAM
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = PROJECT_DIR / "templates"
 STATIC_DIR = PROJECT_DIR / "static"
@@ -109,6 +111,8 @@ ICONS = {
     "arrow-left": '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
     "arrow-right": '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
     "arrow-down": '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+    "pencil": '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 '
+    '.623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
 }
 
 
@@ -130,6 +134,37 @@ def short_date(day: date) -> str:
 def clock(timestamp: str) -> str:
     """Local clock time from an ISO timestamp, e.g. 06:31."""
     return datetime.fromisoformat(timestamp).strftime("%H:%M")
+
+
+def amsterdam_time(timestamp: str) -> datetime:
+    """An ISO timestamp as Amsterdam time. A timestamp without a zone is refused, never guessed."""
+    moment = datetime.fromisoformat(timestamp)
+    if moment.tzinfo is None:
+        raise ValueError(f"Timestamp {timestamp!r} has no timezone; write it with its offset, e.g. +01:00.")
+    return moment.astimezone(AMSTERDAM)
+
+
+def correction_time(at: str, built_at: str) -> str:
+    """When a correction was made: "09:14", or "30 Oct 09:14" if it was on a later day than the build."""
+    moment = amsterdam_time(at)
+    if moment.date() == amsterdam_time(built_at).date():
+        return f"{moment:%H:%M}"
+    return f"{moment.day} {moment:%b %H:%M}"
+
+
+def latest_correction(corrections: list[dict]) -> dict | None:
+    """The most recent correction by its time (not its place in the list), or None."""
+    return max(corrections, key=lambda c: amsterdam_time(c["at"]), default=None)
+
+
+def publication_line(built_at: str, corrections: list[dict]) -> str:
+    """ "Published 06:52 · Amsterdam time", plus "Corrected 09:14" after a correction (spec §2.3)."""
+    parts = [f"Published {amsterdam_time(built_at):%H:%M}"]
+    latest = latest_correction(corrections)
+    if latest:
+        parts.append(f"Corrected {correction_time(latest['at'], built_at)}")
+    parts.append("Amsterdam time")
+    return " · ".join(parts)
 
 
 def translate_url(url: str, source_language: str) -> str:
@@ -265,8 +300,12 @@ def prepare_briefs(briefs: list[dict]) -> list[dict]:
         brief["day"] = date.fromisoformat(brief["date"])
         brief["edition"] = number
         brief.setdefault("sample", False)
-        brief.setdefault("review", "auto")
-        brief.setdefault("published_at", None)
+        # Published directly by the morning job; hand-made fixes are listed, never silent (spec §6).
+        corrections = brief.setdefault("corrections", [])
+        for fix in corrections:
+            fix["when"] = correction_time(fix["at"], brief["built_at"])
+        corrections.sort(key=lambda fix: amsterdam_time(fix["at"]))
+        brief["publication"] = publication_line(brief["built_at"], corrections)
         build = brief.setdefault("build", {})
         for key in ("sources_checked", "items_collected", "items_kept"):
             build.setdefault(key, None)

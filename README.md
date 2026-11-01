@@ -57,8 +57,9 @@ It downloads coastlines and water areas, and separately roads, railways, breakwa
 
 | Field | Meaning |
 |---|---|
-| `date`, `built_at`, `published_at` | Day of the brief and ISO timestamps (Amsterdam time) |
-| `review` | `"reviewed"` if approved in the pull request, `"auto"` if published at 08:00 without review |
+| `date` | Day of the brief (Amsterdam date) |
+| `built_at` | When the morning job wrote the brief (ISO timestamp with offset, Amsterdam time); shown as "Published HH:MM". The brief goes online straight away |
+| `corrections[]` | `{at, note}` for every hand-made fix after publishing, `[]` if none. The page shows "Corrected HH:MM" (latest one) and lists every note under "How this brief was made" |
 | `sample` | `true` shows the "Sample data" note |
 | `status[]` | Status indicators: `key`, `label`, `icon`, `value` (number, text or `null` = no data), `unit`, `place`, `level` (`green`/`amber`/`red`/`null`), `observed_at`, `source_name`, `source_url`, optional `gauge_max`, `note` |
 | `items[]` | `severity` (`high`/`medium`/`low`), `headline`, `url`, `source`, `language`, `published`, `summary`, `impact` (`null` = "Not enough information"), `affects[]`, optional `access: "headline-only"` for paywalled sources, optional `map: {lat, lon, label}` to pin the item on the chart |

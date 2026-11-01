@@ -18,12 +18,13 @@
     <section aria-labelledby="steps">
       <h2 id="steps">How a brief is made</h2>
       <ol class="steps">
-        <li><strong>06:30 Amsterdam time.</strong> A scheduled job collects new items from the sources, reads the port status values and records about 12 minutes of ship positions.</li>
+        <li><strong>Collect, around 06:45 Amsterdam time.</strong> A scheduled job collects new items from the sources and records about 12 minutes of ship positions.</li>
         <li><strong>Filter.</strong> Items about the Port of Rotterdam and the routes, carriers and hinterland links that serve it are kept. The rest are dropped.</li>
         <li><strong>Summarise.</strong> An AI model writes a two-line summary, a planner impact and a severity for each kept item, following the rules below. It may only use facts from the source.</li>
-        <li><strong>Review.</strong> The brief opens as a pull request on GitHub. {{ site.author.split(" ")[0] }} can approve it, edit it or remove items.</li>
-        <li><strong>08:00 publish.</strong> If nobody has reviewed it by then, it is published automatically and the page says so. A day is never skipped.</li>
+        <li><strong>Status.</strong> The job reads the port status values: weather warnings, the Rhine water level and the strike flag.</li>
+        <li><strong>Publish.</strong> The brief goes online straight away. A day is never skipped.</li>
       </ol>
+      <p>Every step is automatic and nobody checks the brief before it goes online. When a mistake is found afterwards, {{ site.author.split(" ")[0] }} fixes it and the page is published again with a correction: the time at the top of the brief ("Corrected 09:14") and a note saying what changed, under "How this brief was made". A brief is never changed silently.</p>
     </section>
 
     <section aria-labelledby="severity">

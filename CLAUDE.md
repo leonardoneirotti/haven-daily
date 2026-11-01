@@ -54,7 +54,7 @@ A brief in `data/briefs/` is public as soon as the morning job commits it. Whene
 
 ## Open items
 
-See spec §11 (permission emails, terms still to check, cost check after week one, code still on the old review model, and more).
+See spec §11 (permission emails, terms still to check, cost check after week one, and more).
 
 ## Agent skills
 

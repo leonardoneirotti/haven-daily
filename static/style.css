@@ -1312,8 +1312,9 @@ html:not(.has-map) .needs-map,
   font-size: 0.8125rem;
 }
 
-.publication .is-auto {
-  color: var(--medium-ink);
+.publication a {
+  color: var(--ink-2);
+  white-space: nowrap;
 }
 
 .items {
@@ -1627,6 +1628,17 @@ td.ais-text {
   list-style: none;
 }
 
+.corrections {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.corrections strong { white-space: nowrap; }
+
+.corrections li,
 .failures li,
 .all-ok,
 .draft {
@@ -1640,6 +1652,7 @@ td.ais-text {
 .draft { color: var(--medium-ink); }
 .all-ok { color: var(--ok-ink); }
 
+.corrections .icon,
 .failures .icon,
 .all-ok .icon,
 .draft .icon {
