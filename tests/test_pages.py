@@ -169,11 +169,13 @@ def kn_list_card(title, slug):
     )
 
 
-def kn_featured_card(title, slug):
+def kn_featured_card(title, slug, size="large"):
+    """The large featured card has `h2.headline`, the small ones `h3.headline-second-group`."""
+    heading = f'<h2 class="headline">{title}</h2>' if size == "large" else f'<h3 class="headline-second-group">{title}</h3>'
     return (
-        f'<a href="/news/article/{slug}" class="featured-card featured-card--large"><img src="/f.jpg" alt="{title}">'
+        f'<a href="/news/article/{slug}" class="featured-card featured-card--{size}"><img src="/f.jpg" alt="{title}">'
         '<div class="featured-card__overlay"><div class="meta"><span class="date">Oct 30, 2026 · Sea news</span></div>'
-        f'<h2 class="headline">{title}</h2></div></a>'
+        f"{heading}</div></a>"
     )
 
 
@@ -188,10 +190,13 @@ def kn_list(*cards, featured=()):
 KN_LIST = kn_list(
     kn_list_card("Invented crane delivery in Jakarta", "invented-crane-delivery"),
     kn_list_card(WEEKLY_TITLE, "port-operational-updates-from-27-10-2026"),
-    featured=[kn_featured_card("Invented Rotterdam and India sign port deal", "invented-rotterdam-india-deal")],
+    featured=[
+        kn_featured_card("Invented Rotterdam and India sign port deal", "invented-rotterdam-india-deal"),
+        kn_featured_card("Invented strike threat at a US port", "invented-us-strike-threat", size="small"),
+    ],
 )
 
-INTRO = "Invented intro: a storm hit Rotterdam APM Terminals and Le Havre."
+INTRO = "Invented intro: an invented storm closed the Invented Quay in Rotterdam."  # mentions Rotterdam on purpose
 ROTTERDAM = "The invented 7-day average waiting time is around 9.99 days. Invented yard occupancy at ECT is 11%."
 NEXT_PORT = "Invented London Gateway text."
 
