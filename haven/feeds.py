@@ -87,9 +87,13 @@ class Item:
     language: str  # "en" / "nl"
     access: str  # "full" / "headline-only" (spec §6, items[].access)
     snippet: str | None = field(default=None, repr=False)  # in memory only, never stored (hard rule 13)
+    # Text for the summariser, in memory only, never stored (hard rule 13). Set by the K+N page
+    # collector (the Rotterdam paragraph only, haven/pages.py); the collect step (#11) fills it
+    # for the other `use` items and must not replace one that is already set.
+    article_text: str | None = field(default=None, repr=False)
 
     def record(self) -> dict:
-        """The fields that may be stored in data/items/: everything except the snippet."""
+        """The fields that may be stored in data/items/: everything except snippet and article text."""
         return {
             "source": self.source,
             "headline": self.headline,

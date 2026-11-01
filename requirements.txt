@@ -1,4 +1,6 @@
 jinja2>=3.1,<4
+# Reads the HTML news lists (haven/pages.py) with CSS selectors, on Python's built-in parser.
+beautifulsoup4>=4.12,<5
 # Time zone rules for zoneinfo ("today" in Amsterdam, haven/clock.py). Linux has
 # them built in; Windows doesn't, so without this the code fails on a laptop.
 tzdata>=2024.1

@@ -14,6 +14,7 @@ haven/env.py              loads API keys from a local .env file (names only in .
 haven/storage.py          daily files in data/ (items, status, briefs): written once, never rewritten; no article text
 haven/fetch.py            polite HTTP for every collector: own user agent, robots.txt, AI opt-outs, delays, one retry
 haven/feeds.py            reads the RSS sources into one item shape; headline-only feed text is never read; PIN gap check
+haven/pages.py            reads the HTML news lists into the same item shape; K+N: only the Rotterdam paragraph of the weekly update
 config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep
 config/filter.toml        off-topic word lists for the relevance filter (empty until tuning)
 tests/                    pytest tests; tests/test_repo_config.py keeps sources.toml and SOURCES.md in step
