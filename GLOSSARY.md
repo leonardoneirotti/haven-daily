@@ -37,7 +37,7 @@ An item the relevance filter judged relevant (kept) or not (dropped) to a Rotter
 _Avoid_: Filtered, rejected, accepted
 
 **Auto-keep source**:
-A Rotterdam-specific source (Port Authority news, ECT) whose items the relevance filter keeps without the AI check, unless an earlier rule (age, off-topic word) drops them.
+A Rotterdam-specific source (Port Authority news, ECT) whose items the relevance filter keeps without the off-topic word lists or the AI check; only the 48 h age rule can drop them.
 _Avoid_: Trusted source, whitelist
 
 **Unrated item**:

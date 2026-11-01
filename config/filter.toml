@@ -5,7 +5,8 @@
 # 'off-topic word "<word>"'). Matching ignores upper/lower case and finds whole
 # words only ("sport" doesn't match "transport"). A word may be a phrase
 # ("Champions League"). A * at the end matches any ending: "voetbal*" also finds
-# "voetbalclub" (Dutch compound words). Applies to every source, auto-keep too.
+# "voetbalclub" (Dutch compound words). Not applied to auto-keep sources (Port
+# Authority news, ECT), which only the 48 h age rule can drop (owner, 1 Nov 2026).
 #
 # Start small: only words that can't be about the port. Crime, housing and the
 # like stay with the AI check, because a word can't tell a port story from

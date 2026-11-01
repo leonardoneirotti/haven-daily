@@ -352,16 +352,17 @@ Question it answers per item: *is this relevant to a logistics planner working w
 
 **Rules module (`haven/filter.py`, built 1 Nov 2026, issue #12).** `apply_rules(items, sources, config, now)` gives every item one outcome with a reason: **kept** (auto-keep source), **dropped**, or **to the AI check** (stage 2, #13). The rules run in this order and the first that hits gives the reason:
 1. older than 48 h → dropped, `"older than 48 h"`;
-2. a word from the off-topic list of the item's language in the headline → dropped, `off-topic word "<word>"`;
-3. auto-keep source → kept, `"Rotterdam-specific source (auto-keep)"`;
+2. auto-keep source → kept, `"Rotterdam-specific source (auto-keep)"` (the word lists don't apply to it);
+3. a word from the off-topic list of the item's language in the headline → dropped, `off-topic word "<word>"`;
 4. anything else → to the AI check, `"not decided by the rules: goes to the AI check"`.
 
-Kept and dropped items get `Item.filter` = `{"kept", "stage": "rules", "reason"}`, which `Item.record()` adds to the stored line; items for the AI check get theirs from stage 2. Ages are compared in UTC, so the clock change can't shift the 48 h by an hour (tested on 25 Oct 2026). Live smoke run (1 Nov 2026, 18:18, in memory, nothing written): 151 items → 1 kept (auto-keep), 104 dropped as older than 48 h, 46 to the AI check (38 of them RTV Rijnmond, 7 of those football).
+Kept and dropped items get `Item.filter` = `{"kept", "stage": "rules", "reason"}`, which `Item.record()` adds to the stored line; items for the AI check get theirs from stage 2. Ages are compared in UTC, so the clock change can't shift the 48 h by an hour (tested on 25 Oct 2026). Live smoke run (1 Nov 2026, 18:18, in memory, nothing written; before the starter words and the owner's changes): 151 items → 1 kept (auto-keep), 104 dropped as older than 48 h, 46 to the AI check (38 of them RTV Rijnmond, 7 of those football).
 
-*Claude's defaults, not yet confirmed by the owner (1 Nov 2026, issue #12):*
-- **Age and words come before auto-keep**, so a three-day-old Port Authority story is dropped, and a word on the list drops it from every source, auto-keep too.
+*Proposed by Claude, confirmed by the owner with the changes marked (1 Nov 2026, PR #57):*
+- **Auto-keep sources skip the off-topic word lists; the 48 h age rule still applies to them.** So a three-day-old Port Authority story is dropped, but a badly chosen word can't drop a Rotterdam-specific item. *(Changed by the owner: Claude had proposed words before auto-keep. Tested: `test_an_auto_keep_source_skips_the_word_lists_but_not_the_age_rule`.)*
 - **The age is counted to the moment the sources were read** (`feeds_read_at` from the collect step, passed by the runner #22), not to the end of the run: an earlier moment can only keep an item longer.
-- **A timestamp without a timezone, an unreadable date or a date in the future** is not dropped for age (the first two count as "no readable date", §5.8; a future date is a feed or clock error, not an old item).
+- **A timestamp without a timezone is read as Amsterdam time** and the 48 h rule applies (summer or winter time as on that date). *(Changed by the owner: Claude had proposed treating it as no readable date. Tested: `test_a_timestamp_without_a_timezone_is_read_as_amsterdam_time` and its summer-time twin.)* None of our collectors writes one today (feeds read a zone-less date as UTC when collecting, §5.8, so it reaches the filter with an offset). **An unreadable date or a date in the future** is not dropped for age (an unreadable date counts as "no readable date", §5.8; a future date is a feed or clock error, not an old item).
+*Proposed by Claude, confirmed by the owner (1 Nov 2026, PR #57):*
 - **Words are matched in the headline only** (not the snippet, which headline-only items don't have), ignoring case, as **whole words**, phrases allowed; a **`*` at the end** matches any ending ("voetbal*" → "voetbalclub"), because Dutch writes compounds as one word. `*` anywhere else is a config error. A `*` at the start ("*voetbal" for "profvoetballer") is not supported, to keep matching predictable.
 - **Starter lists: football only** (`football`, `Eredivisie`, `Feyenoord`; Dutch also `voetbal*`, `Excelsior`, `Sparta`): the most frequent noise in the live RTV Rijnmond headlines, and words that can't be about the port (the Feijenoord district is spelled differently). **Crime and housing stay with the AI check**: a word can't tell "stabbing in the city centre" from "drugs found in a container". A repo test checks that no list word hits an invented port headline.
 - **A source not in the config** is never auto-kept (its items go to the AI check).
