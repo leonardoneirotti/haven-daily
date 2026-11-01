@@ -11,6 +11,7 @@ haven/render.py           builds the site from brief files
 haven/config.py           reads and checks the config files; a mistake stops the run with a clear message
 haven/clock.py            "today" and "now" in Amsterdam time (a brief belongs to an Amsterdam date)
 haven/env.py              loads API keys from a local .env file (names only in .env.example; never printed)
+haven/storage.py          daily files in data/ (items, status, briefs): written once, never rewritten; no article text
 config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep
 config/filter.toml        off-topic word lists for the relevance filter (empty until tuning)
 tests/                    pytest tests; tests/test_repo_config.py keeps sources.toml and SOURCES.md in step
