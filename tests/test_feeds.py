@@ -470,3 +470,41 @@ def test_no_gap_check_when_the_pin_feed_failed():
     result = collect_feed(PIN, fetcher, previous_run=PREVIOUS_RUN)
     assert len(result.failures) == 1
     assert "HTTP 503" in result.failures[0]["error"]
+
+
+# --- article text from the feed (PIN only; issue #11) -----------------------------------
+
+
+def test_pin_feed_description_is_the_whole_notice_so_it_becomes_the_article_text():
+    """PIN's feed carries the full notice (checked 1 Nov 2026), so no notice page is opened."""
+    long = "Invented notice sentence. " * 100  # 2,600 characters: over the snippet cap
+    pin = source(id=feeds.PIN_SOURCE_ID, name="PIN notices to shipping")
+    fetcher, net = fetcher_for({FEED: xml(rss(entry(extra=f"<description>{long}</description>")))})
+    [item] = collect_feed(pin, fetcher).items
+    assert item.article_text == long.strip()
+    assert len(item.snippet) <= feeds.SNIPPET_MAX
+    assert [c for c in net.calls if not c.endswith("/robots.txt")] == [FEED]
+    assert "article_text" not in item.record()
+
+
+def test_pin_article_text_is_capped():
+    long = "Invented notice sentence. " * 400  # 10,400 characters
+    pin = source(id=feeds.PIN_SOURCE_ID)
+    fetcher, _ = fetcher_for({FEED: xml(rss(entry(extra=f"<description>{long}</description>")))})
+    [item] = collect_feed(pin, fetcher).items
+    assert len(item.article_text) <= feeds.ARTICLE_TEXT_MAX
+
+
+def test_other_use_feeds_get_no_article_text_from_their_description():
+    """A description is usually only a teaser; only PIN's is known to be the whole text."""
+    fetcher, _ = fetcher_for({FEED: xml(rss(entry(extra=f"<description>{SECRET_SNIPPET}</description>")))})
+    [item] = collect_feed(source(), fetcher).items
+    assert item.snippet == SECRET_SNIPPET
+    assert item.article_text is None
+
+
+def test_headline_only_pin_gets_no_article_text():
+    pin = source(id=feeds.PIN_SOURCE_ID, verdict="headline-only")
+    fetcher, _ = fetcher_for({FEED: xml(rss(entry(extra=f"<description>{SECRET_SNIPPET}</description>")))})
+    [item] = collect_feed(pin, fetcher).items
+    assert item.article_text is None and item.snippet is None
