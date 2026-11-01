@@ -24,9 +24,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Get a copy of the repository's code and briefs.
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      # Install Python 3.12; cache pip downloads between runs to save time.
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -38,9 +40,12 @@ jobs:
       - name: Render the site
         run: python -m haven.render --briefs data/sample/briefs --out site
 
-      - uses: actions/configure-pages@v5
+      # Read this repo's Pages settings (address, base path) for the deploy.
+      - uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v3
+      # Pack site/ into the artifact the deploy job publishes.
+      # Since v4, dotfiles are left out; site/ has none, so nothing is lost.
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
@@ -51,5 +56,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Publish the artifact from the build job to GitHub Pages.
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
