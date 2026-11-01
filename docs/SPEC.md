@@ -249,7 +249,7 @@ haven/                 Python package
   feeds.py             RSS collectors: common item shape, headline-only text never read, PIN gap check (§5.8)
   pages.py             HTML list collectors: same item shape, K+N Rotterdam paragraph only (§5.8)
   collect.py           collect step: every source, duplicates, feed read time, K+N 14-day check, article text (§5.8)
-  filter.py            relevance filter: stage 1 rules (§5.4); stage 2 AI check to build (#13)
+  filter.py            relevance filter: stage 1 rules, stage 2 AI check (Haiku 5.5), kept/dropped report (§5.4)
   (summarise.py, status.py, ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
@@ -273,7 +273,7 @@ design/logo-concepts/  generated logo explorations
 site/                  output, not committed (Actions builds it)
 CLAUDE.md, SOURCES.md, README.md
 BUILD_PLAN.md          pointer only: the plan is the GitHub issues + §10
-requirements.txt       jinja2>=3.1,<4, tzdata (time zone rules; Windows has none built in), beautifulsoup4>=4.12,<5 (HTML lists, §5.8)
+requirements.txt       jinja2>=3.1,<4, tzdata (time zone rules; Windows has none built in), beautifulsoup4>=4.12,<5 (HTML lists, §5.8), anthropic>=2.3,<3 (Claude API, §5.4)
 requirements-dev.txt   + pytest, + shapely>=2.0,<3 (only for the basemap tool)
 .gitignore             .venv/, __pycache__/, *.pyc, osm caches, site/
 ```
@@ -305,6 +305,7 @@ python -m venv .venv
 - **Unknown fields are an error**, not ignored, so `auto_kep = true` can't quietly turn auto-keep off.
 - The clock helper **refuses a datetime without a timezone** instead of guessing which zone it is in.
 - **`.env` is read by a small standard-library loader** (`haven/env.py`), not python-dotenv: the format is only `NAME=value` lines. Variables already set win (so GitHub Actions secrets are never replaced), an empty value counts as not set (a fresh copy of `.env.example` means "no key"), and errors give the line number, never the line.
+- **Secret names** (the same in `.env`, `.env.example` and GitHub Actions secrets): **`ANTHROPIC_API_KEY`** for the Claude API (relevance filter, summariser), `AISSTREAM_API_KEY` for the AIS snapshot (v2), later `KNMI_API_KEY` (§4). The code reads the Claude key from `ANTHROPIC_API_KEY` only, never logs or prints it, and an unset or empty key means "AI unavailable" (§5.6). *(Name written into the spec 1 Nov 2026, issue #13.)*
 
 *Technical necessity (not a choice):*
 - **`tzdata` is a runtime dependency**: on Windows, `zoneinfo` has no time zone rules without it (found while building this; the Linux runner has them built in).
@@ -374,6 +375,21 @@ Kept and dropped items get `Item.filter` = `{"kept", "stage": "rules", "reason"}
 **Every decision is recorded** on the item's line in `data/items/YYYY-MM-DD.jsonl`, so kept vs dropped can be reviewed and tuned (build plan step 4):
 `"filter": {"kept": false, "stage": "rules", "reason": "older than 48 h"}` or `{"kept": true, "stage": "ai", "reason": "Strike at ECT Delta this week"}`.
 When tuning: a wrong rule-stage decision means editing a word list; a wrong AI-stage decision means editing the prompt.
+
+**AI check (`haven/filter.py`, built 1 Nov 2026, issue #13).** `check_with_ai(items, client)` sends each item the rules couldn't decide to **Claude Haiku 5.5** (`claude-haiku-5-5`), effort `low`, standard API, one call per item, with **structured output** forcing the answer into `{"kept": true/false, "reason": "<one sentence>"}`. Decisions are stored as `"filter": {"kept", "stage": "ai", "reason"}`. `run_filter(items, sources, config, now, client)` runs both stages (rules, then the AI for the rest) and returns the items in input order, the failure lines, whether the AI was unavailable, and the calls and tokens used. **`python -m haven.filter [--rules-only]`** collects once, runs both stages, writes nothing, and prints the report: kept, then dropped, then not checked, one line each with stage, source, headline and reason, plus the tokens used and their estimated cost.
+- **What the AI sees** (hard rule 12): the headline, the source id and the language; plus the teaser (`snippet`, ≤ 1,000 characters) **only for `use` items**. A headline-only item sends its headline alone, even if a teaser were in memory (tested). The text is wrapped in `<headline>`/`<teaser>` tags and the prompt says it is third-party data, never instructions.
+- **Key:** only from `ANTHROPIC_API_KEY` (§5.2.1). No key → AI unavailable, no call made.
+
+*Claude's defaults, not yet confirmed by the owner (1 Nov 2026, issue #13):*
+- **One call per item**, not one call for all items: a bad answer costs one item, not the whole morning, and each decision is easy to trace. The cost difference is cents a month.
+- **One item fails** (timeout, connection or server error after the SDK's 2 retries, refusal, answer cut off, unreadable answer, or a bug of ours): the item is **kept**, reason *"AI check failed (<problem>); kept to be safe"*, and a failure line `"<url>: <problem>"` goes to `build.failures` under "AI relevance check". Missing a real item is worse than one extra (the issue's suggestion).
+- **The AI counts as unavailable** (§5.6), nothing is decided and the items for the AI keep no `filter` (the runner #22 then retries later or publishes a reduced brief) when: the key is not set; the key is rejected (HTTP 401/403, stops at once); or **the first 3 calls in a row fail**. If the AI answered at least once this morning and then 3 calls in a row fail, the AI is not "unavailable": the remaining items are kept as failed **without calling again**, so a mid-run outage can't hold the job up. Refusals and bad answers mean the API is up, so they never count toward the 3.
+- **Timeout 30 s per request**, plus the SDK's own 2 retries: an outage is declared after at most about 5 minutes.
+- **The prompt** (`SYSTEM_PROMPT` in `haven/filter.py`, in English): what counts as relevant (port and terminal operations, labour action, weather and water levels, hinterland barge/rail/truck, carriers serving Rotterdam, customs and fees, incidents and infrastructure in the port) and what doesn't (general city news, sport, culture, crime or politics with no link to freight through Rotterdam, other ports unless it affects Rotterdam). **PIN notices:** keep those that limit traffic for many ships (fog procedures, closures, pilot capacity), drop routine ones. **When unsure, keep.** The reason is one English sentence in the AI's own words, at most 15 words; stored at most 200 characters.
+- **Thinking left at Haiku 5.5's default** (adaptive) at `low` effort, `max_tokens` 1,024 (thinking counts toward it). No temperature (rejected by Haiku 5.5), no prompt caching (the prompt is ~500 tokens; caching would save cents a month).
+- **Failure lines and reasons name the kind of error only** (e.g. "HTTP 529", "timeout"), never the API's own message, so nothing it echoes can reach the public page.
+
+**Cost (to check after week one, §2):** live run 1 Nov 2026: 41 items a morning reached the AI check after the rules. At ~700 input + ~150 output tokens per call (system prompt included; thinking counted as output), 41 × 30 ≈ 1,230 calls/month ≈ 0.86 M input + 0.18 M output ≈ **$0.18/month**, inside the $0.25 estimate above.
 
 **Cost estimate (to check after week 1, see §2 AI budget):** ~30 items/day reach stage 2 × ~1,000 input + ~300 output tokens (thinking included) ≈ 0.9 M input + 0.27 M output per month ≈ **$0.25/month**. That leaves most of the €5 for the summariser.
 
@@ -953,4 +969,4 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 
 ## 12. Credits
 
-Status data: weather warnings by KNMI via MeteoAlarm (shown: "KNMI", time of issue, link to www.meteoalarm.org, MeteoAlarm's exact disclaimer), Rhine Kaub by WSV / PEGELONLINE (DL-DE→Zero-2.0), Rhine Lobith by Rijkswaterstaat (CC0). Map data © OpenStreetMap contributors (ODbL). Leaflet 1.9.4 (BSD-2). Icons: Lucide (ISC). Fonts: IBM Plex Sans, Sans Condensed, Mono, Serif (SIL Open Font License). Shapely (BSD) for the basemap tool. Jinja2 (BSD). Beautiful Soup and soupsieve (MIT).
+Status data: weather warnings by KNMI via MeteoAlarm (shown: "KNMI", time of issue, link to www.meteoalarm.org, MeteoAlarm's exact disclaimer), Rhine Kaub by WSV / PEGELONLINE (DL-DE→Zero-2.0), Rhine Lobith by Rijkswaterstaat (CC0). Map data © OpenStreetMap contributors (ODbL). Leaflet 1.9.4 (BSD-2). Icons: Lucide (ISC). Fonts: IBM Plex Sans, Sans Condensed, Mono, Serif (SIL Open Font License). Shapely (BSD) for the basemap tool. Jinja2 (BSD). Beautiful Soup and soupsieve (MIT). Anthropic Python SDK (MIT).

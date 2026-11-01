@@ -16,7 +16,7 @@ haven/fetch.py            polite HTTP for every collector: own user agent, robot
 haven/feeds.py            reads the RSS sources into one item shape; headline-only feed text is never read; PIN gap check
 haven/pages.py            reads the HTML news lists into the same item shape; K+N: only the Rotterdam paragraph of the weekly update
 haven/collect.py          the collect step: every source, 14-day duplicate check, feed read time, article text in memory only
-haven/filter.py           relevance filter, stage 1 rules: older than 48 h, auto-keep, off-topic words, else to the AI check
+haven/filter.py           relevance filter: rules (older than 48 h, auto-keep, off-topic words), then Claude Haiku 5.5 for the rest; report
 config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep
 config/filter.toml        off-topic word lists for the relevance filter (small starter lists, tuned after the first runs)
 tests/                    pytest tests; tests/test_repo_config.py keeps sources.toml and SOURCES.md in step
@@ -48,7 +48,14 @@ Run all tests:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-For local runs that need API keys: copy `.env.example` to `.env` and fill in the values. `.env` is git-ignored; online, the keys are GitHub Actions secrets.
+For local runs that need API keys: copy `.env.example` to `.env` and fill in the values. `.env` is git-ignored; online, the keys are GitHub Actions secrets. The Claude API key is `ANTHROPIC_API_KEY`.
+
+To see what the relevance filter keeps and drops today (reads the sources once, writes nothing; the AI check costs a fraction of a cent):
+
+```powershell
+.\.venv\Scripts\python.exe -m haven.filter               # rules + AI check (needs ANTHROPIC_API_KEY)
+.\.venv\Scripts\python.exe -m haven.filter --rules-only  # rules only, no API calls
+```
 
 The basemap is already built. To rebuild it (for example after changing the map area or place names in `tools/build_basemap.py`):
 
