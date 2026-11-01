@@ -60,7 +60,7 @@ Owner: Leonardo Neirotti. Compiled 31 October 2026.*
 - For Dutch items: "Read in English" link.
 - Optional map pin so the item appears on the chart: the AI picks a place from a fixed list, the code adds `lat`, `lon`, `label` (§5.10). "Affects" tags also come from a fixed list (§5.10).
 - Paywalled sources: headline + link only ("Headline only. This source is paywalled, so there is no summary.").
-- **Headline-only items** (paywalled or AI opt-out, §3 rule 12, §4) still get a **severity, rated by the AI from the headline alone**, shown as **"rated from headline only"** next to the severity tag. No summary; impact stays `null` = "Not enough information". If that AI call fails, the item is unrated like any other. *(Decided by the owner, 1 Nov 2026.)*
+- **Headline-only items** (paywalled or AI opt-out, §3 rule 12, §4) still get a **severity, rated by the AI from the headline alone**, shown as **"rated from headline only"** next to the severity tag. From the same headline the AI also picks the **place** and **"affects" tags** (same fixed lists, §5.10) and extracts **strike details** (same rules, §5.7: dates only if the headline states them; an `unsure` match never clears a strike), so a strike reported only by a headline-only source (e.g. NL Times, RTV Rijnmond) still raises the strike flag. No summary; impact stays `null` = "Not enough information". If that AI call fails, the item is unrated like any other. *(Decided by the owner, 1 Nov 2026.)*
 
 ### 2.2 Port status line
 
@@ -115,7 +115,7 @@ Each day page also shows: publication line ("Published 06:52 · Amsterdam time",
 9. If one source or step fails, the rest of the page still builds and the failure is shown on the page.
 10. Sample/fake data must be clearly marked on every page ("Sample data. The ships, news and readings on this page are invented to preview the design.").
 11. **A published brief is never changed silently.** Any change to a published brief's content adds an entry to its `corrections` list (§6), shown on the page.
-12. **Respect AI opt-outs.** If a source opts out of AI use (robots.txt blocks AI crawlers such as ClaudeBot/GPTBot, or signals like `ai-train=no`), only its **headline and link** are used, shown like a paywalled item. Its article text is never sent to an AI. The headline may still go to the AI, for the relevance filter and to rate severity from the headline alone (§2.1); nothing else from the source does. *(Added 31 Oct 2026; severity from headline added 1 Nov 2026. Affects NL Times, Nieuwsblad Transport, PortsEurope, The Loadstar, TradeWinds, RTV Rijnmond as tested.)*
+12. **Respect AI opt-outs.** If a source opts out of AI use (robots.txt blocks AI crawlers such as ClaudeBot/GPTBot, or signals like `ai-train=no`), only its **headline and link** are used, shown like a paywalled item. Its article text is never sent to an AI. The headline may still go to the AI, for the relevance filter and for what can be read from the headline alone: severity, place, "affects" tags and strike details (§2.1); nothing else from the source does. *(Added 31 Oct 2026; headline rating added 1 Nov 2026. Affects NL Times, Nieuwsblad Transport, PortsEurope, The Loadstar, TradeWinds, RTV Rijnmond as tested.)*
 13. **No third-party article text in the repo.** No article text or feed snippets are ever committed (the repo is public, so committing them would republish them). Text is fetched and used **in memory only**, for summarising, then discarded. The stored item keeps the URL, so the original can always be reopened. *(Added 31 Oct 2026.)*
 
 ---
@@ -126,7 +126,7 @@ Every candidate was tested for: feed or clean page, how much text, robots.txt, t
 
 **Verdicts**
 - **use** = headline + link + own-words AI summary.
-- **headline-only** = headline + link, shown like a paywalled item, no article text to any AI (the headline may go to the AI for the relevance filter and for a severity "rated from headline only", §2.1).
+- **headline-only** = headline + link, shown like a paywalled item, no article text to any AI (the headline may go to the AI for the relevance filter and for severity, place, tags and strike details "rated from headline only", §2.1).
 - **drop** = not collected.
 
 **News sources**
@@ -351,7 +351,7 @@ So the page never skips a day. A full AI outage costs at most one hour's delay b
 
 **Why not just today's items:** strikes are announced days ahead. A strike announced Monday for Thursday has no new article on Thursday, and the Monday item is older than the filter's 48 h, so a flag built only from today's items would show Normal on the strike day.
 
-**1. The summariser extracts strike details** for every item it writes (no extra AI call), or `null` if the item is not about a strike:
+**1. The summariser extracts strike details** for every item it writes (no extra AI call), or `null` if the item is not about a strike. For headline-only items it works from the headline alone (§2.1), so their strikes count too:
 
 ```json
 "strike": {
@@ -502,7 +502,7 @@ Examples: terminals (ECT Delta, Euromax, RWG, APMT Maasvlakte II…), areas (Maa
 | `status[].value` | number, text, or `null` = No data |
 | `items[].impact` | `null` → "Not enough information in the source to judge the impact." |
 | `items[].severity` | `"high"` / `"medium"` / `"low"`, or `null` = **unrated** (AI step failed for this item; `summary` and `impact` are `null` too, §5.6). `null` means **only** "the AI failed". For a headline-only item a non-null severity was rated from the headline alone (§2.1). |
-| `items[].access` | `"headline-only"` for paywalled and AI-opt-out sources: `summary` and `impact` are `null`, severity rated from the headline only and shown as "rated from headline only" (§2.1) |
+| `items[].access` | `"headline-only"` for paywalled and AI-opt-out sources: `summary` and `impact` are `null`, severity, place, `affects` and `strike` taken from the headline only, shown as "rated from headline only" (§2.1) |
 | `items[].strike` | strike details or `null` (§5.7): `state` `announced`/`ongoing`/`cancelled`, `location`, `affects_rotterdam`, `start`/`end` (dates or `null`, never guessed), `match` `same`/`new`/`unsure`, `strike_id` (assigned by code) |
 | `items[].written_by` | which model wrote the summary and via which API: `{"model": "claude-…", "api": "batch" \| "standard"}` (§5.5) |
 | `build.summaries` | how many items were summarised in the batch vs fell back to the standard API with Haiku 5.5 |
