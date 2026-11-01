@@ -183,6 +183,47 @@ def test_a_link_written_differently_still_counts_as_seen(tmp_path):
     assert result.items == []
 
 
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        ("https://a.test/news/1#comments", "https://a.test/news/1"),
+        ("https://a.test/news/1#top", "https://a.test/news/1#bottom"),
+        ("https://a.test/n?id=5#x", "https://a.test/n?id=5"),
+    ],
+)
+def test_url_key_ignores_the_fragment(a, b):
+    """Owner's decision (1 Nov 2026): the #fragment never makes a link a different one."""
+    assert url_key(a) == url_key(b)
+
+
+@pytest.mark.parametrize(
+    "a, b, same",
+    [
+        ("https://a.test/n?id=5&utm_source=rss&utm_medium=feed", "https://a.test/n?id=5", True),
+        ("https://a.test/n?utm_campaign=autumn", "https://a.test/n", True),  # nothing left: no "?"
+        ("https://a.test/n?UTM_Source=rss&id=5", "https://a.test/n?id=5", True),  # name case doesn't matter
+        ("https://a.test/n?utm_source=a&id=5&page=2", "https://a.test/n?id=5&page=2", True),  # others kept, in order
+        ("https://a.test/n?id=5&utm_source=rss", "https://a.test/n?id=6", False),  # other parameters still count
+        ("https://a.test/n?ref=rss", "https://a.test/n", False),  # only utm_* is stripped
+        ("https://a.test/n?xutm_source=1", "https://a.test/n", False),  # must start with utm_
+    ],
+)
+def test_url_key_strips_only_utm_parameters(a, b, same):
+    """Owner's decision (1 Nov 2026): utm_* tracking parameters are ignored; every other one is kept."""
+    assert (url_key(a) == url_key(b)) is same
+
+
+def test_a_stored_link_with_a_fragment_or_utm_tags_counts_as_seen(tmp_path):
+    store_items(tmp_path, TODAY - timedelta(days=2),
+                item("a", 1, url="https://a.test/news/1#comments"),
+                item("a", 2, url="https://a.test/news/2?utm_source=rss&id=2"))
+    result, _ = run(tmp_path, [src("a")], {"a": ok(item("a", 1, url="https://a.test/news/1"),
+                                                   item("a", 2, url="https://a.test/news/2?id=2&utm_medium=feed"),
+                                                   item("a", 3, url="https://a.test/news/2?id=3"))})
+    assert [i.url for i in result.items] == ["https://a.test/news/2?id=3"]
+    assert result.duplicates == 2
+
+
 def test_the_same_link_from_two_sources_today_is_kept_once_first_source_wins(tmp_path):
     shared = "https://shared.test/story"
     result, _ = run(tmp_path, [src("a"), src("b")], {"a": ok(item("a", url=shared)), "b": ok(item("b", url=shared))})
