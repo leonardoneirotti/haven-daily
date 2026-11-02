@@ -109,15 +109,17 @@ LEVELS = {
 # What a weather or strike level means for a planner, shown next to the level (design review S6,
 # issue #83): one constant, never written per day. The Rhine's meanings sit next to its
 # thresholds in config/rhine.toml. No data has none: it shows only "No data".
-# Wording: Claude's proposal (#83), not yet confirmed by the owner.
+# Wording confirmed by the owner 3 Nov 2026 (PR #89), Normal texts changed by the owner.
 STATUS_MEANINGS = {
     "weather": {
-        "green": "no KNMI warning for the rest of today",
+        "green": "no KNMI warning for Zuid-Holland for the rest of today",
         "amber": "weather may slow port operations and road transport today",
         "red": "weather likely to disrupt port operations and road transport today",
     },
     "strike": {
-        "green": f"no active Rotterdam strike found in the last {haven_strike.WINDOW_DAYS} days",
+        # The window: news kept today and in the 14 days before; Normal = none of it reports a
+        # Rotterdam strike on today (or ongoing) or announced for a later day (spec §5.7).
+        "green": f"no Rotterdam strike today or coming up, in the news of the last {haven_strike.WINDOW_DAYS} days",
         "amber": "no strike confirmed for today; check the dates",
         "red": "a strike is on today",
     },

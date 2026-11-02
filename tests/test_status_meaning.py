@@ -28,7 +28,7 @@ CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 THRESHOLDS = RhineThresholds(alert_at_or_below=80, watch_at_or_below=150, watch_above=460, alert_above=640)
 MEANINGS = load_rhine_meanings()
 
-# Claude's default wording (issue #83, not yet confirmed by the owner).
+# Wording confirmed by the owner 3 Nov 2026 (PR #89); alert_high still under discussion there.
 RHINE_MEANINGS = {
     "normal": "no low-water surcharge or high-water restriction at Kaub",
     "watch_low": "low-water surcharges on barge transport",
@@ -37,12 +37,12 @@ RHINE_MEANINGS = {
     "alert_high": "high water: shipping stops",
 }
 WEATHER_MEANINGS = {
-    "green": "no KNMI warning for the rest of today",
+    "green": "no KNMI warning for Zuid-Holland for the rest of today",
     "amber": "weather may slow port operations and road transport today",
     "red": "weather likely to disrupt port operations and road transport today",
 }
 STRIKE_MEANINGS = {
-    "green": "no active Rotterdam strike found in the last 14 days",
+    "green": "no Rotterdam strike today or coming up, in the news of the last 14 days",
     "amber": "no strike confirmed for today; check the dates",
     "red": "a strike is on today",
 }
