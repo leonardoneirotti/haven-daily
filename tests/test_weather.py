@@ -310,9 +310,22 @@ def test_times_are_stored_in_amsterdam_time():
     assert result["warnings"][0]["expires"] == f"{DAY}T18:00:00+01:00"
 
 
-def test_with_no_warnings_the_time_of_issue_is_knmis_newest_entry_for_today():
+def test_with_no_warnings_there_is_no_time_of_issue_only_the_read_time():
+    # Owner's change, 2 Nov 2026: a green entry's issue time (days old) reads as stale.
     result = reading(green_day(sent="2026-10-28T03:08:43+01:00"), green_day(sent="2026-11-01T00:04:00+01:00"))
-    assert result["issued_at"] == "2026-11-01T00:04:00+01:00"
+    assert result["value"] == "No warnings"
+    assert result["issued_at"] is None
+    assert result["observed_at"] == f"{DAY}T06:45:00+01:00"
+    assert result["note"] == "Warnings at 06:45 · not live"
+
+
+def test_with_warnings_the_time_of_issue_is_the_earliest_starting_ones():
+    result = reading(
+        green_day(),
+        warning("yellow", "1; Wind", onset=f"{DAY}T14:00:00+01:00", expires=f"{DAY}T20:00:00+01:00", sent=f"{DAY}T05:30:00+01:00"),
+        warning("yellow", "4; Fog", onset=f"{DAY}T03:00:00+01:00", expires=f"{DAY}T11:00:00+01:00", sent=f"{DAY}T01:10:00+01:00"),
+    )
+    assert result["issued_at"] == f"{DAY}T01:10:00+01:00"
 
 
 def test_the_warning_text_never_reaches_the_reading():
