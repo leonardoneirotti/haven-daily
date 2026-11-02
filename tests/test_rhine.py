@@ -46,9 +46,33 @@ def test_a_reading_below_the_record_low_is_a_valid_alert():
     assert rhine.kaub_level(-3, THRESHOLDS) == "red"
 
 
-@pytest.mark.parametrize("value, level", [(80.5, "amber"), (150.5, "green"), (460.5, "amber"), (640.5, "red")])
-def test_a_value_between_whole_centimetres_falls_on_the_right_side(value, level):
-    assert rhine.kaub_level(value, THRESHOLDS) == level
+@pytest.mark.parametrize(
+    "value, shown, level",
+    [
+        (150.5, 151, "green"),  # owner, 2 Nov 2026 (PR #72): rounded half up first, then compared
+        (80.5, 81, "amber"),
+        (150.4, 150, "amber"),
+        (80.4, 80, "red"),
+        (460.5, 461, "amber"),
+        (640.5, 641, "red"),
+        (21.4, 21, "red"),
+    ],
+)
+def test_kaub_value_is_rounded_to_whole_cm_before_the_level_is_decided(value, shown, level):
+    # So the number on the page always matches its level: never "150 cm · Normal".
+    reading = rhine.kaub_from_answer(kaub_answer(value=value), READ_AT, THRESHOLDS)
+    assert reading["value"] == shown and isinstance(reading["value"], int)
+    assert reading["level"] == level
+    assert reading["level"] == rhine.kaub_level(reading["value"], THRESHOLDS)
+
+
+def test_kaub_rounding_is_half_up_not_to_even():
+    # Python's round() would give 150 for 150.5 and 80 for 80.5 (round half to even).
+    assert rhine.round_half_up(150.5) == 151
+    assert rhine.round_half_up(80.5) == 81
+    assert rhine.round_half_up(21.5) == 22
+    assert rhine.round_half_up(21.49) == 21
+    assert rhine.round_half_up(-0.5) == 0
 
 
 def test_thresholds_come_from_the_config_not_from_the_api():
@@ -81,7 +105,7 @@ def test_kaub_reading_has_the_shape_the_page_uses():
         "unit": "cm",
         "place": "Kaub gauge",
         "level": "amber",
-        "gauge_max": 300,
+        "gauge_max": 700,
         "observed_at": "2026-11-02T06:30:00+01:00",
         "source_name": "WSV via PEGELONLINE",
         "source_url": "https://pegelonline.wsv.de/gast/stammdaten?pegelnr=25700100",
@@ -92,7 +116,12 @@ def test_kaub_reading_has_the_shape_the_page_uses():
 def test_kaub_whole_centimetres_are_stored_as_a_whole_number():
     assert rhine.kaub_from_answer(kaub_answer(value=21.0), READ_AT, THRESHOLDS)["value"] == 21
     assert isinstance(rhine.kaub_from_answer(kaub_answer(value=21.0), READ_AT, THRESHOLDS)["value"], int)
-    assert rhine.kaub_from_answer(kaub_answer(value=21.4), READ_AT, THRESHOLDS)["value"] == 21.4
+
+
+def test_gauge_top_is_above_the_high_water_alert_edge():
+    # Owner, 2 Nov 2026 (PR #72): 700 cm, so Watch (> 460) and Alert (> 640) show on the gauge.
+    assert rhine.GAUGE_MAX == 700
+    assert rhine.GAUGE_MAX > THRESHOLDS.alert_above
 
 
 def test_kaub_time_is_stored_in_amsterdam_time():

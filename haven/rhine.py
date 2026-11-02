@@ -5,7 +5,8 @@ Two readings a morning, from two public APIs with no key:
 - **Kaub** (PEGELONLINE, WSV; DL-DE->Zero-2.0): the gauge on the Middle Rhine that barge
   operators use for their low-water surcharges. One GET of `currentmeasurement.json`: the
   latest value (cm on the gauge board, every 15 minutes) and its time. **Shown** on the
-  status line, with a level from the thresholds in `config/rhine.toml`:
+  status line, rounded to whole cm (half up) and then given a level from the thresholds
+  in `config/rhine.toml`, so the number shown always matches its level:
   Alert at 80 cm or below or above 640, Watch at 150 or below or above 460, Normal between.
   A reading below the record low (21 cm on 2 Nov 2026, under NNW 25) is a valid Alert.
 - **Lobith** (Rijkswaterstaat; CC0): where the Rhine enters the Netherlands. One POST to
@@ -35,7 +36,7 @@ KAUB_URL = "https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/KAUB
 KAUB_PAGE = "https://pegelonline.wsv.de/gast/stammdaten?pegelnr=25700100"  # the gauge's public page
 KAUB_FAILURE_SOURCE = "Rhine level, Kaub (PEGELONLINE)"
 KAUB_MAX_AGE = timedelta(hours=6)  # the gauge reports every 15 minutes; older = stuck
-GAUGE_MAX = 300  # top of the little river-gauge graphic, in cm (display only, as in the samples)
+GAUGE_MAX = 700  # top of the river-gauge graphic, cm: above Alert 640, so high water shows (owner, PR #72; may change in #25)
 
 LOBITH_URL = "https://ddapi20-waterwebservices.rijkswaterstaat.nl/ONLINEWAARNEMINGENSERVICES/OphalenWaarnemingen"
 LOBITH_PAGE = "https://rijkswaterstaatdata.nl/waterdata/"
@@ -91,9 +92,15 @@ def kaub_from_answer(data, read_at: datetime, thresholds: RhineThresholds) -> di
         raise RhineDataError("no readable time in the answer")
     if read_at - observed > KAUB_MAX_AGE:
         raise RhineDataError(f"latest reading is from {_iso(observed)}, older than 6 h (gauge stuck?)")
+    shown = round_half_up(value)  # first round, then compare: the number and its level always agree
     reading = kaub_no_data()
-    reading.update(value=value, level=kaub_level(value, thresholds), observed_at=_iso(observed))
+    reading.update(value=shown, level=kaub_level(shown, thresholds), observed_at=_iso(observed))
     return reading
+
+
+def round_half_up(value: float) -> int:
+    """Whole centimetres, .5 going up (150.5 -> 151). Python's round() would give 150 (half to even)."""
+    return math.floor(value + 0.5)
 
 
 def kaub_no_data() -> dict:
