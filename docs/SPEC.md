@@ -460,7 +460,7 @@ The relevance filter (§5.4) uses the standard API: its output is needed before 
 - **Result:** facts about equal (2 errors each; both misread a PIN notice's "End Date" at least once). **Severity: Sonnet followed §2.1 on 13 of 14 rated items, Haiku on 7 of 15**: Haiku rated fog and pilot notices that had already ended High 3× and Medium 4×. Tags: Haiku 2 mistakes (*Sea access* as a filler), Sonnet 1 small. Sonnet left 1 quote-heavy item unrated (copy check after the retry). Measured per item: Haiku $0.00076, Sonnet $0.0090 (standard API); **at 12 items/day in batch ≈ $0.14 vs ≈ $1.63 a month** (Sonnet used far fewer output tokens than the $2.90 estimate above assumed).
 - **The owner's decision (2 Nov 2026): Sonnet 5.5, through the batch** (checklist #43), as Claude recommended. Set in `SUMMARY_MODEL` in `haven/summarise.py`; `FALLBACK_MODEL` stays Haiku 5.5 (§5.5 step 3). Two prompt fixes that the comparison showed (a meaning per tag; something already ended = Low, and what a PIN "End Date" means) are issue #67, right after #17 in build order, with a re-run of the same 15 items (and a proposal to drop PIN notices whose End Date has passed).
 
-*Claude's defaults for the comparison, not yet confirmed by the owner:*
+*Proposed by Claude, all five confirmed by the owner 2 Nov 2026 (issue #17, PR #66):*
 1. **Both models get exactly the same request** (tested), including effort `medium`, the summariser's setting (Sonnet 5.5's own default would be `high`): the comparison is of the models, not of their settings.
 2. **Standard API, not the batch**: the batch sends the same request (§5.5), so the answers should be alike, and the result comes in minutes.
 3. **A cap on items, taken in config order** (`--max-items`), so the cost has a ceiling before the run.
