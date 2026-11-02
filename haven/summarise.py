@@ -25,12 +25,17 @@ The checks (any failure = the item is **unrated**: severity, summary and impact 
 - the answer must be readable JSON with every field, enums from their lists;
 - summary and impact must be text, not too long, and must not copy 10 or more words in a row
   from the article (hard rules 2 and 13: the summary is committed to the public repo);
-- strike dates must be ISO dates (YYYY-MM-DD) **stated in the source's own wording**
-  (`stated_in`), end not before start;
 - a `same` / `unsure` strike match must name a known strike id; for a `new` strike **the code**
   gives the id (`strike-YYYY-MM-DD-n`), never the AI;
 - place and tags go through `places.pick` (#14): anything off the lists is dropped and logged
   as `unlisted`, which doesn't make the item unrated.
+
+Strike dates (owner's decisions, 2 Nov 2026): the AI **copies the words** that say when a strike
+starts and ends ("on Thursday", "5 November", "tomorrow"), and **the code works out the date**
+(`resolve_phrase`): "today", "tomorrow" and weekday names against the item's published date
+(Amsterdam), day and month from the words themselves. Words that are not in the source are left
+out with a failure line; vague words ("next week", "soon") or no published date give no date.
+Either way the strike itself stays (with no date it shows Watch, §5.7), and the item stays rated.
 
 API failures are handled like the relevance filter's (§5.4, #13): no key, a rejected key or the
 first 3 calls in a row failing = **AI unavailable** (nothing is summarised; the runner, #22,
@@ -44,17 +49,18 @@ import html
 import json
 import re
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, datetime, timedelta
 
 import anthropic
 
+from haven.clock import AMSTERDAM
 from haven.config import Place, Source, load_places, load_tags
 from haven.feeds import Item
 from haven.filter import BREAKER, NO_KEY
 from haven.places import pick
 
-__all__ = ["BREAKER", "SUMMARY_MODEL", "SummaryResult", "brief_item", "known_strikes", "stated_in",
-           "summarise", "unrated"]
+__all__ = ["BREAKER", "SUMMARY_MODEL", "SummaryResult", "brief_item", "known_strikes", "phrase_in",
+           "published_day", "resolve_phrase", "summarise", "unrated"]
 
 SUMMARY_MODEL = "claude-haiku-5-5"  # spec §5.5: the default unless Sonnet 5.5 is clearly better (#17)
 SUMMARY_EFFORT = "medium"
@@ -67,6 +73,7 @@ MATCHES = ("same", "new", "unsure")
 SUMMARY_MAX = 320  # characters; the sample summaries are 156–172
 IMPACT_MAX = 400  # the sample impacts are 194–262
 LOCATION_MAX = 80
+PHRASE_MAX = 80  # characters of a date phrase ("from Thursday 5 to Saturday 7 November")
 COPY_RUN = 10  # this many words in a row from the article = copied, not own words
 
 
@@ -131,9 +138,10 @@ or go-slow, also when announced, called off or settled). Otherwise:
 postponed indefinitely, or settled);
 - location: where, in a few words (for example "ECT Delta, Maasvlakte");
 - affects_rotterdam: true if it affects the Port of Rotterdam or freight to and from it;
-- start and end: the dates as YYYY-MM-DD, only if the item states the day and the month. A \
-weekday alone ("on Thursday"), "tomorrow" or "next week" is not a stated date: answer null. Never \
-work a date out;
+- start_phrase and end_phrase: copy the words that say when it starts and when it ends, \
+exactly as written in the item (for example "on Thursday", "tomorrow", "5 November", "from 5 to 7 \
+November"). Do not turn them into a date and do not change them: the code works out the date. For \
+a one-day strike give the same words for both. null if the item doesn't say;
 - match: compare it with the known strikes given with the item. "same" and that strike's id if \
 you are sure it is the same strike; "unsure" and its id if it might be; "new" and strike_id null \
 if it is a different strike or none are listed.
@@ -148,19 +156,19 @@ def system_prompt(places: tuple[Place, ...], tags: tuple[str, ...]) -> str:
     return _PROMPT.format(places=place_lines, tags=", ".join(tags))
 
 
-_NULLABLE_DATE = {"anyOf": [{"type": "string", "format": "date"}, {"type": "null"}]}
+_NULLABLE_TEXT = {"anyOf": [{"type": "string"}, {"type": "null"}]}
 _STRIKE_SCHEMA = {
     "type": "object",
     "properties": {
         "state": {"type": "string", "enum": list(STRIKE_STATES)},
         "location": {"type": "string"},
         "affects_rotterdam": {"type": "boolean"},
-        "start": _NULLABLE_DATE,
-        "end": _NULLABLE_DATE,
+        "start_phrase": _NULLABLE_TEXT,
+        "end_phrase": _NULLABLE_TEXT,
         "match": {"type": "string", "enum": list(MATCHES)},
-        "strike_id": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "strike_id": _NULLABLE_TEXT,
     },
-    "required": ["state", "location", "affects_rotterdam", "start", "end", "match", "strike_id"],
+    "required": ["state", "location", "affects_rotterdam", "start_phrase", "end_phrase", "match", "strike_id"],
     "additionalProperties": False,
 }
 
@@ -269,8 +277,9 @@ def summarise(items: list[Item], client, known: list[dict], today: date, model: 
             usage = getattr(response, "usage", None)
             input_tokens += getattr(usage, "input_tokens", 0) or 0
             output_tokens += getattr(usage, "output_tokens", 0) or 0
+            notes: list[str] = []  # problems that leave the item rated (a date left out)
             try:
-                ai = _checked(_answer(response), item, known_ids, today, places, tags)
+                ai = _checked(_answer(response), item, known_ids, today, places, tags, notes)
             except _ItemFailed as problem:
                 fail(item, str(problem))
                 continue
@@ -281,6 +290,7 @@ def summarise(items: list[Item], client, known: list[dict], today: date, model: 
                 ai["strike"]["strike_id"] = _new_strike_id(today, taken)
             ai["written_by"] = {"model": model, "api": "standard"}
             done.append(replace(item, ai=ai))
+            failures.extend({"source": SUMMARISER, "error": f"{item.url}: {note}"} for note in notes)
             continue
 
         # The call itself failed (after the SDK's own retries). Only these count as an outage:
@@ -325,7 +335,7 @@ def _answer(response) -> dict:
     return data
 
 
-def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, tags) -> dict:
+def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, tags, notes: list[str]) -> dict:
     """The item's AI fields from a checked answer (strike id and written_by are added after)."""
     headline_only = _headline_only(item)
     required = output_format(headline_only)["schema"]["required"]
@@ -345,7 +355,7 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
     if not isinstance(data["tags"], list):
         raise _ItemFailed("tags are not a list")
     source_text = item.headline if headline_only else f"{item.headline}\n{item.article_text}"
-    strike = _strike(data["strike"], source_text, known_ids, today)
+    strike = _strike(data["strike"], source_text, known_ids, today, published_day(item.published), notes)
 
     picked = pick(data["place"], data["tags"], places=places, tags_list=tags)
     ai = {"severity": data["severity"], "summary": summary, "impact": impact, **picked.record(),
@@ -377,7 +387,8 @@ def copies(text: str, article: str, run: int = COPY_RUN) -> bool:
     return any(tuple(words[i:i + run]) in runs for i in range(len(words) - run + 1))
 
 
-def _strike(value, source_text: str, known_ids: set[str], today: date) -> dict | None:
+def _strike(value, source_text: str, known_ids: set[str], today: date, published: date | None,
+            notes: list[str]) -> dict | None:
     if value is None:
         return None
     if not isinstance(value, dict):
@@ -392,21 +403,6 @@ def _strike(value, source_text: str, known_ids: set[str], today: date) -> dict |
         raise _ItemFailed("strike location too long")
     if type(value.get("affects_rotterdam")) is not bool:
         raise _ItemFailed("strike affects_rotterdam is not true/false")
-
-    dates = {}
-    for key in ("start", "end"):
-        raw = value.get(key)
-        if raw is None:
-            dates[key] = None
-            continue
-        if not isinstance(raw, str) or not _ISO_DATE.match(raw) or _date(raw) is None:
-            raise _ItemFailed(f"strike {key} is not an ISO date")
-        if not stated_in(raw, source_text, today=today):
-            raise _ItemFailed(f"strike {key} date not stated in the source")
-        dates[key] = raw
-    if dates["start"] and dates["end"] and dates["end"] < dates["start"]:
-        raise _ItemFailed("strike ends before it starts")
-
     match = value.get("match")
     if match not in MATCHES:
         raise _ItemFailed("unknown strike match")
@@ -415,13 +411,34 @@ def _strike(value, source_text: str, known_ids: set[str], today: date) -> dict |
         strike_id = value.get("strike_id")
         if strike_id not in known_ids:
             raise _ItemFailed(f"strike match '{match}' does not name a known strike")
+
+    # Dates: a bad one is left out, never guessed; the strike and the item stay (owner, 2 Nov 2026).
+    start = _phrase_date(value.get("start_phrase"), "start", source_text, published, today, notes)
+    end = _phrase_date(value.get("end_phrase"), "end", source_text, published, today, notes)
+    first = start[0] if start else None
+    last = end[1] if end else None
+    if first and last and last < first:
+        notes.append("strike ends before it starts (dates left out)")
+        first = last = None
     return {"state": value["state"], "location": location, "affects_rotterdam": value["affects_rotterdam"],
-            "start": dates["start"], "end": dates["end"], "match": match, "strike_id": strike_id}
+            "start": first.isoformat() if first else None, "end": last.isoformat() if last else None,
+            "match": match, "strike_id": strike_id}
 
 
-# --- "stated in the source": the date check --------------------------------------------------
+def _phrase_date(phrase, key: str, source_text: str, published: date | None, today: date,
+                 notes: list[str]) -> tuple[date, date] | None:
+    if phrase is None or (isinstance(phrase, str) and not phrase.strip()):
+        return None
+    if not isinstance(phrase, str) or len(phrase) > PHRASE_MAX:
+        notes.append(f"strike {key} date is not a short phrase (left out)")
+        return None
+    if not phrase_in(phrase, source_text):
+        notes.append(f"strike {key} date not stated in the source (left out)")
+        return None
+    return resolve_phrase(phrase, published, today)  # None = vague: no date, no failure
 
-_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+# --- strike dates: from the source's own words to a date -------------------------------------
 
 _MONTHS = {  # English and Dutch names and short forms, lower case
     1: ("january", "jan", "januari"), 2: ("february", "feb", "februari"), 3: ("march", "mar", "maart", "mrt"),
@@ -429,49 +446,111 @@ _MONTHS = {  # English and Dutch names and short forms, lower case
     8: ("august", "aug", "augustus"), 9: ("september", "sep", "sept"), 10: ("october", "oct", "oktober", "okt"),
     11: ("november", "nov"), 12: ("december", "dec"),
 }
-_ORDINAL = r"(?:st|nd|rd|th|e|ste|de)?"  # 5th, 5e (Dutch)
+_MONTH_NUMBER = {name: number for number, names in _MONTHS.items() for name in names}
+_MONTH = "(" + "|".join(sorted(map(re.escape, _MONTH_NUMBER), key=len, reverse=True)) + r")\.?"
+_ORDINAL = r"(?:st|nd|rd|th|ste|de|e)?"  # 5th, 5e (Dutch)
 _JOIN = r"(?:,|-|–|—|to|and|until|till|through|tot en met|t/m|tot|en)"
+_DAY_LIST = re.compile(  # "5 November", "5th of November", "5 to 7 November", "5, 6 en 7 november 2026"
+    rf"(?<!\w)(\d{{1,2}}){_ORDINAL}\.?((?:\s*{_JOIN}\s*\d{{1,2}}{_ORDINAL}\.?)*)\s+(?:of\s+)?{_MONTH}"
+    rf"(?:\s+(\d{{4}}))?(?!\w)")
+_MONTH_DAY = re.compile(rf"(?<!\w){_MONTH}\s+(\d{{1,2}}){_ORDINAL}(?:,?\s+(\d{{4}}))?(?!\w)")  # "November 5th"
+_ISO = re.compile(r"(?<!\w)(\d{4})-(\d{2})-(\d{2})(?!\w)")
+_NUMERIC = re.compile(r"(?<![\w./-])(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{4}|\d{2}))?(?![-/.]?\d)")  # day first
+
+_WEEKDAYS = {name: n for n, names in enumerate((
+    ("monday", "maandag"), ("tuesday", "dinsdag"), ("wednesday", "woensdag"), ("thursday", "donderdag"),
+    ("friday", "vrijdag"), ("saturday", "zaterdag"), ("sunday", "zondag"))) for name in names}
+_RELATIVE = re.compile(
+    r"(?<!\w)(today|tonight|vandaag|vanavond|tomorrow|morgen(?:ochtend|middag|avond)?|"
+    + "|".join(_WEEKDAYS) + r")(?!\w)")
+_VAGUE = re.compile(r"(?<!\w)(next|last|previous|volgende|vorige|afgelopen)(?!\w)")
 
 
-def _date(text: str) -> date | None:
+def phrase_in(phrase: str, text: str) -> bool:
+    """True when the phrase is in the text word for word (upper/lower case and spacing ignored)."""
+    words = " ".join(phrase.casefold().split())
+    return bool(words) and words in " ".join(text.casefold().split())
+
+
+def published_day(published: str | None) -> date | None:
+    """The Amsterdam date an item was published, or None when it has no readable date.
+
+    A timestamp without a timezone is read as Amsterdam time, as in the relevance filter (§5.4).
+    """
+    if not isinstance(published, str):
+        return None
     try:
-        return date.fromisoformat(text)
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", published):
+            return date.fromisoformat(published)
+        moment = datetime.fromisoformat(published)
     except ValueError:
         return None
+    if moment.tzinfo is None or moment.utcoffset() is None:
+        return moment.date()
+    return moment.astimezone(AMSTERDAM).date()
 
 
-def stated_in(iso: str, text: str, today: date | None = None) -> bool:
-    """True when the text states this calendar date (day and month), in English, Dutch or numbers.
+def resolve_phrase(phrase: str, published: date | None, today: date) -> tuple[date, date] | None:
+    """(first day, last day) a date phrase names, or None when it names no clear date.
 
-    Accepted: "5 November", "5th of November", "November 5", "5 november" (Dutch), "5-7 November"
-    and "5, 6 and 7 November" (for the 5th), "05-11-2026", "5/11", "5.11.26", "2026-11-05". Day
-    first, as written in Europe. A year in the text must be the date's year. Not accepted: a
-    weekday alone, "tomorrow", "next week" (the AI would have to work the date out). With
-    `today`, the date's year must also be this year or the next (or last year, for a strike
-    reported just after New Year), since a text without a year can't confirm it.
+    - **Day and month written out** ("5 November", "November 5th", "5 t/m 7 november", "05-11-2026",
+      "5/11" = day first, "2026-11-05"): those days. A year in the words is taken as written;
+      without one, the year that puts the date nearest the published date (or today, if the
+      item has none), so "5 January" in a 30 December item is next year.
+    - **"today", "tonight", "tomorrow"** (and Dutch "vandaag", "vanavond", "morgen", "morgenochtend"
+      …): counted from the published date.
+    - **A weekday** ("on Thursday", "aanstaande donderdag"): the first one after the published
+      date. The published day's own weekday is ambiguous (today, or a week later?): no date.
+    - **Vague or ambiguous** ("next week", "soon", "next Thursday", "last Monday"), an impossible
+      date ("31 November"), or a relative phrase without a published date: None.
     """
-    day = _date(iso)
-    if day is None:
-        return False
-    if today is not None and not (today.year - 1 <= day.year <= today.year + 1):
-        return False
-    d, m, y = day.day, day.month, day.year
-    month = "(?:" + "|".join(re.escape(name) for name in _MONTHS[m]) + r")\.?"
-    days = rf"0?{d}{_ORDINAL}\.?"
-    patterns = [
-        # "5 November", "5th of November", "5 to 7 November", "5, 6 and 7 November"
-        rf"(?<![\w]){days}(?:\s*{_JOIN}\s*\d{{1,2}}{_ORDINAL}\.?)*\s+(?:of\s+)?{month}(?!\w)",
-        rf"(?<!\w){month}\s+{days}(?!\w)",  # "November 5", "Nov. 5th"
-        rf"(?<!\w){y:04d}-{m:02d}-{d:02d}(?!\w)",  # ISO
-    ]
-    if any(re.search(p, text, re.IGNORECASE) for p in patterns):
-        return True
-    numeric = re.compile(rf"(?<![\w./-])0?{d}[-/.]0?{m}(?:[-/.](\d{{4}}|\d{{2}}))?(?![-/.]?\d)")
-    for found in numeric.finditer(text):
-        year = found.group(1)
-        if year is None or int(year) in (y, y % 100):
-            return True
-    return False
+    words = " ".join(phrase.casefold().split())
+    reference = published or today
+    found: list[date] = []
+    try:
+        for m in _DAY_LIST.finditer(words):
+            days = [m.group(1)] + re.findall(r"\d{1,2}", m.group(2))
+            found += [_day(int(d), _MONTH_NUMBER[m.group(3)], m.group(4), reference) for d in days]
+        for m in _MONTH_DAY.finditer(words):
+            found.append(_day(int(m.group(2)), _MONTH_NUMBER[m.group(1)], m.group(3), reference))
+        for m in _ISO.finditer(words):
+            found.append(date(int(m.group(1)), int(m.group(2)), int(m.group(3))))
+        for m in _NUMERIC.finditer(words):
+            found.append(_day(int(m.group(1)), int(m.group(2)), m.group(3), reference))
+    except ValueError:  # "31 November", month 13
+        return None
+    if found:
+        return min(found), max(found)
+
+    if published is None or _VAGUE.search(words):
+        return None
+    for m in _RELATIVE.finditer(words):
+        token = m.group(1)
+        if token in ("today", "tonight", "vandaag", "vanavond"):
+            found.append(published)
+        elif token in ("tomorrow",) or token.startswith("morgen"):
+            found.append(published + timedelta(days=1))
+        else:
+            ahead = (_WEEKDAYS[token] - published.weekday()) % 7
+            if ahead == 0:
+                return None
+            found.append(published + timedelta(days=ahead))
+    return (min(found), max(found)) if found else None
+
+
+def _day(day: int, month: int, year: str | None, reference: date) -> date:
+    """A date from day and month; the year as written, else the one nearest `reference`."""
+    if year is not None:
+        return date(int(year) + (2000 if len(year) == 2 else 0), month, day)
+    candidates = []
+    for y in (reference.year - 1, reference.year, reference.year + 1):
+        try:
+            candidates.append(date(y, month, day))
+        except ValueError:  # 29 February in a year without it
+            pass
+    if not candidates:
+        raise ValueError(f"no such day: {day}/{month}")
+    return min(candidates, key=lambda d: abs(d - reference))
 
 
 # --- known strikes, and the brief item -------------------------------------------------------
