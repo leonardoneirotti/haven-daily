@@ -533,7 +533,8 @@ def method_page(sources: tuple[Source, ...], rhine: RhineThresholds) -> dict:
         listed = [
             {
                 "name": src.name,
-                "url": src.urls[0] if src.urls else None,
+                "home": src.home,  # the name links the source's normal public page
+                "read_url": src.urls[0] if src.urls else None,  # "(feed)": what the job reads
                 "language_name": LANGUAGE_NAMES.get(src.language, src.language) if src.language else None,
                 "access": {"rss": "RSS feed", "html": "Web page"}.get(src.access),
                 "how": source_use(src),

@@ -2008,6 +2008,12 @@ td.ais-text {
   gap: 0.55rem;
 }
 
+/* "(feed)": the address the job reads, after the link to the source's public page */
+.source-feed {
+  font-size: 0.875em;
+  color: var(--ink-2);
+}
+
 .source-group h3 {
   font-family: var(--font-mono);
   font-size: 0.8125rem;
