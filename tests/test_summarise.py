@@ -6,7 +6,7 @@ rule 13). The real place and tag lists (config/) are used, so the ids are the re
 """
 
 import json
-from datetime import date
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
 import anthropic
@@ -14,8 +14,9 @@ import httpx2
 import pytest
 
 from haven import storage
-from haven.config import Source
-from haven.feeds import Item
+from haven.clock import AMSTERDAM
+from haven.config import Source, load_tag_list
+from haven.feeds import PIN_SOURCE_ID, Item
 from haven.render import render_site
 from haven.summarise import (
     BREAKER,
@@ -30,6 +31,7 @@ from haven.summarise import (
 )
 
 TODAY = date(2026, 11, 2)
+READ_AT = datetime(2026, 11, 2, 6, 45, tzinfo=AMSTERDAM)  # when the sources were read
 ARTICLE = (
     "Invented article. Dockworkers at the ECT Delta terminal on the Maasvlakte will stop work "
     "on 5 November, the union said on Monday. Container handling is expected to halt for the "
@@ -121,9 +123,9 @@ class FakeClient:
         self.messages = FakeMessages(answers)
 
 
-def run(items, *answers, known=(), **kw):
+def run(items, *answers, known=(), read_at=READ_AT, **kw):
     client = FakeClient(*answers)
-    result = summarise(list(items), client, known=list(known), today=TODAY, **kw)
+    result = summarise(list(items), client, known=list(known), today=TODAY, read_at=read_at, **kw)
     return result, client
 
 
@@ -551,7 +553,7 @@ def test_failure_lines_never_repeat_what_the_ai_or_the_article_wrote():
 
 
 def test_no_client_means_ai_unavailable_and_items_untouched():
-    result = summarise([item()], None, known=[], today=TODAY)
+    result = summarise([item()], None, known=[], today=TODAY, read_at=READ_AT)
     assert result.unavailable == "ANTHROPIC_API_KEY is not set"
     assert result.items[0].ai is None and result.calls == 0
     assert result.failures == [{"source": "AI summariser", "error": "AI unavailable: ANTHROPIC_API_KEY is not set"}]
@@ -656,3 +658,86 @@ def test_brief_items_from_the_summariser_render(tmp_path):
     assert render_site(tmp_path / "briefs", tmp_path / "site") >= 1
     page = (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
     assert GOOD["summary"] in page and "Invented: port strike called off" in page
+
+
+# --- prompt fixes after the comparison (issue #67) ----------------------------------------------
+
+
+def pin_item(end="2 Nov 2026 - 02:47", n=1):
+    text = ("Invented notice. Visibility in the invented area is below 1000 metres; inbound ships wait "
+            f"for permission from the traffic centre. End Date {end} Please follow the invented rules.")
+    return Item(source=PIN_SOURCE_ID, headline="Visibility Arrangement - Activate", url=f"https://pin.test/{n}",
+                published="2026-11-01T21:00:00+01:00", language="en", access="full", article_text=text,
+                filter={"kept": True, "stage": "ai", "reason": "Invented reason."})
+
+
+PIN_GOOD = dict(summary="Low visibility made the traffic centre hold inbound ships until it cleared.",
+                impact="Arrivals may run late; check updated ETAs with the agent.", tags=["Sea access"],
+                place="none", strike=None)
+
+
+def test_the_prompt_gives_every_tag_with_its_meaning():
+    _, client = run([item()], full())
+    system = client.messages.calls[0]["system"]
+    tags = load_tag_list()
+    assert tags
+    for tag in tags:
+        assert f"- {tag.name}: {tag.meaning}" in system
+
+
+def test_the_prompt_says_something_already_over_is_low():
+    _, client = run([item()], full())
+    system = client.messages.calls[0]["system"]
+    assert "already over" in system
+    low_rule = next(line for line in system.splitlines() if line.startswith("- Low:"))
+    assert "already over" in low_rule
+
+
+def test_the_prompt_says_what_a_pin_end_date_means():
+    _, client = run([item()], full())
+    system = client.messages.calls[0]["system"]
+    assert '"End Date"' in system
+    assert "when the notice itself stops being valid" in system
+    assert "not when the measure started or stopped" in system
+    assert '"Activate"' in system and '"De-activate"' in system and "published" in system
+
+
+def test_the_request_gives_the_time_the_sources_were_read():
+    _, client = run([item()], full(), read_at=READ_AT)
+    assert "The sources were read at 06:45 Amsterdam time on 2026-11-02." in user_text(client.messages.calls[0])
+
+
+def test_the_time_is_given_in_amsterdam_time_whatever_zone_it_is_passed_in():
+    _, client = run([item()], full(), read_at=READ_AT.astimezone(timezone.utc))
+    assert "06:45 Amsterdam time" in user_text(client.messages.calls[0])
+
+
+@pytest.mark.parametrize("severity", ["high", "medium", "low"])
+def test_a_kept_notice_that_has_already_ended_is_low_whatever_the_ai_says(severity):
+    result, _ = run([pin_item(end="2 Nov 2026 - 02:47")], full(severity=severity, **PIN_GOOD), read_at=READ_AT)
+    ai = result.items[0].ai
+    assert ai["severity"] == "low"
+    assert ai["summary"] == PIN_GOOD["summary"]  # nothing else is changed
+    assert result.failures == []
+
+
+def test_a_notice_that_has_not_ended_keeps_the_ais_severity():
+    result, _ = run([pin_item(end="2 Nov 2026 - 21:00")], full(severity="high", **PIN_GOOD), read_at=READ_AT)
+    assert result.items[0].ai["severity"] == "high"
+
+
+def test_a_notice_without_a_readable_end_date_keeps_the_ais_severity():
+    result, _ = run([pin_item(end="31 Nov 2026 - 10:00")], full(severity="high", **PIN_GOOD), read_at=READ_AT)
+    assert result.items[0].ai["severity"] == "high"
+
+
+def test_other_sources_are_never_forced_to_low_by_an_end_date():
+    text = ARTICLE + " End Date 1 Nov 2026 - 02:00"
+    result, _ = run([item(text=text)], full(severity="high"), read_at=READ_AT)
+    assert result.items[0].ai["severity"] == "high"
+
+
+def test_an_ended_notice_the_ai_refused_stays_unrated():
+    refusal = answer(None, stop_reason="refusal")
+    result, _ = run([pin_item()], refusal, read_at=READ_AT)
+    assert result.items[0].ai == unrated()

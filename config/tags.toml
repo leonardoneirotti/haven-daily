@@ -6,25 +6,81 @@
 # on the item's line in data/items/ ("unlisted"). Add a tag when the log shows the
 # same one coming up often (build plan step 10). Matching ignores upper/lower case;
 # the item always gets the spelling written here.
-# Read and checked by haven/config.py; used by haven/places.py.
+#
+# Each tag has a one-line `meaning` (at most 240 characters), sent with the tag in
+# the summariser prompt, so the AI doesn't guess a tag from its name (issue #67:
+# the comparison showed "Sea access" and "Hinterland" used as fillers).
+# Read and checked by haven/config.py; used by haven/places.py and haven/summarise.py.
 
-affects = [
-  # Cargo types
-  "Containers",
-  "Dry bulk",
-  "Liquid bulk",
-  "Breakbulk",
-  "RoRo",
-  # Ways cargo moves in and out of the port
-  "Shortsea",
-  "Ferries",
-  "Barge",
-  "Rail",
-  "Truck pickups",
-  "Rhine",
-  "Hinterland",
-  "Sea access",
-  # Rules and people
-  "Customs",
-  "Labour",
-]
+# ---------- Cargo types ----------
+
+[[tag]]
+name = "Containers"
+meaning = "Container cargo: container terminals, container ships and carriers' container services."
+
+[[tag]]
+name = "Dry bulk"
+meaning = "Loose dry cargo such as iron ore, coal, grain, biomass or scrap, and the terminals that handle it."
+
+[[tag]]
+name = "Liquid bulk"
+meaning = "Oil, oil products, chemicals, LNG and other liquids or gases shipped in bulk, their tank terminals and pipelines."
+
+[[tag]]
+name = "Breakbulk"
+meaning = "General cargo shipped piece by piece, not in containers: steel, project cargo, machinery, forest products."
+
+[[tag]]
+name = "RoRo"
+meaning = "Rolling cargo driven on and off ships: cars, trucks, trailers."
+
+# ---------- Ways cargo moves in and out of the port ----------
+
+[[tag]]
+name = "Shortsea"
+meaning = "Sea transport within Europe on smaller ships (feeder and shortsea services), not deep-sea routes."
+
+[[tag]]
+name = "Ferries"
+meaning = "Scheduled ferry services for freight and passengers, for example to and from the UK."
+
+[[tag]]
+name = "Barge"
+meaning = "Inland shipping: barges on rivers and canals to and from the port, barge terminals and barge waiting times."
+
+[[tag]]
+name = "Rail"
+meaning = "Freight trains to and from the port: the Betuweroute, rail terminals, track works, rail bridges."
+
+[[tag]]
+name = "Truck pickups"
+meaning = "Trucks collecting or delivering cargo at the terminals: slots, gate times, waiting times, road closures near the port."
+
+[[tag]]
+name = "Rhine"
+meaning = "The river Rhine itself: water levels, closures or incidents on the river that limit barges to Germany and beyond."
+
+[[tag]]
+name = "Hinterland"
+meaning = "Cargo moving between the port and inland Europe by several modes at once, or by no named mode. Not for an area named \"Hinterland\" (as in a PIN notice)."
+
+[[tag]]
+name = "Sea access"
+meaning = "Ships reaching or leaving the port by sea: fairways, pilots, tugs, anchorages, storm barriers, fog; not work on the quay."
+
+# ---------- Rules and people ----------
+
+[[tag]]
+name = "Customs"
+meaning = "Customs and border checks, inspections and scanning, declarations, and the rules and fees that come with them."
+
+[[tag]]
+name = "Labour"
+meaning = "Strikes and other labour action, wage talks and staff shortages at the port or in transport."
+
+# ---------- Systems ----------
+
+# Owner's addition, 2 Nov 2026 (issue #67).
+[[tag]]
+name = "IT systems"
+meaning = "Outages or cyberattacks affecting Portbase, terminal or carrier IT systems, and booking or gate systems."

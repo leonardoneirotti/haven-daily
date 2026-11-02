@@ -30,6 +30,7 @@ from haven.summarise import (
 )
 from test_summarise import (
     COPIED,
+    READ_AT,
     REQUEST,
     TODAY,
     FakeClient,
@@ -39,6 +40,8 @@ from test_summarise import (
     headline_answer,
     headline_item,
     item,
+    PIN_GOOD,
+    pin_item,
     status_error,
     strike,
     user_text,
@@ -150,7 +153,7 @@ def run_batch(items, *answers, known=(), model=SUMMARY_MODEL, **batch_kw):
     clock = Clock()
     batches = FakeBatches(clock, **batch_kw)
     client = BatchClient(batches, *answers)
-    result = summarise_batch(list(items), client, known=list(known), today=TODAY, model=model,
+    result = summarise_batch(list(items), client, known=list(known), today=TODAY, read_at=READ_AT, model=model,
                              clock=clock, sleep=clock.sleep)
     return result, client, batches, clock
 
@@ -189,7 +192,7 @@ def test_a_batch_finished_in_time_writes_every_item_and_nothing_falls_back():
 def test_the_batch_holds_one_request_per_item_identical_to_the_standard_request():
     items = [item(1), headline_item(2)]
     standard = FakeClient(full(strike=None), headline_answer())
-    summarise(items, standard, known=[], today=TODAY, model=SONNET)
+    summarise(items, standard, known=[], today=TODAY, read_at=READ_AT, model=SONNET)
     _, _, batches, _ = run_batch(items, model=SONNET,
                                  results={0: succeeded(full(strike=None)), 1: succeeded(headline_answer())})
     [requests] = batches.created
@@ -243,7 +246,7 @@ def test_the_wait_counts_from_the_batch_start_so_another_step_can_run_meanwhile(
     clock = Clock()
     batches = FakeBatches(clock, ends_at=NEVER, results={0: succeeded(full(strike=None))})
     client = BatchClient(batches, full(strike=None))
-    run = start_batch([item(1), item(2)], client, known=[], today=TODAY, clock=clock)
+    run = start_batch([item(1), item(2)], client, known=[], today=TODAY, read_at=READ_AT, clock=clock)
     clock.now += 15 * 60  # e.g. the AIS snapshot (#31) runs during the wait
     result = finish_batch(run, sleep=clock.sleep)
     assert batches.cancelled_at == BATCH_WAIT  # not 15 + 20 minutes
@@ -254,7 +257,7 @@ def test_the_wait_counts_from_the_batch_start_so_another_step_can_run_meanwhile(
 def test_if_the_batch_ended_during_the_other_step_finishing_does_not_wait():
     clock = Clock()
     batches = FakeBatches(clock, ends_at=5 * 60, results={0: succeeded(full(strike=None))})
-    run = start_batch([item(1)], BatchClient(batches), known=[], today=TODAY, clock=clock)
+    run = start_batch([item(1)], BatchClient(batches), known=[], today=TODAY, read_at=READ_AT, clock=clock)
     clock.now += 12 * 60
     result = finish_batch(run, sleep=clock.sleep)
     assert clock.sleeps == [] and written_by(result) == [BATCH]
@@ -298,7 +301,7 @@ def test_a_rejected_key_at_batch_creation_means_ai_unavailable(cls, code):
 
 
 def test_no_client_means_ai_unavailable_and_no_batch():
-    result = summarise_batch([item()], None, known=[], today=TODAY)
+    result = summarise_batch([item()], None, known=[], today=TODAY, read_at=READ_AT)
     assert result.unavailable == "ANTHROPIC_API_KEY is not set" and result.items[0].ai is None
 
 
@@ -402,7 +405,7 @@ def test_batch_tokens_are_counted_apart_for_the_cost_check():
 
 
 def test_the_standard_summariser_alone_counts_its_items_as_standard():
-    result = summarise([item(1)], FakeClient(full(strike=None)), known=[], today=TODAY)
+    result = summarise([item(1)], FakeClient(full(strike=None)), known=[], today=TODAY, read_at=READ_AT)
     assert result.summaries == {"batch": 0, "fallback": 1}
     assert (result.batch_input_tokens, result.batch_output_tokens) == (0, 0)
 
@@ -413,3 +416,19 @@ def test_a_strike_from_a_batch_answer_keeps_its_known_id():
     result, *_ = run_batch([item(1)], known=known,
                            results={0: succeeded(full(strike=strike(match="same", strike_id="strike-2026-10-30-1")))})
     assert result.items[0].ai["strike"]["strike_id"] == "strike-2026-10-30-1"
+
+
+# --- an ended PIN notice is Low on the batch route too (issue #67) ----------------------------
+
+
+def test_an_ended_notice_answered_by_the_batch_is_low():
+    result, *_ = run_batch([pin_item(end="2 Nov 2026 - 02:47")],
+                           results={0: succeeded(full(severity="high", **PIN_GOOD))})
+    assert result.items[0].ai["severity"] == "low"
+    assert result.items[0].ai["written_by"] == BATCH
+
+
+def test_the_batch_request_gives_the_time_the_sources_were_read():
+    _, _, batches, _ = run_batch([item(1)], results={0: succeeded(full(strike=None))})
+    [requests] = batches.created
+    assert "06:45 Amsterdam time" in user_text(requests[0]["params"])
