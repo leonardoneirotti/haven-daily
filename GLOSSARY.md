@@ -44,6 +44,10 @@ _Avoid_: Trusted source, whitelist
 A kept item that appears with headline and link only, because no severity, summary or impact could be produced for it.
 _Avoid_: Unknown, unclassified, failed item
 
+**Haiku fallback**:
+Summarising an item through the standard API with Claude Haiku 5.5 because the batch gave **no answer** for it within 20 minutes (unfinished, cancelled, expired or errored). Never used for an answer the batch did give: a refusal or bad answer makes the item unrated.
+_Avoid_: Refusal fallback, retry, second opinion
+
 **Reduced brief**:
 A brief published without any AI-written content because the AI was unavailable all morning: status line plus unrated items only.
 _Avoid_: Fallback brief, degraded page, emergency edition

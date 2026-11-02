@@ -18,7 +18,7 @@ haven/pages.py            reads the HTML news lists into the same item shape; K+
 haven/collect.py          the collect step: every source, 14-day duplicate check, feed read time, article text in memory only
 haven/filter.py           relevance filter: rules (older than 48 h, auto-keep, off-topic words), then Claude Haiku 5.5 for the rest; report
 haven/places.py           checks the AI's place and tags against the fixed lists; adds coordinates; logs anything not listed
-haven/summarise.py        summariser: Claude writes summary, impact, severity, place, tags, strike details; the code checks every answer
+haven/summarise.py        summariser: Claude writes summary, impact, severity, place, tags, strike details; the code checks every answer (one batch, 20-min limit, Haiku fallback)
 config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep
 config/filter.toml        off-topic word lists for the relevance filter (small starter lists, tuned after the first runs)
 config/places.toml        the 41 places an item can be pinned to, coordinates taken once from OpenStreetMap (each with its OSM id)
