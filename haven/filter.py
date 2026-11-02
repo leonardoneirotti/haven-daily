@@ -16,11 +16,17 @@ The rules, in this order (first match wins, so the reason is always the first ru
    timezone is read as Amsterdam time. An item with **no readable date** (or a date in the
    future) is never dropped for age: the collect step has already dropped it if its link was
    seen in the last 14 days (`haven/collect.py`), so it is new.
-2. **Auto-keep source** (Port Authority news, ECT; `auto_keep` in `config/sources.toml`) ->
+2. **A PIN notice that ended more than 12 h before the run** -> dropped, reason
+   `PIN notice ended more than 12 h ago (End Date <yyyy-mm-dd hh:mm>)` (owner's decision, 2 Nov
+   2026, issue #67). The End Date (when the *notice* stops being valid) is read from the notice
+   text in memory (`End Date 1 Nov 2026 - 02:47`, Amsterdam time); only the date goes into the
+   reason. Exactly 12 h is kept; no readable End Date = the rule doesn't apply. A notice that
+   ended within the 12 h goes on, and the summariser makes it Low in code (`notice_ended`).
+3. **Auto-keep source** (Port Authority news, ECT; `auto_keep` in `config/sources.toml`) ->
    kept, without the word lists and without the AI check.
-3. **Off-topic word in the headline** -> dropped, reason `off-topic word "<word>"`. The word
+4. **Off-topic word in the headline** -> dropped, reason `off-topic word "<word>"`. The word
    lists are in `config/filter.toml`, one per language; the item's language picks the list.
-4. Anything else -> to the AI check.
+5. Anything else -> to the AI check.
 
 Age comes first, so a three-day-old Port Authority story is still dropped; auto-keep comes
 before the words, so a badly chosen word can't drop a Rotterdam-specific item (both owner's
@@ -63,13 +69,14 @@ import anthropic
 
 from haven.clock import AMSTERDAM
 from haven.config import FilterConfig, Source
-from haven.feeds import Item
+from haven.feeds import PIN_SOURCE_ID, Item
 
 MAX_AGE = timedelta(hours=48)  # exactly 48 h is kept; dropped only when older (spec §5.4)
 
 KEEP, DROP, TO_AI = "keep", "drop", "ai"
 
 TOO_OLD = "older than 48 h"
+PIN_ENDED_GRACE = timedelta(hours=12)  # exactly 12 h is kept; dropped only when longer ago (spec §5.4)
 AUTO_KEEP = "Rotterdam-specific source (auto-keep)"
 GOES_TO_AI = "not decided by the rules: goes to the AI check"
 
@@ -122,6 +129,10 @@ def decide(item: Item, source: Source | None, words, now: datetime, max_age: tim
     if start is not None and _utc(now) - _utc(start) > max_age:
         return Decision(DROP, TOO_OLD if max_age == MAX_AGE else f"older than {max_age.days} days")
 
+    end = pin_end(item)
+    if end is not None and _utc(now) - _utc(end) > PIN_ENDED_GRACE:
+        return Decision(DROP, f"PIN notice ended more than 12 h ago (End Date {end:%Y-%m-%d %H:%M})")
+
     if source is not None and source.auto_keep:
         return Decision(KEEP, AUTO_KEEP)
 
@@ -153,6 +164,64 @@ def age_start(published: str | None) -> datetime | None:
     if moment.tzinfo is None or moment.utcoffset() is None:
         return moment.replace(tzinfo=AMSTERDAM)
     return moment
+
+
+# "End Date 1 Nov 2026 - 02:47" in a PIN notice; the time may be missing ("End Date 1 Nov 2026").
+_END_DATE = re.compile(
+    r"\bEnd\s+Date\s*:?\s*(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})(?!\d)"
+    r"(?:\s*[-–—,]?\s*(\d{1,2})[:.](\d{2})(?!\d))?",
+    re.IGNORECASE)
+_MONTHS = {name: n for n, names in enumerate(
+    (("jan", "january"), ("feb", "february"), ("mar", "march"), ("apr", "april"), ("may",),
+     ("jun", "june"), ("jul", "july"), ("aug", "august"), ("sep", "sept", "september"),
+     ("oct", "october"), ("nov", "november"), ("dec", "december")), start=1) for name in names}
+
+
+def read_end_date(text: str | None) -> datetime | None:
+    """The End Date of a PIN notice, Amsterdam time, or None when there is no readable one.
+
+    The End Date is when the *notice* stops being valid, not when the measure started or
+    stopped (issue #67). Read as written: day, English month name or abbreviation, four-digit
+    year, then the time. Claude's defaults, not yet confirmed by the owner:
+    - **no time** ("End Date 1 Nov 2026"): the end of that day (midnight at the start of the
+      next), like a date-only published date (§5.4), so a notice is never dropped too early;
+    - **an impossible date or time** (31 Nov, 25:10) or a two-digit year: not readable;
+    - **more than one End Date** in a notice: the latest;
+    - **an hour that happens twice or not at all at the clock change**: the reading that is the
+      later moment, again so a notice is never dropped too early.
+    """
+    if not text:
+        return None
+    ends = []
+    for match in _END_DATE.finditer(text):
+        day, month_name, year, hour, minute = match.groups()
+        month = _MONTHS.get(month_name.casefold())
+        if month is None:
+            continue
+        try:
+            if hour is None:
+                moment = datetime(int(year), month, int(day)) + timedelta(days=1)
+            else:
+                moment = datetime(int(year), month, int(day), int(hour), int(minute))
+        except ValueError:  # 31 Nov, 25:10, 10:75
+            continue
+        ends.append(max((moment.replace(tzinfo=AMSTERDAM, fold=fold) for fold in (0, 1)), key=_utc))
+    return max(ends, key=_utc) if ends else None
+
+
+def pin_end(item: Item) -> datetime | None:
+    """The End Date of a PIN notice (its text is in memory from the feed), else None."""
+    if item.source != PIN_SOURCE_ID:
+        return None
+    return read_end_date(item.article_text)
+
+
+def notice_ended(item: Item, now: datetime) -> bool:
+    """True for a PIN notice whose End Date is at or before `now` (the run): the summariser makes it Low."""
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("The run time has no timezone; it must be timezone-aware (Amsterdam or UTC).")
+    end = pin_end(item)
+    return end is not None and _utc(end) <= _utc(now)
 
 
 def off_topic_word(headline: str, words) -> str | None:
