@@ -78,3 +78,10 @@ def test_no_off_topic_word_drops_a_port_headline():
     for language, headlines in port_headlines.items():
         for headline in headlines:
             assert off_topic_word(headline, lists[language]) is None, headline
+
+
+def test_every_headline_only_and_dropped_source_says_why_in_public_words():
+    # The Method page shows `why` (issue #24); `note` stays for people reading the config.
+    for source in load_sources():
+        if source.verdict in ("headline-only", "drop"):
+            assert source.why, f"{source.id}: add a one-line public `why`"
