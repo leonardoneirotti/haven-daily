@@ -252,6 +252,7 @@ haven/                 Python package
   filter.py            relevance filter: stage 1 rules, stage 2 AI check (Haiku 5.5), kept/dropped report (§5.4)
   places.py            the AI's place id + tags -> items[].map, affects, unlisted; nothing off the lists gets through (§5.10)
   summarise.py         summariser: one Claude call per kept item, structured output, checks; unrated on any bad answer (§5.5)
+  compare.py           Haiku 5.5 vs Sonnet 5.5 on the same kept items, side by side, run by hand (§5.5, #17)
   (status.py, ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
@@ -453,6 +454,18 @@ The relevance filter (§5.4) uses the standard API: its output is needed before 
 6. **New strike ids** are `strike-<run date>-<n>`, n counting from 1 and skipping ids already known; an id the AI sends with `"new"` is ignored. The known-strike list is fixed for the whole run (so it also works for the batch in #16): two items about the same *new* strike on the same morning get two ids, which can only make the flag stay up longer (safe side).
 7. **Known strikes:** location and dates from the strike's **newest** item, "first headline" from its **oldest**, oldest strike first; strikes with `affects_rotterdam: false` are listed too, so the AI can match them.
 8. **No refusal fallback to another model**: a refusal makes the item unrated (§5.6), and `written_by` always names the one model that wrote it. *(Confirmed by the owner, 2 Nov 2026.)*
+
+**The comparison (issue #17, run 2 Nov 2026; write-up and side-by-side in `docs/model-comparison.md`).** `python -m haven.compare [--dry-run] [--max-age-days N] [--max-items N] [--out FILE]` collects, filters, reads article text in memory and sends **the same kept items** through `summarise` once per model; it writes nothing to `data/`, and its view holds headlines, links and the AI's own words only (hard rule 13). `--dry-run` makes no API call and prints the cost estimate, so the owner can approve it first.
+- **Run:** 7-day age limit for the comparison only *(owner's choice, 2 Nov 2026: at 02:20 on a Monday the 48 h rule left only headline-only items, nothing to compare)*, 15 of 23 kept items (10 PIN notices, 3 Contargo, 1 ECT, 1 Port Authority). **Cost: ~$0.155** (filter $0.008, Haiku $0.011, Sonnet $0.136), estimate approved beforehand ≤ $0.34.
+- **Result:** facts about equal (2 errors each; both misread a PIN notice's "End Date" at least once). **Severity: Sonnet followed §2.1 on 13 of 14 rated items, Haiku on 7 of 15**: Haiku rated fog and pilot notices that had already ended High 3× and Medium 4×. Tags: Haiku 2 mistakes (*Sea access* as a filler), Sonnet 1 small. Sonnet left 1 quote-heavy item unrated (copy check after the retry). Measured per item: Haiku $0.00076, Sonnet $0.0090 (standard API); **at 12 items/day in batch ≈ $0.14 vs ≈ $1.63 a month** (Sonnet used far fewer output tokens than the $2.90 estimate above assumed).
+- **The owner's decision: pending** (checklist #43). Claude recommends Sonnet 5.5 in the batch; see the doc. The chosen model is `SUMMARY_MODEL` in `haven/summarise.py`.
+
+*Claude's defaults for the comparison, not yet confirmed by the owner:*
+1. **Both models get exactly the same request** (tested), including effort `medium`, the summariser's setting (Sonnet 5.5's own default would be `high`): the comparison is of the models, not of their settings.
+2. **Standard API, not the batch**: the batch sends the same request (§5.5), so the answers should be alike, and the result comes in minutes.
+3. **A cap on items, taken in config order** (`--max-items`), so the cost has a ceiling before the run.
+4. **The age limit is a parameter of the filter** (`max_age`, default 48 h, tested); only `haven.compare` passes another value. The morning job is unchanged.
+5. **"Words not in the source"**: numbers and capitalised names in the summary or impact that the headline and article don't contain (words of the place and tag lists ignored). A pointer for the facts check, not a verdict.
 
 ### 5.6 When the AI fails (decided 31 Oct 2026)
 
@@ -1003,7 +1016,7 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 - ~~Code still on the old review model~~ **Done 1 Nov 2026 (issue #5):** renderer, day and Method templates, README field table and the sample briefs now use `built_at` + `corrections` (the 29 Oct sample has one correction; sample build times moved after 06:45). `BUILD_PLAN.md` is now only a pointer to the GitHub issues and §10.
 - Check `havendaily.nl` availability; buy once the first version works.
 - Test every candidate source (§4) before building on it.
-- Summariser model: run the Haiku 5.5 vs Sonnet 5.5 comparison on the first real run, write `docs/model-comparison.md` (§5.5).
+- Summariser model: ~~run the Haiku 5.5 vs Sonnet 5.5 comparison~~ **run 2 Nov 2026 (#17), written up in `docs/model-comparison.md`; the owner's choice is pending** (§5.5).
 - **After the first week of daily runs: check real AI costs** in the Anthropic Console against the §5.4 estimates.
 - **MeteoAlarm daily snapshot:** email **meteoalarm@geosphere.at** asking whether a daily, dated snapshot (06:45, labelled "not live", linking to meteoalarm.org) is allowed, given the ≤ 10 min real-time requirement for operational use. **The owner sends it.** Keep the reply in `docs/permissions/`. If refused: switch to KNMI directly sooner, or weather = "No data".
 - **Switch weather warnings to KNMI directly** once `KNMI-public-weather-warnings` leaves TEST (check monthly); register a free KNMI key then.
