@@ -18,13 +18,17 @@ from haven.compare import (
     SONNET,
     compare,
     cost_usd,
+    ended_notices,
     estimate,
     format_markdown,
+    run_cost,
+    skip_links,
     unsupported_terms,
 )
 from test_summarise import (
     ARTICLE,
     SOURCES,
+    READ_AT,
     TODAY,
     GOOD,
     answer,
@@ -32,8 +36,11 @@ from test_summarise import (
     headline_answer,
     headline_item,
     item,
+    PIN_GOOD,
+    pin_item,
     status_error,
 )
+from test_summarise_batch import BatchClient, Clock, FakeBatches, succeeded
 
 SECRET_TEXT = "Invented article marker zebra-quartz: the berth stays shut until Friday."
 SECRET_TEASER = "Invented teaser marker mango-lattice."
@@ -106,7 +113,7 @@ def test_the_estimate_with_nothing_to_do_is_zero():
 
 def test_both_models_get_exactly_the_same_request_apart_from_the_model():
     client = Client(haiku=[full()], sonnet=[sonnet_answer()])
-    compare([item(1)], client, known=[], today=TODAY)
+    compare([item(1)], client, known=[], today=TODAY, read_at=READ_AT)
     haiku, sonnet = client.messages.calls
     assert haiku["model"] == HAIKU and sonnet["model"] == SONNET
     assert {k: v for k, v in haiku.items() if k != "model"} == {k: v for k, v in sonnet.items() if k != "model"}
@@ -114,7 +121,7 @@ def test_both_models_get_exactly_the_same_request_apart_from_the_model():
 
 def test_each_model_gets_its_own_result_for_every_item():
     client = Client(haiku=[full(), headline_answer()], sonnet=[sonnet_answer(), headline_answer(severity="low")])
-    result = compare([item(1), headline_item(2)], client, known=[], today=TODAY)
+    result = compare([item(1), headline_item(2)], client, known=[], today=TODAY, read_at=READ_AT)
     assert [i.ai["severity"] for i in result.outputs[HAIKU].items] == ["high", "medium"]
     assert [i.ai["severity"] for i in result.outputs[SONNET].items] == ["medium", "low"]
     assert result.outputs[HAIKU].items[0].ai["written_by"] == {"model": HAIKU, "api": "standard"}
@@ -123,7 +130,7 @@ def test_each_model_gets_its_own_result_for_every_item():
 
 def test_max_items_caps_what_is_sent_and_lists_the_rest():
     client = Client(haiku=[full()], sonnet=[sonnet_answer()])
-    result = compare([item(1), item(2), item(3)], client, known=[], today=TODAY, max_items=1)
+    result = compare([item(1), item(2), item(3)], client, known=[], today=TODAY, read_at=READ_AT, max_items=1)
     assert len(client.messages.calls) == 2  # one item, two models
     assert [i.url for i in result.left_out] == [item(2).url, item(3).url]
 
@@ -131,7 +138,7 @@ def test_max_items_caps_what_is_sent_and_lists_the_rest():
 def test_one_model_failing_does_not_stop_the_other():
     error = status_error(anthropic.InternalServerError, 500)
     client = Client(haiku=[full(), full()], sonnet=[error, sonnet_answer()])
-    result = compare([item(1), item(2)], client, known=[], today=TODAY)
+    result = compare([item(1), item(2)], client, known=[], today=TODAY, read_at=READ_AT)
     assert [i.ai["severity"] for i in result.outputs[HAIKU].items] == ["high", "high"]
     assert [i.ai["severity"] for i in result.outputs[SONNET].items] == [None, "medium"]
     assert "HTTP 500" in result.outputs[SONNET].failures[0]["error"]
@@ -167,14 +174,14 @@ def test_nothing_to_check_gives_nothing():
 def test_the_check_runs_on_summary_and_impact_against_headline_and_article():
     said = sonnet_answer(summary="Dock staff at Antwerp plan a stoppage.", impact="Book 7 extra barges.")
     client = Client(haiku=[full()], sonnet=[said])
-    result = compare([item(1)], client, known=[], today=TODAY)
+    result = compare([item(1)], client, known=[], today=TODAY, read_at=READ_AT)
     assert result.checks[SONNET][0] == ["Antwerp", "7"]
     assert result.checks[HAIKU][0] == []
 
 
 def test_a_headline_only_item_has_nothing_to_check():
     client = Client(haiku=[headline_answer()], sonnet=[headline_answer()])
-    result = compare([headline_item(1)], client, known=[], today=TODAY)
+    result = compare([headline_item(1)], client, known=[], today=TODAY, read_at=READ_AT)
     assert result.checks[HAIKU] == [[]] and result.checks[SONNET] == [[]]
 
 
@@ -183,7 +190,7 @@ def test_a_headline_only_item_has_nothing_to_check():
 
 def view(items, haiku, sonnet, **kw):
     client = Client(haiku=haiku, sonnet=sonnet)
-    return format_markdown(compare(items, client, known=[], today=TODAY, **kw), SOURCES)
+    return format_markdown(compare(items, client, known=[], today=TODAY, read_at=READ_AT, **kw), SOURCES)
 
 
 def test_the_view_shows_headline_link_and_both_answers():
@@ -254,3 +261,113 @@ def test_the_morning_job_keeps_the_48_hour_limit():
     assert MAX_AGE.total_seconds() == 48 * 3600
     assert inspect.signature(apply_rules).parameters["max_age"].default == MAX_AGE
     assert inspect.signature(run_filter).parameters["max_age"].default == MAX_AGE
+
+
+
+# --- the re-run after the prompt fixes: one model, through the batch (issue #67) -------------
+
+
+class BatchByModel(Client):
+    def __init__(self, batches, **answers):
+        super().__init__(**answers)
+        self.messages.batches = batches
+
+
+def batch_compare(items, results, models=(SONNET,), **kw):
+    clock = Clock()
+    batches = FakeBatches(clock, results=results)
+    client = BatchByModel(batches)
+    result = compare(items, client, known=[], today=TODAY, read_at=READ_AT, models=models, batch=True,
+                     clock=clock, sleep=clock.sleep, **kw)
+    return result, client, batches
+
+
+def test_one_model_can_be_run_alone():
+    client = Client(sonnet=[sonnet_answer()])
+    result = compare([item(1)], client, known=[], today=TODAY, read_at=READ_AT, models=(SONNET,))
+    assert list(result.outputs) == [SONNET]
+    assert [c["model"] for c in client.messages.calls] == [SONNET]
+
+
+def test_the_batch_route_sends_one_batch_like_the_morning_job():
+    result, client, batches = batch_compare([item(1), item(2)], {0: succeeded(sonnet_answer()),
+                                                                 1: succeeded(sonnet_answer())})
+    [requests] = batches.created
+    assert [r["params"]["model"] for r in requests] == [SONNET, SONNET]
+    assert client.messages.calls == []  # nothing through the standard API
+    assert [i.ai["written_by"] for i in result.outputs[SONNET].items] == [{"model": SONNET, "api": "batch"}] * 2
+    assert result.route == "batch"
+
+
+def test_the_batch_route_is_not_the_default():
+    client = Client(haiku=[full()], sonnet=[sonnet_answer()])
+    assert compare([item(1)], client, known=[], today=TODAY, read_at=READ_AT).route == "standard"
+
+
+def test_batch_tokens_cost_half_and_standard_tokens_full_price():
+    result, *_ = batch_compare([item(1)], {0: succeeded(sonnet_answer())})
+    out = result.outputs[SONNET]
+    assert out.batch_input_tokens == 2100 and out.batch_output_tokens == 500
+    assert run_cost(SONNET, out) == pytest.approx(cost_usd(SONNET, 2100, 500) / 2)
+
+
+def test_the_view_says_the_batch_was_used_and_shows_the_batch_cost():
+    result, *_ = batch_compare([item(1)], {0: succeeded(sonnet_answer())})
+    text = format_markdown(result, SOURCES)
+    assert "through the batch" in text
+    assert f"${cost_usd(SONNET, 2100, 500) / 2:.4f}" in text
+
+
+def test_the_estimate_for_one_model_through_the_batch():
+    est = estimate(ai_check_items=10, summary_items=15, models=(SONNET,), batch=True)
+    assert HAIKU not in est
+    assert est[SONNET] == pytest.approx(estimate(10, 15)[SONNET] / 2)
+    assert est["total"] == pytest.approx(est["filter"] + est[SONNET])
+
+
+def test_the_view_marks_a_kept_ended_notice_as_low_by_the_code():
+    result, *_ = batch_compare([pin_item(end="2 Nov 2026 - 02:47")], {0: succeeded(answer_for_pin())})
+    assert result.outputs[SONNET].items[0].ai["severity"] == "low"
+    text = format_markdown(result, SOURCES)
+    assert "| Notice ended | 2026-11-02 02:47: Low by the code |" in text
+
+
+def answer_for_pin():
+    data = json.loads(json.dumps(GOOD))
+    data.update(severity="high", **PIN_GOOD)
+    return answer(json.dumps(data))
+
+
+# --- fresh items: leave out the links of an earlier comparison --------------------------------
+
+
+def test_items_whose_links_are_in_the_earlier_write_up_are_left_out():
+    earlier = f"### 1. Earlier item
+
+{item(1).url} · ECT news
+
+See also <{item(3).url}?utm_source=x>."
+    fresh, skipped = skip_links([item(1), item(2), item(3)], earlier)
+    assert [i.url for i in fresh] == [item(2).url]
+    assert [i.url for i in skipped] == [item(1).url, item(3).url]
+
+
+def test_nothing_is_left_out_when_the_write_up_has_no_links():
+    fresh, skipped = skip_links([item(1)], "No links here.")
+    assert fresh == [item(1)] and skipped == []
+
+
+# --- ended PIN notices, dropped or kept -------------------------------------------------------
+
+
+def test_ended_notices_lists_the_dropped_and_the_kept_ones():
+    from dataclasses import replace
+    dropped = replace(pin_item(n=1, end="1 Nov 2026 - 10:00"), filter={
+        "kept": False, "stage": "rules", "reason": "PIN notice ended more than 12 h ago (End Date 2026-11-01 10:00)"})
+    kept = pin_item(n=2, end="2 Nov 2026 - 02:47")
+    running = pin_item(n=3, end="2 Nov 2026 - 21:00")
+    lines = ended_notices([dropped, kept, running, item(4)], READ_AT)
+    assert lines == [
+        f"- dropped by the rules: {dropped.headline} ({dropped.url}), End Date 2026-11-01 10:00",
+        f"- kept, Low by the code: {kept.headline} ({kept.url}), End Date 2026-11-02 02:47",
+    ]
