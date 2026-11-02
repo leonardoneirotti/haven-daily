@@ -382,9 +382,10 @@ def prepare_indicator(indicator: dict, previous: dict | None, is_first: bool, br
 
 
 # The one grey line of a short card, an item with no summary (design review S5, #82, spec §7.5).
-# The headline-only wording is the owner's (PR #80); the panel shows the same line when opened.
+# The headline-only wording is the owner's (PR #80, paywall added in PR #88, spec §2.1); the panel
+# shows the same line when opened.
 HEADLINE_NOTES = {
-    "headline-only": "Headline only (the source's terms don't allow a summary) · severity rated from the headline",
+    "headline-only": "Headline only (paywalled, or the source's terms don't allow a summary) · severity rated from the headline",
     "unread": "Headline only (the article couldn't be read) · severity rated from the headline",
     "unrated": "Headline only (the AI step failed for this item) · no summary, impact or severity",
 }
