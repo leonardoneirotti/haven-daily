@@ -209,7 +209,7 @@ Each step catches its own errors and records them in `build.failures` so the pag
 The daily job renders and deploys **itself** (steps 8–9). It can't rely on `pages.yml` firing on its commit: pushes made with the built-in `GITHUB_TOKEN` don't trigger other workflows. `pages.yml` stays as the path for the owner's own pushes (corrections) and manual runs. The daily job needs `contents: write` to commit.
 
 **Writing to `main` (decided 31 Oct 2026).** The repo is public; `main` has no PR requirement, so the job pushes directly with the built-in token (`permissions: contents: write` in the daily workflow; the repo default stays read-only). Safeguards:
-1. A **ruleset on `main` that only blocks force-pushes and branch deletion**. Normal pushes (owner and job) still work; history can't be rewritten by accident. **Whether the test run (`tests.yml`) also becomes a required status check is decided when the daily workflow is built (#26)**, not before *(owner, 2 Nov 2026)*: a required check on `main` would also apply to the job's direct push, so the two have to be settled together.
+1. A **ruleset on `main` that only blocks force-pushes and branch deletion**. Normal pushes (owner and job) still work; history can't be rewritten by accident. **The test run (`tests.yml`) is not a required status check: decided by the owner 2 Nov 2026: not now, revisit at launch** (#26, PR #77). A required check on `main` would also apply to the job's direct push of `data/` and to the owner's correction pushes, neither of which has a check run; until then a PR is merged only when its tests are green.
 2. The job **stages only `data/`**, so it can never commit code.
 3. Before pushing: `git pull --rebase`, retry once (in case the owner pushed a correction at the same moment).
 Commits come from `github-actions[bot]`, message `Brief YYYY-MM-DD (automatic)`.
@@ -246,7 +246,7 @@ Rules and limits:
 
 **`pages.yml`** is now one job (render + deploy) that checks out the **latest `main`**, renders with `python -m haven.render --out site` and deploys; it runs on the owner's pushes, by hand, and from the daily job.
 
-*Claude's defaults, not yet confirmed by the owner (issue #26):*
+*Proposed by Claude, all eight confirmed by the owner 2 Nov 2026 (issue #26, PR #77):*
 1. **The guard and the commit are Python modules, not shell in the YAML**, so the rules the issue asks to test (summer/winter, "only `data/` ever staged") are tested like the rest of the pipeline. `tests/test_workflows.py` checks the YAML calls them and keeps no copy of their logic (e.g. no `git add` in it, the crons equal `guard.SCHEDULE_CRONS`).
 2. **The last trigger is recognised by its cron** (`github.event.schedule` = `45 6 * * *`). An unknown cron or event **fails the run red** instead of building without the reduced-brief fallback, so a cron edited in one place only shows up the same morning.
 3. **A manual run has a tick box "last trigger", off by default**: §5.6 gives the reduced brief to the last scheduled trigger only. Tick it when running by hand after every scheduled run of the day failed, so an AI outage then gives a reduced brief instead of a skipped day.
@@ -256,7 +256,9 @@ Rules and limits:
 7. **Timeouts:** 45 minutes for `brief` (the batch wait alone can take 22), 10 for the deploy. **Full history** in the checkout (`fetch-depth: 0`) so the rebase never misses a commit. **Runner exit 2** (today's files already there) fails the run red: after the guard it can't normally happen, so the owner should look.
 8. **The ruleset is kept in the repo**, `.github/rulesets/main.json`: default branch, rules `non_fast_forward` (no force-push) and `deletion` only, **no bypass**, so neither the job nor the owner can rewrite `main`'s history by accident. Applied with `gh api --method POST repos/leonardoneirotti/haven-daily/rulesets --input .github/rulesets/main.json` after the owner's OK.
 
-**Still to decide (owner): `tests.yml` as a required status check on `main`?** See the PR for #26.
+**Required status check:** decided by the owner 2 Nov 2026: not now, revisit at launch (§5.1).
+
+**Daily publishing is off until launch** *(owner's decision, 2 Nov 2026, PR #77)*: the workflow is merged but **disabled** (`gh workflow disable "Daily brief"`) right after the merge, so no brief is built or published yet. It is enabled at launch, after #27 (fonts), #68 (privacy check), #25 (design review) and the MeteoAlarm permission (§11). Still open on #26 until then: enable the workflow, the manual test run (acceptance), and the required-check decision.
 
 ### 5.2 Repository layout
 
