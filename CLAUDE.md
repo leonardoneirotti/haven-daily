@@ -38,6 +38,7 @@
 11. A published brief is never changed silently: every edit adds a correction.
 12. Respect AI opt-outs: sources that block AI crawlers are headline-only; their text never goes to an AI.
 13. No third-party article text or snippets in the repo; text is used in memory only.
+14. Privacy: no cookies, no browser storage, no analytics or tracking, nothing loaded from other sites (links are fine); footer privacy note on every page. Tested by `tests/test_privacy.py`.
 
 ## Editing a published brief
 
