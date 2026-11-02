@@ -11,6 +11,7 @@ design review S6, S7; spec §2.2, §5.12, §7.8).
 Headlines are invented.
 """
 
+import json
 import re
 from pathlib import Path
 
@@ -65,6 +66,7 @@ alert_above = {3}
 
 def rhine_toml(tmp_path, thresholds=(80, 150, 460, 640), **meanings):
     texts = dict(RHINE_MEANINGS, **meanings)
+    tmp_path.mkdir(parents=True, exist_ok=True)
     path = tmp_path / "rhine.toml"
     path.write_text(THRESHOLDS_TOML.format(*thresholds) + MEANINGS_TOML.format(**texts), encoding="utf-8")
     return path
@@ -73,7 +75,6 @@ def rhine_toml(tmp_path, thresholds=(80, 150, 460, 640), **meanings):
 def render_with(tmp_path, brief, rhine_path=None):
     briefs_dir = tmp_path / "briefs"
     briefs_dir.mkdir(parents=True)
-    import json
     (briefs_dir / f"{brief['date']}.json").write_text(json.dumps(brief), encoding="utf-8")
     render.render_site(briefs_dir, tmp_path / "site", rhine_path=rhine_path)
     return (tmp_path / "site" / "days" / f"{brief['date']}.html").read_text(encoding="utf-8")
@@ -133,11 +134,12 @@ def test_an_unknown_part_of_kaub_is_still_refused(tmp_path):
         load_rhine(path)
 
 
-def test_the_rhine_meanings_are_not_written_into_the_code_or_templates():
-    code = (ROOT / "haven" / "render.py").read_text(encoding="utf-8")
-    templates = "".join(p.read_text(encoding="utf-8") for p in (ROOT / "templates").glob("*.html"))
+def test_the_rhine_meanings_are_not_written_into_the_code_or_the_day_templates():
+    # The Method page (about.html) keeps its own, longer threshold wording with the sources (#24).
+    shown = "".join((ROOT / name).read_text(encoding="utf-8")
+                    for name in ("haven/render.py", "templates/_macros.html", "templates/day.html"))
     for text in RHINE_MEANINGS.values():
-        assert text not in code and text not in templates
+        assert text not in shown
 
 
 # --- the meaning per level --------------------------------------------------------------------
