@@ -394,7 +394,7 @@ def test_headline_only_item_with_a_severity_says_rated_from_headline_only(tmp_pa
                 summary=None, impact=None)
     card = text_of(news_card(render_day(tmp_path, make_brief(items=[item])), 1))
     # The short card (#82, S5): one line instead of a tag, no impact block (spec §7.5).
-    assert "Headline only (the source's terms don't allow a summary) · severity rated from the headline" in card
+    assert "Headline only (paywalled, or the source's terms don't allow a summary) · severity rated from the headline" in card
     assert "Not enough information" not in card
 
 
