@@ -43,7 +43,7 @@ Total cost of the comparison run, filter included: **about $0.155** at list pric
 
 ## Claude's recommendation (not a decision)
 
-**Sonnet 5.5**, through the batch as built (#16), because its advantage is consistent where it matters most (severity and impact of time-limited items, 9 of 10 notices) and the measured cost (~$1.63/month in batch) is well inside the budget. Two prompt fixes help whichever model is chosen; **the owner made them issue #67**, right after #17 in build order, with a re-run of the same 15 items with Sonnet 5.5:
+**Sonnet 5.5**, through the batch as built (#16), because its advantage is consistent where it matters most (severity and impact of time-limited items, 9 of 10 notices) and the measured cost (~$1.63/month in batch) is well inside the budget. Two prompt fixes help whichever model is chosen; **the owner made them issue #67**, right after #17 in build order, with a Sonnet 5.5 re-run through the batch on **fresh items** (owner, 2 Nov 2026):
 
 1. **A one-line meaning for each "affects" tag** in `config/tags.toml`, sent with the list (e.g. *Sea access: ships reaching or leaving the port by sea: fairways, pilots, tugs, anchorages, barriers, fog; not work on the quay*).
 2. **Severity of something that has already ended by today is Low**, and PIN notices: "End Date" is when the notice ends, not when the measure changed.
