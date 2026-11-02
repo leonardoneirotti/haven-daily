@@ -437,7 +437,6 @@ def test_phrase_in_ignores_case_and_spacing_but_needs_the_words():
     ({"severity": "critical"}, "unknown severity"),
     ({"severity": None}, "unknown severity"),
     ({"summary": ""}, "empty summary"),
-    ({"summary": "word " * 80}, "summary too long"),
     ({"impact": 42}, "impact is not text"),
     ({"tags": "Containers"}, "tags are not a list"),
     ({"strike": strike(state="postponed")}, "unknown strike state"),
@@ -452,11 +451,77 @@ def test_an_invalid_field_makes_the_item_unrated(change, problem):
     assert result.failures == [{"source": "AI summariser", "error": f"https://ect-news.test/1: {problem}"}]
 
 
-def test_a_summary_that_copies_the_article_makes_the_item_unrated():
-    copied = "Dockworkers at the ECT Delta terminal on the Maasvlakte will stop work on 5 November."
-    result, _ = run([item()], full(summary=copied))
-    assert result.items[0].ai["severity"] is None
-    assert result.failures[0]["error"].endswith("summary copies the article (10+ words in a row)")
+# --- copied or too long: one retry asking to rephrase (owner's decision, 2 Nov 2026) -------------
+
+COPIED = "Dockworkers at the ECT Delta terminal on the Maasvlakte will stop work on 5 November."
+TOO_LONG = "word " * 80
+
+
+def test_the_first_prompt_asks_for_own_words_and_warns_that_copies_are_rejected():
+    _, client = run([item()], full())
+    system = client.messages.calls[0]["system"]
+    assert "entirely in your own words" in system and "a few words in a row" in system
+    assert "rejected" in system
+    assert "could not be used" not in user_text(client.messages.calls[0])  # no retry note the first time
+
+
+@pytest.mark.parametrize("change, reason", [
+    ({"summary": COPIED}, "summary copies the article (10+ words in a row)"),
+    ({"impact": COPIED}, "impact copies the article (10+ words in a row)"),
+    ({"summary": TOO_LONG}, "summary too long"),
+    ({"impact": "word " * 100}, "impact too long"),
+])
+def test_a_copied_or_too_long_answer_is_retried_once_and_the_rephrased_answer_used(change, reason):
+    result, client = run([item()], full(**change), full())
+    assert len(client.messages.calls) == 2
+    retry = user_text(client.messages.calls[1])
+    assert "could not be used" in retry and reason in retry and "in your own words" in retry
+    assert user_text(client.messages.calls[0]) in retry  # the same item, with the note added
+    assert result.items[0].ai["summary"] == GOOD["summary"] and result.items[0].ai["severity"] == "high"
+    assert result.failures == []
+    assert (result.calls, result.input_tokens) == (2, 4000)  # both calls counted for the cost check
+
+
+def test_if_the_retry_also_copies_the_item_is_unrated():
+    result, client = run([item()], full(summary=COPIED), full(summary=COPIED))
+    assert len(client.messages.calls) == 2
+    assert result.items[0].ai == unrated()
+    assert result.failures == [{"source": "AI summariser", "error":
+                                "https://ect-news.test/1: summary copies the article (10+ words in a row) "
+                                "(after a retry)"}]
+
+
+def test_if_the_retry_fails_another_way_the_item_is_unrated_with_that_problem():
+    result, _ = run([item()], full(summary=TOO_LONG), answer("{bad"))
+    assert result.items[0].ai == unrated()
+    assert result.failures[0]["error"] == "https://ect-news.test/1: unreadable answer (after a retry)"
+
+
+def test_a_retry_that_hits_an_api_error_leaves_the_item_unrated():
+    result, _ = run([item(1), item(2)], full(summary=COPIED), anthropic.APITimeoutError(request=REQUEST),
+                    full(strike=None))
+    assert result.items[0].ai == unrated() and result.items[1].ai["severity"] == "high"
+    assert result.failures == [{"source": "AI summariser", "error": "https://ect-news.test/1: timeout (after a retry)"}]
+
+
+@pytest.mark.parametrize("change", [{"severity": "critical"}, {"strike": strike(match="maybe")}, {"summary": ""}])
+def test_other_problems_are_not_retried(change):
+    result, client = run([item()], full(**change))
+    assert len(client.messages.calls) == 1 and result.items[0].ai == unrated()
+
+
+def test_only_one_retry_per_item_and_the_next_item_starts_fresh():
+    result, client = run([item(1), item(2)], full(summary=COPIED), full(summary=TOO_LONG),
+                         full(summary=COPIED), full(strike=None))
+    assert len(client.messages.calls) == 4
+    assert result.items[0].ai == unrated() and result.items[1].ai["severity"] == "high"
+    assert "could not be used" not in user_text(client.messages.calls[2])
+
+
+def test_date_notes_of_a_rejected_answer_are_not_kept():
+    first = full(summary=COPIED, strike=strike(start_phrase="6 November"))  # rejected: copied
+    result, _ = run([item()], first, full())
+    assert result.failures == [] and result.items[0].ai["strike"]["start"] == "2026-11-05"
 
 
 @pytest.mark.parametrize("response, problem", [
