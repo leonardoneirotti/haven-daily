@@ -22,7 +22,7 @@ _SOURCE_FIELDS = {"id", "name", "verdict", "urls", "access", "language", "auto_k
 _LANGUAGE = re.compile(r"^[a-z]{2}$")
 
 # Place list (spec §5.10). "barrier" and "bridge" are Claude's additions to the
-# spec's five kinds, not yet confirmed by the owner.
+# spec's five kinds, confirmed by the owner (spec §5.10.1, 2 Nov 2026).
 PLACE_KINDS = ("terminal", "area", "anchorage", "lock", "barrier", "bridge", "fairway")
 LABEL_SIDES = ("right", "left")
 # The chart sheet (south, west, north, east), spec §8.1: every place must be on it.
