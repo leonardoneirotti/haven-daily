@@ -52,6 +52,10 @@ A brief in `data/briefs/` is public as soon as the morning job commits it. Whene
 - Code reads secrets **only from environment variables**: a local `.env` file (git-ignored; `.env.example` lists the variable names with no values) and **GitHub Actions secrets** online.
 - Never write a key into code, config, tests, docs, output files or commit messages.
 
+## Personal data
+
+- **Never send the owner's email address or any other personal data to an outside service** (APIs, websites, user-agent strings, contact fields, search queries, …) **without asking me first.** This includes the email address the session knows about. Use a project name with no personal details in user agents (e.g. `HavenDaily-gazetteer/1.0`). *(Owner's rule, 2 Nov 2026.)*
+
 ## Open items
 
 See spec §11 (permission emails, terms still to check, cost check after week one, and more).
