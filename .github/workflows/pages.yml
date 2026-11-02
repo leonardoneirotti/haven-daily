@@ -1,5 +1,7 @@
 # Build the site from the briefs and publish it on GitHub Pages.
-# Runs on every push to main, and by hand from the Actions tab ("Run workflow").
+# Runs on every push to main (the owner's code changes and corrections), by hand from the
+# Actions tab ("Run workflow"), and at the end of the daily job (daily.yml calls it), because
+# the daily job's own push, made with GITHUB_TOKEN, doesn't start other workflows.
 # The built site/ folder is never committed: it only exists inside this job.
 name: Build and deploy site
 
@@ -7,6 +9,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
 
 # Only what deploying to Pages needs: read the code, publish Pages, prove the
 # deployment comes from this repository (id-token).
@@ -15,17 +18,25 @@ permissions:
   pages: write
   id-token: write
 
-# One deployment at a time; a newer push does not cancel one already publishing.
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
-  build:
+  site:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # One deployment at a time, shared by every way this job starts; a newer run never cancels one
+    # that is publishing. A waiting run may be replaced by a newer one, which is fine: every run
+    # renders the latest main (below), so the newest one always includes everything.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      # Get a copy of the repository's code and briefs.
+      # The latest main, not the commit that started this run: if the daily job pushed a brief
+      # a moment after the owner's push, this deployment still includes it (and the reverse).
       - uses: actions/checkout@v7
+        with:
+          ref: main
 
       # Install Python 3.12; cache pip downloads between runs to save time.
       - uses: actions/setup-python@v7
@@ -36,26 +47,20 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
-      # For now the sample briefs (the renderer's default input). Later: data/briefs.
+      # The real briefs in data/briefs/, or the samples until the first morning run has
+      # committed one (haven.render.default_briefs_dir); never both.
       - name: Render the site
-        run: python -m haven.render --briefs data/sample/briefs --out site
+        run: python -m haven.render --out site
 
       # Read this repo's Pages settings (address, base path) for the deploy.
       - uses: actions/configure-pages@v6
 
-      # Pack site/ into the artifact the deploy job publishes.
+      # Pack site/ into the artifact the deploy step publishes.
       # Since v4, dotfiles are left out; site/ has none, so nothing is lost.
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      # Publish the artifact from the build job to GitHub Pages.
+      # Publish the artifact to GitHub Pages.
       - id: deployment
         uses: actions/deploy-pages@v5

@@ -81,8 +81,9 @@ def test_only_data_is_committed_even_when_other_files_changed(repo):
     assert sorted(origin_files(repo)) == [
         f"data/briefs/{DAY}.json", f"data/items/{DAY}.jsonl", f"data/status/{DAY}.json"]
     assert result.day == DAY
-    status = git(repo, "status", "--porcelain")
-    assert " M README.md" in status and "?? haven/new.py" in status  # left alone, not committed
+    # Left alone, not committed: still changed / untracked in the checkout.
+    assert git(repo, "diff", "--name-only") == "README.md"
+    assert git(repo, "ls-files", "--others", "--exclude-standard") == "haven/new.py"
 
 
 def test_the_commit_comes_from_the_bot_with_the_spec_message(repo):
@@ -173,6 +174,13 @@ def test_a_correction_pushed_meanwhile_is_kept_and_the_brief_goes_on_top(repo, t
 # --- push retry (fake git) -------------------------------------------------------
 
 
+def command(args):
+    """The git command without the leading `-c name=value` settings."""
+    while args[:1] == ["-c"]:
+        args = args[2:]
+    return args
+
+
 class FakeGit:
     """Answers like git for a clean day; `fail` lists the commands that fail, in the order they fail."""
 
@@ -181,6 +189,7 @@ class FakeGit:
         self.fail = list(fail)
 
     def __call__(self, args, cwd):
+        args = command(args)
         self.calls.append(args)
         if self.fail and args[0] == self.fail[0]:
             self.fail.pop(0)
@@ -190,14 +199,22 @@ class FakeGit:
         return subprocess.CompletedProcess(args, 0, out.get(args[0], ""), "")
 
 
-def test_stages_with_the_data_pathspec_only(tmp_path):
+@pytest.fixture
+def checkout(tmp_path):
+    (tmp_path / "data").mkdir()
+    return tmp_path
+
+
+def test_stages_with_the_data_pathspec_only(checkout):
+    tmp_path = checkout
     fake = FakeGit()
     publish.publish(tmp_path, git=fake)
     adds = [call for call in fake.calls if call[0] == "add"]
     assert adds == [["add", "--all", "--", "data"]]
 
 
-def test_a_rejected_push_is_retried_once_after_another_rebase(tmp_path):
+def test_a_rejected_push_is_retried_once_after_another_rebase(checkout):
+    tmp_path = checkout
     fake = FakeGit(fail=["push"])
     result = publish.publish(tmp_path, git=fake)
     assert result.attempts == 2
@@ -205,24 +222,43 @@ def test_a_rejected_push_is_retried_once_after_another_rebase(tmp_path):
     assert sequence == ["pull", "push", "pull", "push"]
 
 
-def test_two_rejected_pushes_fail_the_job(tmp_path):
+def test_two_rejected_pushes_fail_the_job(checkout):
+    tmp_path = checkout
     fake = FakeGit(fail=["push", "push"])
     with pytest.raises(publish.PublishError, match="twice"):
         publish.publish(tmp_path, git=fake)
     assert [call[0] for call in fake.calls].count("push") == 2
 
 
-def test_a_failed_rebase_is_aborted_and_retried_once(tmp_path):
+def test_a_failed_rebase_is_aborted_and_retried_once(checkout):
+    tmp_path = checkout
     fake = FakeGit(fail=["pull"])
     result = publish.publish(tmp_path, git=fake)
     assert ["rebase", "--abort"] in fake.calls
     assert result.attempts == 2
 
 
-def test_the_push_goes_to_main_on_origin(tmp_path):
+def test_the_push_goes_to_main_on_origin(checkout):
+    tmp_path = checkout
     fake = FakeGit()
     publish.publish(tmp_path, git=fake)
     pushes = [call for call in fake.calls if call[0] == "push"]
     assert pushes == [["push", "origin", "HEAD:main"]]
     pulls = [call for call in fake.calls if call[0] == "pull"]
-    assert pulls == [["pull", "--rebase", "origin", "main"]]
+    assert pulls == [["pull", "--rebase", "--autostash", "origin", "main"]]
+
+
+def test_the_rebase_runs_as_the_bot_because_the_checkout_has_no_git_user(tmp_path):
+    (tmp_path / "data").mkdir()
+    seen = []
+    fake = FakeGit()
+
+    def recording(args, cwd):
+        seen.append(args)
+        return fake(args, cwd)
+
+    publish.publish(tmp_path, git=recording)
+    for name in ("commit", "pull"):
+        call = next(args for args in seen if command(args)[0] == name)
+        assert call[:4] == ["-c", "user.name=github-actions[bot]",
+                            "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com"]
