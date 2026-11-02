@@ -400,7 +400,7 @@ python -m venv .venv
 5. **KNMI's level with no warnings** reads "KNMI: Code green → Normal"; on No data there is no mapping line, but the meteoalarm.org link and the disclaimer stay.
 6. **An item's time is Amsterdam time, with the date when it isn't the brief's day** ("19 Nov 17:20"): real items can be up to 48 h old, and "17:20" alone would read as this morning. A date-only `published` shows the date ("19 Nov"); a zone-less one is read as Amsterdam time (as the filter does, §5.4); a missing or unreadable one shows nothing.
 7. **Several failure lines from one source are grouped under its name**, sources in the order they first appear.
-8. **The chart legend leaves out the ship symbols when a day has no ships**, and the chart says "No ship positions: ships are not collected yet."
+8. **The chart legend leaves out the ship symbols when a day has no ships**, and the chart says "No ship positions: ships are not collected yet." *(Since #81, 2 Nov 2026: no box on the chart in v1; the legend line under the chart says "Ship positions are not collected yet." in grey, §7.4.)*
 9. **The four sample briefs use the real weather and strike reading shapes** (§5.11, §5.7), so the sample site shows the MeteoAlarm requirements and a linked strike item (29 Oct: "Strike today · Maasvlakte"; 27 Oct: KNMI yellow fog issued the evening before).
 
 *The Method page (built 2 Nov 2026, issue #24).* `templates/about.html`, rewritten for the real pipeline: what this is; how a brief is made (collect → filter → summarise → status → publish, automatic, "Nobody checks a brief before it goes online", corrections afterwards); severity rules (Low incl. "already over" and the forced Low for ended PIN notices; "rated from headline only"; Unrated; the reduced brief); the status thresholds with their sources; weather warnings (all MeteoAlarm requirements, disclaimer verbatim); how the strike flag works (§5.7, 14 days, not today's items); the AI models; sources; copyright and article text (hard rules 2, 3, 12, 13); the chart; credits (§12); who makes this. What lives in config or code comes from `render.method_page(sources, rhine)`, so the page can't drift: **the source list from `config/sources.toml`**, grouped by verdict, each name linking the source's public page (`home`) followed by a "(feed)" or "(page)" link to what the job reads, with a "how it's used" line built from verdict + `auto_keep` and the public `why` (§5.2.1); **the Kaub numbers from `config/rhine.toml`** (Normal = watch + 1 to watch_above); **the model names from `filter.AI_MODEL`, `summarise.SUMMARY_MODEL` / `FALLBACK_MODEL`** and the batch wait from `BATCH_WAIT`. Tests: `tests/test_method_page.py` (footer exact on every page, disclaimer verbatim, every use/headline-only source from config listed, a changed config changes the page, every threshold row links its source, nothing official or reviewed).
@@ -1052,7 +1052,7 @@ Principle: **fact vs interpretation in two typefaces** — the impact is the onl
 ### 7.4 Layout
 
 **Wide screens (≥ 64rem): the "stage"**
-- The chart fills the first screen: height `clamp(36rem, 100vh − 5.5rem, 62rem)`.
+- The chart fills the first screen: height `clamp(36rem, 100vh − 5.5rem, 62rem)`. **Except on a day with nothing on the chart** (see "First screen" below).
 - **News panel floats over the chart's western side (open North Sea)**: `position:absolute; top/bottom/left: 1rem; width: 25rem`, background `rgba(21,19,17,.95)` (no backdrop blur — too slow), 1px rule border, big shadow.
   - Panel head: kicker "MORNING BRIEF · NO. 003" (mono), weekday huge (Plex Sans 700, ~2.9rem), date below (mono), publication line.
   - Panel items list (scrolls inside): numbered square + severity tag + first "affects" tag + headline. The selected item gets `--surface-2`, an ivory left bar, and **expands to show its 2-line summary**.
@@ -1062,7 +1062,24 @@ Principle: **fact vs interpretation in two typefaces** — the impact is the onl
 - Vignette: `.chart-frame::after` with `box-shadow: inset 0 0 110px 16px rgba(0,0,0,.55)`, z-index 401 (above map, below panels).
 - **Below the stage**: two columns — "The brief" (full items) and "Port status" (detailed dials, sticky), then ship table, build notes, day navigation.
 
-**Phones/tablets (< 64rem)**: chart (62vh, 340–560px) → legend → panel in normal flow (head + mini status + link; the item list is hidden because the full brief follows) → full brief → status.
+**Phones/tablets (< 64rem)**: **panel first** (head, item list, mini status, link) → chart (62vh, 340–560px) → legend → full brief → status. *(Changed by #81, 2 Nov 2026: the chart used to come first and the panel's item list was hidden.)*
+
+**First screen (built 2 Nov 2026, #81; design review M1, M2, S4, §7.8).** The brief comes before the chart, and the chart only takes the first screen when it has something to show.
+- **The panel comes before the chart in the page itself** (HTML order), at every width. Phones show it in that order; on wide screens the panel is positioned over the chart, so they look as before. The panel's item list now shows on phones too.
+- **Empty chart** = no shown item (of the 5) has a place and the day has no ships (`brief.chart_empty`, `render.prepare_briefs`). The stage gets the class `stage-empty` and the chart becomes a **strip**: phones `30vh` (min 15rem, max 20rem); wide screens: the panel stops floating and sits in a 25rem column **beside** the strip, the strip as tall as the panel (min 18rem), and the panel's item list is left out because the full brief starts right below. Days with pins or ships look as before.
+- **Legend line under the chart**, grey: "No item has a place on the chart today." ("on this day" on an older day) on an empty day, and in v1 "Ship positions are not collected yet." on every day without ships. **No box over the port in v1.**
+- **From v2 (#31, `AIS_SNAPSHOT_BUILT = True`)** a failed snapshot is still shown on the chart (hard rule 9): "No ship positions for this day. The AIS snapshot failed.", in the chart's **top-left corner** (where the ship filter would be; on wide screens right of the panel), amber edge, never over the Maasvlakte.
+- `map.js` is unchanged: the strip opens on the same home views; with the panel not floating, `panelCover()` is 0, so no room is kept for it.
+- Tests: `tests/test_first_screen.py`. Screenshots before/after (sample briefs only): `design/screenshots/issue-81/`.
+
+*Claude's defaults (#81), not yet confirmed by the owner:*
+1. **An item cut from the 5 shown doesn't count** as a pin, and **a day with ships but no pins keeps the full chart** (the ships are something to show).
+2. **Strip sizes**: phone `30vh`, min 15rem (240 px: room for the whole-port and zoom buttons, the scale and the credit), max 20rem; wide screens as tall as the panel beside it, min 18rem.
+3. **Wide screens, empty day: panel beside the strip, without its item list.** With the list the panel is ~800 px tall and the chart beside it would be full height again; without it the strip is ~360 px and the first full card is on a 1440 × 900 laptop's first screen.
+4. **The empty-chart line is shown on a day with no items too** (it stays true), next to "Nothing significant today" in the panel.
+5. **The v1 line reads "Ship positions are not collected yet."**, the same words as the ships dial, instead of the review's "Ships: from v2": version names are internal words, which #84 removes from the public pages.
+6. **The v2 note keeps its amber edge** (it is a real failure) but is smaller (13 px) and in the corner.
+7. **The brief's intro now says "Show on chart" moves the chart "above the brief"** (was "at the top of the page", no longer true on phones); when the sentence shows at all is #82 (S10).
 
 **Top bar**: signal-flag logo + "HAVEN DAILY" (mono) + "Thu 29 Oct · No. 003"; nav Today / Archive / Method (active = 3px underline). Sample-data note below in amber.
 
@@ -1102,7 +1119,7 @@ The review (`docs/design-review.md`) found why the site didn't feel user-friendl
 
 | Issue | Proposals | What changes |
 |---|---|---|
-| **#81** First screen | M1, M2, S4 | The chart shrinks to a strip on a day with no placed items and no ships; on phones the brief (head, item list, mini status) comes before the chart; in v1 no amber "No ship positions" box over the port (one grey line under the chart instead; from v2 a failed snapshot is shown off the port). |
+| **#81** First screen | M1, M2, S4 | The chart shrinks to a strip on a day with no placed items and no ships; on phones the brief (head, item list, mini status) comes before the chart; in v1 no amber "No ship positions" box over the port (one grey line under the chart instead; from v2 a failed snapshot is shown off the port). **Built 2 Nov 2026 (§7.4 "First screen").** |
 | **#82** Cards and panel | S5, S10, S11, M3 | Short headline-only card (no empty impact block, no "No single place on the chart"); the "Show on chart" sentence only when an item has a place; ▸ on the ship list; "Whole port" label on wide screens; panel text 13–14 px and no tag in the panel; every panel entry opens in the panel. |
 | **#83** Status meaning | S6, S7 | Each status value with a short meaning built from config ("16 cm · Alert: barge transport no longer guaranteed"); Watch/Alert lines on the Rhine gauge; `gauge_max` stays 700 (§5.12). |
 | **#84** Plain words, archive legend | S8, S9 | Internal terms replaced on the public pages ("No AIS", batch/fallback, "Derived from kept items", the gap-check failure wording; the failure itself is still shown, hard rule 9); a legend line on the archive and text labels for its icons on phones. |
@@ -1226,7 +1243,7 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 - Highlight ships at terminals mentioned in today's news (already designed).
 - Optional "see it live" link to the ship on MarineTraffic (link only).
 - **Idea, not decided: an English line under Dutch headline-only items** (design review #25, proposal L1). The summariser would add a short English "what the headline says" (≈ 12 words, labelled as an AI translation of the headline). **Not in v1 (owner, 2 Nov 2026, PR #80).** It needs a rule decision first: it sits close to hard rule 2 (no translations of third-party text) and to each source's terms (a new use of their headline), and it changes the summariser's prompt and checks. Until then, Dutch items rely on "Read in English".
-- Check aisstream.io terms on public display before launch. aisstream is beta and sometimes unstable: **the page must still build if it fails** ("No ship positions for this day. The AIS snapshot failed.").
+- Check aisstream.io terms on public display before launch. aisstream is beta and sometimes unstable: **the page must still build if it fails** ("No ship positions for this day. The AIS snapshot failed.", in the chart's top-left corner, §7.4).
 
 ---
 
