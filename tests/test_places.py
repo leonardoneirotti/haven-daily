@@ -192,56 +192,23 @@ def test_tags_are_loaded_with_their_meanings(tmp_path):
 
 
 def test_a_meaning_is_tidied_to_one_line(tmp_path):
-    text = '[[tag]]
-name = "Rail"
-meaning = """Freight trains
-   to and from the port."""
-'
+    text = '[[tag]]\nname = "Rail"\nmeaning = """Freight trains\n   to and from the port."""\n'
     assert load_tag_list(write(tmp_path, "tags.toml", text))[0].meaning == "Freight trains to and from the port."
 
 
 @pytest.mark.parametrize("text, message", [
-    ('[[tag]]
-name = "Rail"
-', "tag 'Rail' has no meaning"),
-    ('[[tag]]
-name = "Rail"
-meaning = "  "
-', "tag 'Rail' has no meaning"),
-    ('[[tag]]
-name = "Rail"
-meaning = 3
-', "tag 'Rail': 'meaning' must be text"),
-    ('[[tag]]
-name = "Rail"
-meaning = "' + "x" * 241 + '"
-', "tag 'Rail': meaning longer than 240 characters"),
-    ('[[tag]]
-meaning = "Trains."
-', "tag #1 has no name"),
-    ('[[tag]]
-name = " "
-meaning = "Trains."
-', "tag #1 has no name"),
-    ('[[tag]]
-name = "Rail"
-meaning = "Trains."
-colour = "red"
-', "tag 'Rail': unknown field 'colour'"),
-    ('[[tag]]
-name = "Barge"
-meaning = "A."
-[[tag]]
-name = "barge"
-meaning = "B."
-',
+    ('[[tag]]\nname = "Rail"\n', "tag 'Rail' has no meaning"),
+    ('[[tag]]\nname = "Rail"\nmeaning = "  "\n', "tag 'Rail' has no meaning"),
+    ('[[tag]]\nname = "Rail"\nmeaning = 3\n', "tag 'Rail': 'meaning' must be text"),
+    ('[[tag]]\nname = "Rail"\nmeaning = "' + "x" * 241 + '"\n', "tag 'Rail': meaning longer than 240 characters"),
+    ('[[tag]]\nmeaning = "Trains."\n', "tag #1 has no name"),
+    ('[[tag]]\nname = " "\nmeaning = "Trains."\n', "tag #1 has no name"),
+    ('[[tag]]\nname = "Rail"\nmeaning = "Trains."\ncolour = "red"\n', "tag 'Rail': unknown field 'colour'"),
+    ('[[tag]]\nname = "Barge"\nmeaning = "A."\n[[tag]]\nname = "barge"\nmeaning = "B."\n',
      "duplicate tag 'barge'"),
-    ('affects = ["Containers"]
-', "unknown key 'affects'"),
-    ("# nothing
-", "missing the [[tag]] list"),
-    ('tag = "Rail"
-', "missing the [[tag]] list"),
+    ('affects = ["Containers"]\n', "unknown key 'affects'"),
+    ("# nothing\n", "missing the [[tag]] list"),
+    ('tag = "Rail"\n', "missing the [[tag]] list"),
 ])
 def test_bad_tags_are_rejected(tmp_path, text, message):
     with pytest.raises(ConfigError, match=re.escape(message)):
@@ -280,8 +247,7 @@ def test_every_real_tag_has_a_one_line_meaning():
     tags = load_tag_list()
     assert [t.name for t in tags] == list(load_tags())
     for tag in tags:
-        assert tag.meaning and "
-" not in tag.meaning, tag.name
+        assert tag.meaning and "\n" not in tag.meaning, tag.name
 
 
 def test_the_real_meanings_settle_the_tags_the_comparison_got_wrong():

@@ -342,11 +342,7 @@ def answer_for_pin():
 
 
 def test_items_whose_links_are_in_the_earlier_write_up_are_left_out():
-    earlier = f"### 1. Earlier item
-
-{item(1).url} · ECT news
-
-See also <{item(3).url}?utm_source=x>."
+    earlier = f"### 1. Earlier item\n\n{item(1).url} · ECT news\n\nSee also <{item(3).url}?utm_source=x>."
     fresh, skipped = skip_links([item(1), item(2), item(3)], earlier)
     assert [i.url for i in fresh] == [item(2).url]
     assert [i.url for i in skipped] == [item(1).url, item(3).url]
