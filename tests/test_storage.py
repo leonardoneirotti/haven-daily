@@ -332,3 +332,59 @@ def test_first_day_is_the_oldest_day_with_a_file(tmp_path):
 def test_first_day_checks_the_kind(tmp_path):
     with pytest.raises(ValueError):
         storage.first_day("ships", data_dir=tmp_path)
+
+
+# --- one day's three files, all or nothing (issue #22) -----------------------------------
+
+
+def day_files(day=DAY):
+    return {"items": [item(1), item(2)], "status": [{"key": "rhine", "value": 94}], "briefs": brief(day)}
+
+
+def kinds_on_disk(data_dir, day=DAY):
+    return [kind for kind in ("items", "status", "briefs") if storage.path(kind, day, data_dir).exists()]
+
+
+def test_write_day_writes_all_three_files(tmp_path):
+    paths = storage.write_day(DAY, day_files(), data_dir=tmp_path)
+    assert [p.parent.name for p in paths] == ["items", "status", "briefs"]  # the brief last
+    assert storage.read("items", DAY, tmp_path) == [item(1), item(2)]
+    assert storage.read("briefs", DAY, tmp_path)["date"] == DAY.isoformat()
+
+
+def test_write_day_writes_the_brief_last_whatever_the_order_given(tmp_path):
+    files = day_files()
+    reordered = {"briefs": files["briefs"], "status": files["status"], "items": files["items"]}
+    paths = storage.write_day(DAY, reordered, data_dir=tmp_path)
+    assert [p.parent.name for p in paths] == ["items", "status", "briefs"]
+
+
+def test_write_day_checks_everything_before_writing_anything(tmp_path):
+    files = day_files()
+    files["briefs"]["items"][0]["article_text"] = "Invented text"  # refused by the hard rule 13 guard
+    with pytest.raises(storage.ArticleTextError):
+        storage.write_day(DAY, files, data_dir=tmp_path)
+    assert kinds_on_disk(tmp_path) == []  # the items and status files weren't written either
+
+
+def test_write_day_refuses_if_any_of_the_files_exists_and_writes_none(tmp_path):
+    storage.write("status", DAY, [{"key": "old"}], data_dir=tmp_path)
+    before = storage.path("status", DAY, tmp_path).read_bytes()
+    with pytest.raises(storage.AlreadyWrittenError, match="status/2026-11-02.json"):
+        storage.write_day(DAY, day_files(), data_dir=tmp_path)
+    assert kinds_on_disk(tmp_path) == ["status"]
+    assert storage.path("status", DAY, tmp_path).read_bytes() == before  # untouched
+
+
+def test_write_day_removes_what_it_wrote_when_a_later_file_fails(tmp_path):
+    (tmp_path / "briefs").write_text("a file where the briefs folder should be", encoding="utf-8")
+    with pytest.raises(OSError):
+        storage.write_day(DAY, day_files(), data_dir=tmp_path)
+    assert kinds_on_disk(tmp_path) == []  # items and status removed again, so a retry can run
+    assert (tmp_path / "briefs").read_text(encoding="utf-8").startswith("a file")  # not ours: left alone
+
+
+def test_write_day_needs_known_kinds(tmp_path):
+    with pytest.raises(ValueError):
+        storage.write_day(DAY, {"ships": []}, data_dir=tmp_path)
+    assert list(tmp_path.iterdir()) == []
