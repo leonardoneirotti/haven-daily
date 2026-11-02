@@ -41,4 +41,4 @@ Trade press (Container News, Tradlinx blog, The Loadstar) repeats these tables, 
 3. **High-water side unchanged:** Marke I 460 cm (Watch) and Marke II / HSW 640 cm (Alert) are official shipping limits; no operator table replaces them.
 4. **Not in scope, worth knowing:** Contargo uses **Duisburg-Ruhrort**, **Cologne** and **Emmerich** for terminals further north (where most Rotterdam barge volume goes). The status line shows Kaub only (§2.2); adding another gauge would be a new decision, not part of #19.
 
-**The owner decides.** Then the spec §2.2 table is updated in this PR and #20 builds the thresholds from config with the new boundary values (e.g. 149/150/151 and, if Alert changes, 79/80/81).
+**Decided by the owner (2 Nov 2026, PR #71): both recommendations accepted.** Watch at 150 cm or below, Alert at 80 cm or below (replaces MNW 65 cm). The spec §2.2 table is updated; #20 builds the thresholds from config and tests the edges 79/80/81 and 149/150/151 (plus 459/460/461 and 639/640/641 on the high side). A reading below the record low (NNW 25 cm; 21 cm on 2 Nov 2026) is a valid Alert, not an error.

@@ -36,7 +36,7 @@ Tested from a desktop, not from GitHub Actions IPs. Some sites may still block t
 |---|---|---|
 | Weather warnings: MeteoAlarm (KNMI's warnings) | https://feeds.meteoalarm.org/api/v1/warnings/feeds-netherlands | No key. Use the Zuid-Holland warning. Terms §5 (read 31 Oct 2026): show "KNMI", time of issue, link to www.meteoalarm.org, their exact disclaimer, original level + hazard. Real-time (≤ 10 min) required for operational use: label "Warnings at 06:45 · not live" until MeteoAlarm answers. https://meteoalarm.org/en/live/page/terms-and-conditions |
 | Weather warnings: KNMI (later) | https://developer.dataplatform.knmi.nl/open-data-api | Switch when `KNMI-public-weather-warnings` leaves TEST. Free registered key (`KNMI_API_KEY`). |
-| Rhine, Kaub (PEGELONLINE): shown | https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/KAUB/W.json?includeCurrentMeasurement=true&includeCharacteristicValues=true | No key. Thresholds from its official values (GlW, MNW, Marke I/II). |
+| Rhine, Kaub (PEGELONLINE): shown | https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/KAUB/W.json?includeCurrentMeasurement=true&includeCharacteristicValues=true | No key. High-water thresholds from its official values (Marke I/II); low-water thresholds from barge operators' surcharge tables (spec §2.2). |
 | Rhine, Lobith (Rijkswaterstaat): stored only | https://ddapi20-waterwebservices.rijkswaterstaat.nl | No key. Use `OphalenWaarnemingen` over a recent window. |
 
 ## Dropped
