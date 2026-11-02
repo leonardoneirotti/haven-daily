@@ -168,3 +168,21 @@ Nothing above is built until you approve it. For each proposal, say **yes / no /
 6. **Optional, your task:** a 5-second test with two or three people (show the Today page for 5 seconds on a phone, then ask "what is this, and who is it for?") before and after the changes. It would turn this review's guesses into observations.
 
 After the approved changes: the new logo and the social preview tags (#28, #29) come next, as planned.
+
+## The owner's decisions (2 Nov 2026, PR #80)
+
+**Approved: 17 of 19 proposals**, built as six `v1` issues that block launch (#26). The owner's texts and the full table are in spec §7.8.
+
+| Issue | Proposals |
+|---|---|
+| #81 First screen: chart shrinks when empty, brief first on phones | M1, M2, S4 |
+| #82 Item cards and panel: short headline-only cards, one click behaviour | S5, S10, S11, M3 |
+| #83 Port status: meaning next to each value, Watch/Alert marks on the Rhine gauge | S6, S7 |
+| #84 Plain words on the pages and an archive legend | S8, S9 |
+| #85 Map pins: merge close pins, move Calandkanaal, home view shows the day's pins | M4 (option b), M5 |
+| #86 Say what this is and who made it: one-liner, About text, links, "How it works" | S1, S2, S3, L2 |
+
+- **S1 / L2:** the owner wrote both texts (spec §7.8); they replace the wording suggested above.
+- **S2:** LinkedIn `https://www.linkedin.com/in/leonardo-neirotti`, repository `https://github.com/leonardoneirotti/haven-daily`.
+- **M4:** option (b): keep Europoort, move the Calandkanaal pin to a point on the canal chosen from OpenStreetMap, **and** merge close pins of the same day into one marker, so no two visible markers overlap at the home view.
+- **Not in v1:** M6 → "Later" (spec §10); L1 → v2 ideas (spec §9).
