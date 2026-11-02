@@ -121,7 +121,7 @@
         <ul>
           {% for src in group.sources %}
           <li>
-            <strong>{% if src.home %}<a href="{{ src.home }}">{{ src.name }}</a>{% else %}{{ src.name }}{% endif %}</strong>{% if src.read_url %} <span class="source-feed">(<a href="{{ src.read_url }}">feed</a>)</span>{% endif %}{% if src.access %} · {{ src.access }}{% endif %}{% if src.language_name %} · {{ src.language_name }}{% endif %}.
+            <strong>{% if src.home %}<a href="{{ src.home }}">{{ src.name }}</a>{% else %}{{ src.name }}{% endif %}</strong>{% if src.read_url %} <span class="source-feed">(<a href="{{ src.read_url }}">{{ src.read_label }}</a>)</span>{% endif %}{% if src.access %} · {{ src.access }}{% endif %}{% if src.language_name %} · {{ src.language_name }}{% endif %}.
             {% if group.verdict != "drop" %}{{ src.how }}{% endif %}{% if src.why %} {{ src.why }}{% endif %}
 
           </li>

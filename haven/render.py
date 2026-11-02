@@ -534,7 +534,8 @@ def method_page(sources: tuple[Source, ...], rhine: RhineThresholds) -> dict:
             {
                 "name": src.name,
                 "home": src.home,  # the name links the source's normal public page
-                "read_url": src.urls[0] if src.urls else None,  # "(feed)": what the job reads
+                "read_url": src.urls[0] if src.urls else None,  # what the job reads
+                "read_label": "page" if src.access == "html" else "feed",  # "(page)" / "(feed)", owner PR #76
                 "language_name": LANGUAGE_NAMES.get(src.language, src.language) if src.language else None,
                 "access": {"rss": "RSS feed", "html": "Web page"}.get(src.access),
                 "how": source_use(src),

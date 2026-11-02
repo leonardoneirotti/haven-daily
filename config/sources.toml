@@ -12,7 +12,7 @@
 #   home       the source's normal public page: its name links here on the Method page
 #              (required unless dropped, tests/test_repo_config.py; owner, PR #76)
 #   urls       one or more feed/page addresses the job reads (required unless dropped);
-#              the first is the "(feed)" link on the Method page
+#              the first is the "(feed)" link (RSS) or "(page)" link (HTML) on the Method page
 #   access     "rss" or "html" (required unless dropped)
 #   language   two-letter code of the source's text: "en" or "nl" (required unless dropped)
 #   auto_keep  true = skips the AI relevance check (spec §5.4); default false

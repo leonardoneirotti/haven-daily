@@ -2008,7 +2008,7 @@ td.ais-text {
   gap: 0.55rem;
 }
 
-/* "(feed)": the address the job reads, after the link to the source's public page */
+/* "(feed)" / "(page)": the address the job reads, after the link to the source's public page */
 .source-feed {
   font-size: 0.875em;
   color: var(--ink-2);
