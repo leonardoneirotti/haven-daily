@@ -255,7 +255,7 @@ haven/                 Python package
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
   filter.toml          off-topic word lists per language (§5.4), small starter lists (football)
-  places.toml          the fixed place list: 40 places, coordinates + OSM element id (§5.10)
+  places.toml          the fixed place list: 41 places, coordinates + OSM element id (§5.10)
   tags.toml            the fixed "affects" tags: 15 cargo/mode tags (§5.10)
 tests/                 pytest; run with `python -m pytest` (settings in pytest.ini). conftest.py: no API keys, no internet in any test
 .github/workflows/
@@ -608,13 +608,14 @@ Examples: terminals (ECT Delta, Euromax, RWG, APMT Maasvlakte II…), areas (Maa
 
 #### 5.10.1 The lists as built (issue #14, 2 Nov 2026)
 
-- **`config/places.toml`**: 40 places (11 terminals, 10 port areas, 5 North Sea anchorages, 1 lock, 2 storm surge barriers, 2 bridges, 9 fairways). Each has an `osm` field naming the OpenStreetMap element its coordinates were taken from (e.g. `way/145614140` = ECT Delta), so anyone can check it on openstreetmap.org. Coordinates were read **once** with an Overpass query on 2 Nov 2026: a node's own position, or the centre Overpass reports for a way or relation. A test checks every place lies inside the sheet bbox (§8.1); the loader refuses one outside it.
+- **`config/places.toml`**: 41 places (12 terminals, 10 port areas, 5 North Sea anchorages, 1 lock, 2 storm surge barriers, 2 bridges, 9 fairways). Each has an `osm` field naming the OpenStreetMap element its coordinates were taken from (e.g. `way/145614140` = ECT Delta), so anyone can check it on openstreetmap.org. Coordinates were read **once** with an Overpass query on 2 Nov 2026: a node's own position, or the centre Overpass reports for a way or relation. A test checks every place lies inside the sheet bbox (§8.1); the loader refuses one outside it.
 - **`config/tags.toml`**: 15 tags. Any place label is also a valid tag.
 - **`haven/places.py` `pick(place, tags)`**: returns `map` (or `null`), `affects` and `unlisted` (left out of the item when nothing was discarded). `config.py` checks both files like the other config (unknown field, duplicate id/label/tag, bad OSM id, outside the sheet → stop with a message).
 
-*Claude's defaults, not yet confirmed by the owner (2 Nov 2026, issue #14):*
+*Proposed by Claude; confirmed by the owner 2 Nov 2026 except where marked (issue #14, PR #59):*
 1. **Two extra place kinds, `barrier` and `bridge`**, next to the five above: the Maeslantkering and Hartelkering (closed in storms: sea access) and the Botlekbrug and Calandbrug (rail/road bridges whose closures and openings delay trains and trucks) are not locks or fairways. Only one lock is listed (Rozenburgsesluis); the port's main waterways have no sea locks.
-2. **The choice of the 40 places** and their short labels (e.g. "RWG", "APMT Maasvlakte II"). Not found in OSM with a name, so left out for now: APM Terminals Rotterdam (Maasvlakte I) and Uniport. **Eurogeul** (the deep-water approach channel) has no named area in OSM: its pin is the Eurogeul E13 buoy (`node/1333828109`). **Rozenburgsesluis** is the OSM lock way named after its canal ("Calandkanaal"); the label is Claude's reading of which lock it is.
+2. **The choice of places** and their short labels (e.g. "RWG", "APMT Maasvlakte II"). **Eurogeul** (the deep-water approach channel) has no named area in OSM: its pin is the Eurogeul E13 buoy (`node/1333828109`). **Uniport** stays out (owner). **Rozenburgsesluis** is the OSM lock way named after its canal ("Calandkanaal"): Claude's reading of which lock it is, kept by the owner and checked on the chart in the design review (#25).
+   - **APM Terminals Rotterdam (Maasvlakte I)** added at the owner's request (41st place). APM Terminals agreed in December 2019 to sell this terminal to Hutchison Ports and kept Maasvlakte II (Freightwaves, 19 Dec 2019); OSM now names its area **"Hutchison Delta 2 Terminal"** (`way/607016850`), and the coordinates are that area's centre. *Claude's default, not yet confirmed by the owner:* id `delta-2`, label **"Delta II (ex-APMT Rotterdam)"**, so news using either name finds it. Also checked: the address APM gives for Maasvlakte II (Europaweg 910) is the APMT Maasvlakte II area already on the list, so that pin is right.
 3. **Label `side`**: `right` unless a neighbour sits close on the right (RWG, APMT Maasvlakte II, Maasvlakte II, Nieuwe Waterweg, Hartelkanaal, Hartelkering, Calandbrug, Rozenburgsesluis are `left`). To be checked on the real chart in the design review (#25).
 4. **Tags**: the spec's 12 plus **Shortsea**, **Ferries** and **Labour** (strikes and other labour news, the most common High item). A tag may not have the same name as a place.
 5. **Matching ignores upper/lower case and spaces around the answer**; the item always gets the list's spelling. Repeated tags count once.

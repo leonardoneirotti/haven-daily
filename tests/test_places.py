@@ -193,7 +193,7 @@ def test_bad_tags_are_rejected(tmp_path, text, message):
 
 def test_real_place_list_size_and_osm_ids():
     places = load_places()
-    assert 30 <= len(places) <= 40
+    assert 30 <= len(places) <= 41  # spec: ~30–40; 41st (Delta II) agreed by the owner, 2 Nov 2026
     for place in places:
         assert re.fullmatch(r"(node|way|relation)/\d+", place.osm), place.id
 

@@ -56,6 +56,17 @@ lon = 4.0068
 side = "left"
 osm = "way/599016100"
 
+# Formerly APM Terminals Rotterdam (Maasvlakte I), sold by APM Terminals to Hutchison
+# Ports (agreed Dec 2019); OSM names it "Hutchison Delta 2 Terminal". News may use either name.
+[[place]]
+id = "delta-2"
+label = "Delta II (ex-APMT Rotterdam)"
+kind = "terminal"
+lat = 51.9565
+lon = 4.0428
+side = "right"
+osm = "way/607016850"
+
 [[place]]
 id = "mot"
 label = "Maasvlakte Olie Terminal"

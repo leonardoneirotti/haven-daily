@@ -20,7 +20,7 @@ haven/filter.py           relevance filter: rules (older than 48 h, auto-keep, o
 haven/places.py           checks the AI's place and tags against the fixed lists; adds coordinates; logs anything not listed
 config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep
 config/filter.toml        off-topic word lists for the relevance filter (small starter lists, tuned after the first runs)
-config/places.toml        the 40 places an item can be pinned to, coordinates taken once from OpenStreetMap (each with its OSM id)
+config/places.toml        the 41 places an item can be pinned to, coordinates taken once from OpenStreetMap (each with its OSM id)
 config/tags.toml          the 15 "affects" tags (place labels count as tags too)
 tests/                    pytest tests; tests/test_repo_config.py keeps sources.toml and SOURCES.md in step
 templates/                Jinja2 page templates (base, day, archive, method page, shared macros)
