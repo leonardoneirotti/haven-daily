@@ -279,7 +279,8 @@ def test_an_undated_item_whose_link_was_seen_in_the_last_14_days_never_reaches_t
     seen = "https://contargo.test/news/invented-old-story"
     storage.write("items", date(2026, 10, 25), [
         {"source": "contargo-news", "headline": "Invented old story", "url": seen,
-         "published": None, "language": "en", "access": "full"},
+         "published": None, "language": "en", "access": "full",
+         "filter": {"kept": False, "stage": "ai", "reason": "Not about Rotterdam"}},  # decided, so it counts as seen
     ], data_dir=tmp_path)
     fresh = "https://contargo.test/news/invented-new-story"
 

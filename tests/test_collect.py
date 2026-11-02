@@ -82,8 +82,19 @@ def ok(*items):
     return FeedResult(items=list(items), failures=[])
 
 
+DECIDED = {"kept": False, "stage": "rules", "reason": "older than 48 h"}
+
+
 def store_items(tmp_path, day, *items):
-    storage.write("items", day, [i.record() if isinstance(i, Item) else i for i in items], data_dir=tmp_path)
+    """Stored lines as a normal morning writes them: every Item with a filter decision."""
+    lines = [(i if i.filter is not None else replace(i, filter=DECIDED)).record() if isinstance(i, Item) else i
+             for i in items]
+    storage.write("items", day, lines, data_dir=tmp_path)
+
+
+def store_unchecked(tmp_path, day, *items):
+    """Stored lines with no filter decision, as on a reduced day (the AI check never ran)."""
+    storage.write("items", day, [i.record() for i in items], data_dir=tmp_path)
 
 
 def store_brief(tmp_path, day, build):
@@ -175,6 +186,43 @@ def test_items_seen_in_the_last_14_days_are_not_returned_again(tmp_path):
     assert [i.headline for i in result.items] == ["Invented headline 3", "Invented headline 4"]
     assert result.items_collected == 4
     assert result.duplicates == 2
+
+
+def test_a_stored_item_with_no_filter_decision_is_not_a_duplicate(tmp_path):
+    """Owner's decision (2 Nov 2026, PR #74): items the AI check never decided (a reduced day) come back
+    the next morning and are checked then; the filter's 48 h rule still applies to them."""
+    store_unchecked(tmp_path, TODAY - timedelta(days=1), item("a", 1))
+    result, _ = run(tmp_path, [src("a")], {"a": ok(item("a", 1))})
+    assert [i.url for i in result.items] == [item("a", 1).url]
+    assert result.duplicates == 0
+
+
+@pytest.mark.parametrize("decision", [None, "kept", []])
+def test_a_stored_line_whose_filter_is_null_or_not_a_decision_is_not_a_duplicate(tmp_path, decision):
+    line = {**item("a", 1).record(), "filter": decision}
+    store_items(tmp_path, TODAY - timedelta(days=1), line)
+    result, _ = run(tmp_path, [src("a")], {"a": ok(item("a", 1))})
+    assert len(result.items) == 1
+
+
+@pytest.mark.parametrize("decision", [
+    {"kept": True, "stage": "rules", "reason": "Rotterdam-specific source (auto-keep)"},
+    {"kept": False, "stage": "rules", "reason": "older than 48 h"},
+    {"kept": True, "stage": "ai", "reason": "Fog procedure"},
+    {"kept": False, "stage": "ai", "reason": "Routine notice"},
+])
+def test_a_stored_item_with_any_filter_decision_is_a_duplicate(tmp_path, decision):
+    store_items(tmp_path, TODAY - timedelta(days=1), item("a", 1, filter=decision))
+    result, _ = run(tmp_path, [src("a")], {"a": ok(item("a", 1))})
+    assert result.items == []
+    assert result.duplicates == 1
+
+
+def test_an_unchecked_item_decided_on_a_later_day_is_a_duplicate(tmp_path):
+    store_unchecked(tmp_path, TODAY - timedelta(days=2), item("a", 1))  # reduced day
+    store_items(tmp_path, TODAY - timedelta(days=1), item("a", 1))  # came back and was decided
+    result, _ = run(tmp_path, [src("a")], {"a": ok(item("a", 1))})
+    assert result.items == []
 
 
 def test_a_link_written_differently_still_counts_as_seen(tmp_path):
