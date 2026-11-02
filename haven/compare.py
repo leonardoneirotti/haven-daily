@@ -20,7 +20,7 @@ import argparse
 import re
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from haven.config import Place, Source, load_places, load_tags
@@ -221,22 +221,25 @@ def format_markdown(comparison: Comparison, sources: tuple[Source, ...]) -> str:
 
 
 def main(argv=None) -> None:
-    """`python -m haven.compare [--dry-run] [--max-items N] [--out FILE]`. Writes nothing to data/."""
+    """`python -m haven.compare [--dry-run] [--max-age-days N] [--max-items N] [--out FILE]`. Writes nothing to data/."""
     from haven import clock, storage
     from haven.collect import add_article_text, run_collect
     from haven.config import load_filter, load_sources
     from haven.env import load_env
     from haven.fetch import Fetcher
-    from haven.filter import AI_CHECK, KEEP, TO_AI, ai_client, ai_cost_usd, apply_rules, run_filter
+    from haven.filter import AI_CHECK, KEEP, MAX_AGE, TO_AI, ai_client, ai_cost_usd, apply_rules, run_filter
     from haven.summarise import known_strikes
 
     parser = argparse.ArgumentParser(prog="python -m haven.compare", description=__doc__.splitlines()[0])
     parser.add_argument("--dry-run", action="store_true", help="no API calls: counts and the cost estimate only")
+    parser.add_argument("--max-age-days", type=int, default=None,
+                        help="let items up to N days old through the age rule (comparison only; default 48 h)")
     parser.add_argument("--max-items", type=int, default=None, help="summarise at most this many kept items")
     parser.add_argument("--out", type=Path, default=None, help="write the side-by-side view to this file")
     args = parser.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")  # headlines and "·" on a Windows console
 
+    max_age = MAX_AGE if args.max_age_days is None else timedelta(days=args.max_age_days)
     load_env()
     sources = load_sources()
     fetcher = Fetcher()
@@ -249,7 +252,7 @@ def main(argv=None) -> None:
         print(f"FAILURE  {failure['source']}: {failure['error']}")
 
     if args.dry_run:
-        ruled = apply_rules(collected.items, sources, load_filter(), now)
+        ruled = apply_rules(collected.items, sources, load_filter(), now, max_age)
         kept = [r.item for r in ruled if r.decision.outcome == KEEP]
         to_ai = [r.item for r in ruled if r.decision.outcome == TO_AI]
         low, high = len(kept), len(kept) + len(to_ai)
@@ -270,7 +273,7 @@ def main(argv=None) -> None:
     client = ai_client()
     if client is None:
         sys.exit("ANTHROPIC_API_KEY is not set (local .env): nothing was sent.")
-    filtered = run_filter(collected.items, sources, load_filter(), now, client)
+    filtered = run_filter(collected.items, sources, load_filter(), now, client, max_age)
     if filtered.ai_unavailable:
         sys.exit("The AI check was unavailable: nothing was summarised.")
     kept = [i for i in filtered.items if i.filter and i.filter["kept"]]
@@ -279,7 +282,8 @@ def main(argv=None) -> None:
     known = known_strikes(storage.read_recent("items", before=today, days=14))
     comparison = compare(texts.items, client, known, today, max_items=args.max_items)
 
-    header = [f"Filter: {len(kept)} kept of {len(filtered.items)} ({filtered.ai_calls} {AI_CHECK} calls, "
+    window = "48 h (as the morning job)" if args.max_age_days is None else f"{args.max_age_days} days (comparison only)"
+    header = [f"Age limit: {window}.", "", f"Filter: {len(kept)} kept of {len(filtered.items)} ({filtered.ai_calls} {AI_CHECK} calls, "
               f"{filtered.input_tokens:,} in / {filtered.output_tokens:,} out, ${filter_cost:.4f}).", ""]
     header += [f"- FAILURE {f['source']}: {f['error']}" for f in filtered.failures + texts.failures]
     text = "\n".join(header) + "\n" + format_markdown(comparison, sources)
