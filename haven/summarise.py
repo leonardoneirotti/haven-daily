@@ -39,10 +39,19 @@ starts and ends ("on Thursday", "5 November", "tomorrow"), and **the code works 
 out with a failure line; vague words ("next week", "soon") or no published date give no date.
 Either way the strike itself stays (with no date it shows Watch, §5.7), and the item stays rated.
 
+How the API is called (§5.5, issue #16): the morning job sends all kept items as **one batch**
+(50% off) with the chosen model (`start_batch`), waits **at most 20 minutes** from sending it
+(`finish_batch`; other work can run in between), cancels what is unfinished, and sends every item
+the batch **didn't answer** through the standard API with **Haiku 5.5**, whatever the batch model.
+That is not a second opinion: an item the batch **did** answer is checked as above, and a refusal
+or bad answer makes it unrated with no other model asked (owner's decision in #15). Each item
+records `written_by` = model + "batch" or "standard"; `SummaryResult.summaries` counts them.
+
 API failures are handled like the relevance filter's (§5.4, #13): no key, a rejected key or the
 first 3 calls in a row failing = **AI unavailable** (nothing is summarised; the runner, #22,
 retries later or publishes a reduced brief); one call failing = that item is unrated; after at
 least one answer, 3 failures in a row = the remaining items are unrated without calling again.
+A batch that can't be created sends every item to the standard API (with a failure line).
 """
 
 from __future__ import annotations
@@ -50,8 +59,10 @@ from __future__ import annotations
 import html
 import json
 import re
+import time
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
+from typing import Callable
 
 import anthropic
 
@@ -61,10 +72,15 @@ from haven.feeds import Item
 from haven.filter import BREAKER, NO_KEY
 from haven.places import pick
 
-__all__ = ["BREAKER", "SUMMARY_MODEL", "SummaryResult", "brief_item", "known_strikes", "phrase_in",
-           "published_day", "resolve_phrase", "summarise", "unrated"]
+__all__ = ["BATCH_WAIT", "BREAKER", "CANCEL_WAIT", "FALLBACK_MODEL", "SUMMARY_MODEL", "BatchRun", "SummaryResult",
+           "brief_item", "finish_batch", "known_strikes", "phrase_in", "published_day", "resolve_phrase",
+           "start_batch", "summarise", "summarise_batch", "unrated"]
 
 SUMMARY_MODEL = "claude-haiku-5-5"  # spec §5.5: the default unless Sonnet 5.5 is clearly better (#17)
+FALLBACK_MODEL = "claude-haiku-5-5"  # items the batch didn't answer, whatever the batch model (§5.5 step 3)
+BATCH_WAIT = 20 * 60  # seconds from sending the batch to cancelling what is unfinished (§5.5 step 2)
+CANCEL_WAIT = 2 * 60  # seconds to wait for a cancelled batch to end (its results can be read only then)
+POLL_EVERY = 30  # seconds between status checks while waiting; checking costs nothing
 SUMMARY_EFFORT = "medium"
 SUMMARY_MAX_TOKENS = 8192  # thinking counts toward it; only what is used is paid for
 SUMMARISER = "AI summariser"  # the `source` of its failure lines
@@ -84,9 +100,18 @@ class SummaryResult:
     items: list[Item]  # input order; `ai` set on all, unless the AI was unavailable (then None)
     failures: list[dict]  # {"source": "AI summariser", "error": ...}, for build.failures
     unavailable: str | None  # why the AI couldn't be used at all, or None
-    calls: int = 0
-    input_tokens: int = 0
+    calls: int = 0  # standard-API calls (fallback and retries); the batch itself is not a call
+    input_tokens: int = 0  # all tokens, batch included
     output_tokens: int = 0
+    batch_input_tokens: int = 0  # the part paid at the batch price (50% off, §5.5)
+    batch_output_tokens: int = 0
+
+    @property
+    def summaries(self) -> dict:
+        """`build.summaries` (§6): rated items written in the batch vs through the standard API."""
+        apis = [(item.ai or {}).get("written_by") or {} for item in self.items]
+        return {"batch": sum(w.get("api") == "batch" for w in apis),
+                "fallback": sum(w.get("api") == "standard" for w in apis)}
 
 
 class _ItemFailed(Exception):
@@ -248,92 +273,275 @@ def _request(item: Item, model: str, system: str, known: list[dict], today: date
 # --- summarising -----------------------------------------------------------------------------
 
 
-def summarise(items: list[Item], client, known: list[dict], today: date, model: str = SUMMARY_MODEL,
-              places: tuple[Place, ...] | None = None, tags: tuple[str, ...] | None = None) -> SummaryResult:
-    """Step 3 of the morning job for the kept items. Never raises for an API problem.
+class _Unavailable(Exception):
+    """The AI can't be used at all this run (§5.6): rejected key, or the first 3 calls failing."""
 
-    `known` is `known_strikes(...)` of the last 14 days of stored items; `today` is the
-    Amsterdam date of the run (new strike ids and the date check use it).
+
+@dataclass(frozen=True)
+class _Retry:
+    """The answer was too long or copied: ask the same model once more (owner, 2 Nov 2026)."""
+    reason: str
+
+
+def _problem(error: Exception) -> str:
+    """A failed call in a few words, never the API's own message."""
+    if isinstance(error, anthropic.APITimeoutError):  # before APIConnectionError, its parent class
+        return "timeout"
+    if isinstance(error, anthropic.APIConnectionError):
+        return "connection error"
+    if isinstance(error, anthropic.APIStatusError):
+        return f"HTTP {error.status_code}"
+    return f"unexpected error ({type(error).__name__})"
+
+
+class _Run:
+    """One summariser run: the prompt, the checks, the counters and the outage rule.
+
+    Shared by the standard API (`summarise`) and the batch (`start_batch` / `finish_batch`), so an
+    answer is checked the same way whichever route it came by.
     """
-    if client is None:
-        return _unavailable(items, NO_KEY, calls=0)
-    places = load_places() if places is None else places
-    tags = load_tags() if tags is None else tags
-    system = system_prompt(places, tags)
-    known_ids = {strike["id"] for strike in known}
-    taken = set(known_ids)
 
-    done: list[Item] = []
-    failures: list[dict] = []
-    calls = input_tokens = output_tokens = 0
-    answered = False  # the API gave at least one answer this run
-    streak = 0  # failed calls in a row
+    def __init__(self, client, known: list[dict], today: date, places, tags):
+        self.client = client
+        self.known = known
+        self.known_ids = {strike["id"] for strike in known}
+        self.today = today
+        self.places = load_places() if places is None else places
+        self.tags = load_tags() if tags is None else tags
+        self.system = system_prompt(self.places, self.tags)
+        self.failures: list[dict] = []
+        self.calls = self.input_tokens = self.output_tokens = 0
+        self.batch_input_tokens = self.batch_output_tokens = 0
+        self.answered = False  # the API gave at least one answer this run
+        self.streak = 0  # failed standard calls in a row
 
-    def fail(item: Item, problem: str) -> None:
-        done.append(replace(item, ai=unrated()))
-        failures.append({"source": SUMMARISER, "error": f"{item.url}: {problem}"})
+    def request(self, item: Item, model: str, retry_reason: str | None = None) -> dict:
+        return _request(item, model, self.system, self.known, self.today, retry_reason)
 
-    for item in items:
-        if streak >= BREAKER:  # the API went down after answering earlier: don't wait on it again
-            fail(item, f"not tried: {BREAKER} calls in a row failed")
-            continue
-        retry_reason = None  # set when the first answer was too long or copied (one retry)
+    def fail(self, item: Item, problem: str) -> Item:
+        self.failures.append({"source": SUMMARISER, "error": f"{item.url}: {problem}"})
+        return replace(item, ai=unrated())
 
+    def count(self, response, batch: bool) -> None:
+        usage = getattr(response, "usage", None)
+        tokens_in = getattr(usage, "input_tokens", 0) or 0
+        tokens_out = getattr(usage, "output_tokens", 0) or 0
+        self.input_tokens += tokens_in
+        self.output_tokens += tokens_out
+        if batch:
+            self.batch_input_tokens += tokens_in
+            self.batch_output_tokens += tokens_out
+
+    def accept(self, response, item: Item, model: str, api: str, retry_reason: str | None) -> Item | _Retry:
+        """The item with its checked AI fields, unrated with a failure line, or a _Retry."""
         def after(problem: str) -> str:
             return f"{problem} (after a retry)" if retry_reason is not None else problem
 
+        notes: list[str] = []  # problems that leave the item rated (a date left out)
+        try:
+            ai = _checked(_answer(response), item, self.known_ids, self.today, self.places, self.tags, notes)
+        except _Rephrase as problem:
+            if retry_reason is None:
+                return _Retry(str(problem))  # this answer's notes are dropped with it
+            return self.fail(item, after(str(problem)))
+        except _ItemFailed as problem:  # a refusal too: never sent to another model (§5.5 point 8)
+            return self.fail(item, after(str(problem)))
+        except Exception as error:  # a bug of ours in the checks
+            return self.fail(item, after(_problem(error)))
+        ai["written_by"] = {"model": model, "api": api}
+        self.failures.extend({"source": SUMMARISER, "error": f"{item.url}: {note}"} for note in notes)
+        return replace(item, ai=ai)
+
+    def standard(self, item: Item, model: str, retry_reason: str | None = None) -> Item:
+        """The item through the standard API (with its one rephrase retry). Raises _Unavailable."""
+        if self.streak >= BREAKER:  # the API went down after answering earlier: don't wait on it again
+            return self.fail(item, f"not tried: {BREAKER} calls in a row failed")
         while True:
-            calls += 1
+            def after(problem: str) -> str:
+                return f"{problem} (after a retry)" if retry_reason is not None else problem
+
+            self.calls += 1
             try:
-                response = client.messages.create(**_request(item, model, system, known, today, retry_reason))
+                response = self.client.messages.create(**self.request(item, model, retry_reason))
             except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as error:
-                return _unavailable(items, f"API key rejected (HTTP {error.status_code})", calls)
-            except anthropic.APITimeoutError:  # before APIConnectionError, its parent class
-                problem = "timeout"
-            except anthropic.APIConnectionError:
-                problem = "connection error"
-            except anthropic.APIStatusError as error:
-                problem = f"HTTP {error.status_code}"
+                raise _Unavailable(f"API key rejected (HTTP {error.status_code})") from None
+            except (anthropic.APITimeoutError, anthropic.APIConnectionError, anthropic.APIStatusError) as error:
+                problem = _problem(error)
             except Exception as error:  # a bug of ours must not stop the run (hard rule 9)
-                fail(item, after(f"unexpected error ({type(error).__name__})"))
-                break
+                return self.fail(item, after(_problem(error)))
             else:
-                answered, streak = True, 0
-                usage = getattr(response, "usage", None)
-                input_tokens += getattr(usage, "input_tokens", 0) or 0
-                output_tokens += getattr(usage, "output_tokens", 0) or 0
-                notes: list[str] = []  # problems that leave the item rated (a date left out)
-                try:
-                    ai = _checked(_answer(response), item, known_ids, today, places, tags, notes)
-                except _Rephrase as problem:
-                    if retry_reason is None:
-                        retry_reason = str(problem)
-                        continue  # ask once more; this answer's notes are dropped with it
-                    fail(item, after(str(problem)))
-                    break
-                except _ItemFailed as problem:
-                    fail(item, after(str(problem)))
-                    break
-                except Exception as error:  # a bug of ours in the checks
-                    fail(item, after(f"unexpected error ({type(error).__name__})"))
-                    break
-                if ai["strike"] is not None and ai["strike"]["match"] == "new":
-                    ai["strike"]["strike_id"] = _new_strike_id(today, taken)
-                ai["written_by"] = {"model": model, "api": "standard"}
-                done.append(replace(item, ai=ai))
-                failures.extend({"source": SUMMARISER, "error": f"{item.url}: {note}"} for note in notes)
-                break
+                self.answered, self.streak = True, 0
+                self.count(response, batch=False)
+                outcome = self.accept(response, item, model, "standard", retry_reason)
+                if isinstance(outcome, _Retry):
+                    retry_reason = outcome.reason
+                    continue
+                return outcome
 
             # The call itself failed (after the SDK's own retries). Only these count as an outage:
             # a refusal or a bad answer means the API is up.
-            streak += 1
-            if streak >= BREAKER and not answered:
-                return _unavailable(items, f"{BREAKER} calls in a row failed (last: {problem})", calls)
-            fail(item, after(problem))
-            break
+            self.streak += 1
+            if self.streak >= BREAKER and not self.answered:
+                raise _Unavailable(f"{BREAKER} calls in a row failed (last: {problem})")
+            return self.fail(item, after(problem))
 
-    return SummaryResult(items=done, failures=failures, unavailable=None, calls=calls,
-                         input_tokens=input_tokens, output_tokens=output_tokens)
+    def result(self, done: list[Item]) -> SummaryResult:
+        """New strike ids in input order (whichever route each item took), then the result."""
+        taken = set(self.known_ids)
+        for item in done:
+            strike = item.ai["strike"] if item.ai else None
+            if strike is not None and strike["match"] == "new":
+                strike["strike_id"] = _new_strike_id(self.today, taken)
+        return SummaryResult(items=done, failures=self.failures, unavailable=None, calls=self.calls,
+                             input_tokens=self.input_tokens, output_tokens=self.output_tokens,
+                             batch_input_tokens=self.batch_input_tokens,
+                             batch_output_tokens=self.batch_output_tokens)
+
+
+def summarise(items: list[Item], client, known: list[dict], today: date, model: str = SUMMARY_MODEL,
+              places: tuple[Place, ...] | None = None, tags: tuple[str, ...] | None = None) -> SummaryResult:
+    """The kept items through the standard API, one call each. Never raises for an API problem.
+
+    The morning job uses `summarise_batch`; this is its fallback route and what the Haiku vs
+    Sonnet comparison (#17) can run directly. `known` is `known_strikes(...)` of the last 14 days
+    of stored items; `today` is the Amsterdam date of the run (new strike ids and the date check).
+    """
+    if client is None:
+        return _unavailable(items, NO_KEY, calls=0)
+    run = _Run(client, known, today, places, tags)
+    try:
+        done = [run.standard(item, model) for item in items]
+    except _Unavailable as why:
+        return _unavailable(items, str(why), run.calls)
+    return run.result(done)
+
+
+# --- the batch (spec §5.5, issue #16) ----------------------------------------------------------
+
+
+@dataclass
+class BatchRun:
+    """A batch that was sent and not yet collected: `start_batch`, other work, `finish_batch`."""
+    items: list[Item]
+    model: str
+    started: float  # clock reading when the batch was sent; the 20 minutes count from here
+    clock: Callable[[], float]
+    run: _Run | None = None
+    batch_id: str | None = None  # None: no batch (no items, or it couldn't be created)
+    unavailable: str | None = None
+
+
+def _custom_id(index: int) -> str:
+    return f"item-{index}"  # the API allows 1-64 letters, digits, "-" and "_"
+
+
+def start_batch(items: list[Item], client, known: list[dict], today: date, model: str = SUMMARY_MODEL,
+                places: tuple[Place, ...] | None = None, tags: tuple[str, ...] | None = None,
+                clock: Callable[[], float] | None = None) -> BatchRun:
+    """Send all kept items as one batch (§5.5 step 1) and return at once, without waiting.
+
+    The runner can do other work (in v2 the AIS snapshot, #31) before `finish_batch`; the
+    20-minute limit counts from now, so that work costs no extra time. Never raises for an
+    API problem: a batch that can't be created sends every item to the standard API later.
+    """
+    clock = clock or time.monotonic
+    items = list(items)
+    if client is None:
+        return BatchRun(items, model, clock(), clock, unavailable=NO_KEY)
+    run = _Run(client, known, today, places, tags)
+    batch_id = None
+    if items:  # an empty batch is not allowed, and there is nothing to wait for
+        requests = [{"custom_id": _custom_id(i), "params": run.request(item, model)} for i, item in enumerate(items)]
+        try:
+            batch_id = client.messages.batches.create(requests=requests).id
+        except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as error:
+            return BatchRun(items, model, clock(), clock, unavailable=f"API key rejected (HTTP {error.status_code})")
+        except Exception as error:
+            run.failures.append({"source": SUMMARISER, "error":
+                                 f"batch not created ({_problem(error)}); all items sent to the standard API"})
+    return BatchRun(items, model, clock(), clock, run=run, batch_id=batch_id)
+
+
+def finish_batch(pending: BatchRun, sleep: Callable[[float], None] | None = None) -> SummaryResult:
+    """Wait for the batch until 20 minutes after it was sent, then cancel what is unfinished.
+
+    An item the batch answered is checked like a standard answer; a refusal or bad answer makes
+    it unrated, with **no other model asked** (owner's decision in #15). Only an item the batch
+    did **not answer** (unfinished, cancelled, expired, errored) goes through the standard API
+    with Haiku 5.5 (§5.5 step 3), whatever model the batch used.
+    """
+    sleep = sleep or time.sleep
+    if pending.unavailable is not None:
+        return _unavailable(pending.items, pending.unavailable, calls=0)
+    run = pending.run
+    answers = _collect(pending, sleep) if pending.batch_id is not None else {}
+    run.answered = bool(answers)
+    try:
+        done = []
+        for index, item in enumerate(pending.items):
+            message = answers.get(index)
+            if message is None:
+                done.append(run.standard(item, FALLBACK_MODEL))
+                continue
+            run.count(message, batch=True)
+            outcome = run.accept(message, item, pending.model, "batch", retry_reason=None)
+            if isinstance(outcome, _Retry):  # the one rephrase retry: same model, standard API
+                outcome = run.standard(item, pending.model, retry_reason=outcome.reason)
+            done.append(outcome)
+    except _Unavailable as why:
+        return _unavailable(pending.items, str(why), run.calls)
+    return run.result(done)
+
+
+def summarise_batch(items: list[Item], client, known: list[dict], today: date, model: str = SUMMARY_MODEL,
+                    places: tuple[Place, ...] | None = None, tags: tuple[str, ...] | None = None,
+                    clock: Callable[[], float] | None = None,
+                    sleep: Callable[[float], None] | None = None) -> SummaryResult:
+    """Step 3 of the morning job: `start_batch` and `finish_batch` with nothing in between."""
+    return finish_batch(start_batch(items, client, known, today, model, places, tags, clock), sleep)
+
+
+def _collect(pending: BatchRun, sleep: Callable[[float], None]) -> dict[int, object]:
+    """{item index: message} for every request the batch answered ("succeeded")."""
+    run, batch_id = pending.run, pending.batch_id
+    batches = run.client.messages.batches
+    if not _wait_until_ended(batches, batch_id, pending.started + BATCH_WAIT, pending.clock, sleep):
+        try:
+            batches.cancel(batch_id)  # finished requests keep their results; the rest are cancelled
+        except Exception:
+            pass  # it may have ended just now; the check below decides
+        if not _wait_until_ended(batches, batch_id, pending.clock() + CANCEL_WAIT, pending.clock, sleep):
+            run.failures.append({"source": SUMMARISER, "error":
+                                 "batch did not end after cancelling; all items sent to the standard API"})
+            return {}
+    ids = {_custom_id(i): i for i in range(len(pending.items))}
+    answers = {}
+    try:
+        for entry in batches.results(batch_id):  # in any order: matched by custom_id
+            index = ids.get(entry.custom_id)
+            if index is not None and entry.result.type == "succeeded":
+                answers[index] = entry.result.message
+    except Exception as error:
+        run.failures.append({"source": SUMMARISER, "error":
+                             f"batch results could not be read ({_problem(error)}); "
+                             "all items sent to the standard API"})
+        return {}
+    return answers
+
+
+def _wait_until_ended(batches, batch_id: str, deadline: float, clock: Callable[[], float],
+                      sleep: Callable[[float], None]) -> bool:
+    """Check the batch every POLL_EVERY seconds until it has ended (True) or the deadline (False)."""
+    while True:
+        try:
+            if batches.retrieve(batch_id).processing_status == "ended":
+                return True
+        except Exception:
+            pass  # one failed check is not fatal: try again until the deadline
+        left = deadline - clock()
+        if left <= 0:
+            return False
+        sleep(min(POLL_EVERY, left))
 
 
 def _unavailable(items: list[Item], why: str, calls: int) -> SummaryResult:
