@@ -432,7 +432,7 @@ The relevance filter (§5.4) uses the standard API: its output is needed before 
 - **Results**: matched to items by `custom_id`, never by position (the API returns them in any order). Items come back in input order, and new strike ids are given in input order after all answers are in, whichever route each item took (so the ids don't depend on which items the batch finished).
 - **Counts**: `build.summaries` counts **rated** items by `written_by.api`: `batch` vs `fallback` (= `standard`). Unrated items count in neither. `SummaryResult` also keeps the batch's tokens apart (`batch_input_tokens`, `batch_output_tokens`) from the total, for the week-one cost check.
 
-*Claude's defaults (issue #16), not yet confirmed by the owner:*
+*Proposed by Claude, all confirmed by the owner 2 Nov 2026 (issue #16, PR #65):*
 1. **After cancelling, wait at most 2 more minutes** for the batch to end: results can only be read once a batch has ended. If it hasn't ended by then, **every** item goes to the Haiku fallback (failure line `batch did not end after cancelling; all items sent to the standard API`). Worst case the items it did finish are paid twice (a few cents on Haiku); the page is never held up. Latest page time: 20 + 2 minutes + the fallback calls.
 2. **Check the batch every 30 seconds** (checking costs nothing); a check that fails is ignored and the next one tried, until the deadline.
 3. **A slow batch is not a failure**: no failure line when items fall back because of the 20-minute limit or `expired` / `errored` results; `build.summaries` shows it. A failure line only when the batch couldn't be created, didn't end after cancelling, or its results couldn't be read (then every item falls back).
