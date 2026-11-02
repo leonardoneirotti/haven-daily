@@ -33,6 +33,7 @@ are the way to make a small file expand into a huge one.
 
 from __future__ import annotations
 
+import copy
 import email.utils
 import re
 import xml.etree.ElementTree as ET
@@ -103,6 +104,10 @@ class Item:
     # (spec §5.4). None until a stage has decided: the rules (haven/filter.py) set it for items
     # they keep or drop; the AI check (#13) for the rest.
     filter: dict | None = None
+    # The summariser's output (haven/summarise.py, #15): severity, summary, impact, affects, map,
+    # strike, written_by, and unlisted when something was discarded (spec §5.10). None until the
+    # summariser has run; for an unrated item the fields are there with null values.
+    ai: dict | None = None
 
     def record(self) -> dict:
         """The fields that may be stored in data/items/: everything except snippet and article text."""
@@ -116,6 +121,8 @@ class Item:
         }
         if self.filter is not None:
             record["filter"] = dict(self.filter)
+        if self.ai is not None:
+            record.update(copy.deepcopy(self.ai))  # a copy: changing the record can't change the item
         return record
 
 

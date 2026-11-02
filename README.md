@@ -18,6 +18,7 @@ haven/pages.py            reads the HTML news lists into the same item shape; K+
 haven/collect.py          the collect step: every source, 14-day duplicate check, feed read time, article text in memory only
 haven/filter.py           relevance filter: rules (older than 48 h, auto-keep, off-topic words), then Claude Haiku 5.5 for the rest; report
 haven/places.py           checks the AI's place and tags against the fixed lists; adds coordinates; logs anything not listed
+haven/summarise.py        summariser: Claude writes summary, impact, severity, place, tags, strike details; the code checks every answer
 config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep
 config/filter.toml        off-topic word lists for the relevance filter (small starter lists, tuned after the first runs)
 config/places.toml        the 41 places an item can be pinned to, coordinates taken once from OpenStreetMap (each with its OSM id)
@@ -80,7 +81,7 @@ It downloads coastlines and water areas, and separately roads, railways, breakwa
 | `corrections[]` | `{at, note}` for every hand-made fix after publishing, `[]` if none. The page shows "Corrected HH:MM" (latest one) and lists every note under "How this brief was made" |
 | `sample` | `true` shows the "Sample data" note |
 | `status[]` | Status indicators: `key`, `label`, `icon`, `value` (number, text or `null` = no data), `unit`, `place`, `level` (`green`/`amber`/`red`/`null`), `observed_at`, `source_name`, `source_url`, optional `gauge_max`, `note` |
-| `items[]` | `severity` (`high`/`medium`/`low`, or `null` = unrated: the AI failed, headline + link only), `headline`, `url`, `source`, `language`, `published`, `summary`, `impact` (`null` = "Not enough information"), `affects[]`, optional `access: "headline-only"` for paywalled sources, optional `map: {lat, lon, label}` to pin the item on the chart |
+| `items[]` | `severity` (`high`/`medium`/`low`, or `null` = unrated: the AI failed, headline + link only), `headline`, `url`, `source`, `language`, `published`, `summary`, `impact` (`null` = "Not enough information"), `affects[]`, optional `access: "headline-only"` for paywalled sources, optional `map: {lat, lon, label, side}` to pin the item on the chart, `written_by: {model, api}` (`null` if unrated), `strike` details or `null` |
 | `ships` | AIS snapshot, or `null` when it failed: `snapshot_start`, `snapshot_end`, `source_name`, `vessels[]` with `name`, `type` (`container`/`tanker`/`bulk`), `flag`, `lat`, `lon`, `heading`, `status` (`underway`/`moored`/`anchored`), `speed_kn`, `length_m`, `area`, `destination_raw` (as typed on board), `destination` (cleaned, `null` = unknown), optional `news_item` (item number) |
 | `build` | `sources_checked`, `items_collected`, `items_kept`, `failures[]` (`source`, `error`), `feeds_read_at` (when the sources were read; the next run's PIN gap check uses it), optional `ai_unavailable: true` on a reduced brief (shows "The AI step was unavailable this morning") |
 
