@@ -254,3 +254,11 @@ def test_the_real_meanings_settle_the_tags_the_comparison_got_wrong():
     meanings = {t.name: t.meaning for t in load_tag_list()}
     assert "not work on the quay" in meanings["Sea access"]  # Haiku tagged a terminal strike Sea access
     assert "PIN" in meanings["Hinterland"]  # Haiku used Hinterland for a PIN notice's area name
+
+
+def test_it_systems_is_a_tag_with_the_owners_meaning():
+    # Owner's addition, 2 Nov 2026 (issue #67): the 16th tag.
+    meanings = {t.name: t.meaning for t in load_tag_list()}
+    assert len(meanings) == 16
+    assert meanings["IT systems"] == ("Outages or cyberattacks affecting Portbase, terminal or carrier IT systems, "
+                                      "and booking or gate systems.")
