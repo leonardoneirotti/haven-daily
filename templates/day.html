@@ -51,6 +51,8 @@
         <li>
           <span class="mini-label">{{ m.icon(ind.icon) }}{{ ind.label }}</span>
           <span class="mini-value lvl-{{ ind.level_key }}">{{ m.icon(level_icons[ind.level_key]) }}{% if ind.value is none %}No data{% else %}{{ ind.display_value }}{% if ind.unit %} {{ ind.unit }}{% endif %}{% endif %}<span class="visually-hidden">, {{ ind.level_label }}</span></span>
+          {# What the level means, as a second small line (design review S6, #83). Not on No data. #}
+          {% if ind.meaning %}<span class="mini-meaning">{{ ind.meaning }}</span>{% endif %}
         </li>
         {% endfor %}
         <li>

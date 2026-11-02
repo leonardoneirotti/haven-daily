@@ -91,6 +91,21 @@ class RhineThresholds:
 _RHINE_FIELDS = ("alert_at_or_below", "watch_at_or_below", "watch_above", "alert_above")  # lowest first
 
 
+@dataclass(frozen=True)
+class RhineMeanings:
+    """What each Kaub level means for a planner, from [kaub.meaning] in config/rhine.toml (issue #83,
+    design review S6): written next to the thresholds they describe, shown next to the level."""
+
+    normal: str
+    watch_low: str
+    alert_low: str
+    watch_high: str
+    alert_high: str
+
+
+_RHINE_MEANINGS = ("normal", "watch_low", "alert_low", "watch_high", "alert_high")
+
+
 def _read_toml(path: Path) -> dict:
     path = Path(path)
     try:
@@ -164,7 +179,8 @@ def load_rhine(path: Path = CONFIG_DIR / "rhine.toml") -> RhineThresholds:
     if not isinstance(data.get("kaub"), dict):
         raise ConfigError(f"{path.name}: missing [kaub] section")
     kaub = data["kaub"]
-    unknown = sorted(set(kaub) - set(_RHINE_FIELDS))
+    # [kaub.meaning] (the texts shown next to each level) is read by load_rhine_meanings.
+    unknown = sorted(set(kaub) - set(_RHINE_FIELDS) - {"meaning"})
     if unknown:
         raise ConfigError(f"{path.name}, [kaub]: unknown field {unknown[0]!r} (allowed: {', '.join(_RHINE_FIELDS)})")
     values = []
@@ -181,6 +197,29 @@ def load_rhine(path: Path = CONFIG_DIR / "rhine.toml") -> RhineThresholds:
             + " < ".join(_RHINE_FIELDS)
         )
     return RhineThresholds(*values)
+
+
+def load_rhine_meanings(path: Path = CONFIG_DIR / "rhine.toml") -> RhineMeanings:
+    """The planner meaning of each Kaub level, checked: five one-line texts, none missing or extra.
+    Only the page needs them; the morning pipeline reads the numbers with load_rhine."""
+    path = Path(path)
+    load_rhine(path)  # the same file must hold good thresholds too
+    meaning = _read_toml(path)["kaub"].get("meaning")
+    if not isinstance(meaning, dict):
+        raise ConfigError(f"{path.name}: missing [kaub.meaning] section")
+    where = f"{path.name}, [kaub.meaning]"
+    unknown = sorted(set(meaning) - set(_RHINE_MEANINGS))
+    if unknown:
+        raise ConfigError(f"{where}: unknown field {unknown[0]!r} (allowed: {', '.join(_RHINE_MEANINGS)})")
+    texts = []
+    for name in _RHINE_MEANINGS:
+        if name not in meaning:
+            raise ConfigError(f"{where}: missing {name!r}")
+        text = meaning[name]
+        if not isinstance(text, str) or not text.strip() or "\n" in text:
+            raise ConfigError(f"{where}: {name} must be one line of text")
+        texts.append(text.strip())
+    return RhineMeanings(*texts)
 
 
 def load_places(path: Path = CONFIG_DIR / "places.toml") -> tuple[Place, ...]:

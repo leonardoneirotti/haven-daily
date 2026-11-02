@@ -22,9 +22,11 @@ from urllib.parse import urlencode
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
 from haven import filter as haven_filter
+from haven import strike as haven_strike
 from haven import summarise
 from haven.clock import AMSTERDAM
-from haven.config import RhineThresholds, Source, load_rhine, load_sources
+from haven.config import (CONFIG_DIR, RhineMeanings, RhineThresholds, Source, load_rhine, load_rhine_meanings,
+                          load_sources)
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = PROJECT_DIR / "templates"
@@ -104,6 +106,25 @@ LEVELS = {
     "red": ("alert", "Alert"),
     None: ("nodata", "No data"),
 }
+# What a weather or strike level means for a planner, shown next to the level (design review S6,
+# issue #83): one constant, never written per day. The Rhine's meanings sit next to its
+# thresholds in config/rhine.toml. No data has none: it shows only "No data".
+# Wording confirmed by the owner 3 Nov 2026 (PR #89), Normal texts changed by the owner.
+STATUS_MEANINGS = {
+    "weather": {
+        "green": "no KNMI warning for Zuid-Holland for the rest of today",
+        "amber": "weather may slow port operations and road transport today",
+        "red": "weather likely to disrupt port operations and road transport today",
+    },
+    "strike": {
+        # The window: news kept today and in the 14 days before; Normal = none of it reports a
+        # Rotterdam strike on today (or ongoing) or announced for a later day (spec §5.7).
+        "green": f"no Rotterdam strike today or coming up, in the news of the last {haven_strike.WINDOW_DAYS} days",
+        "amber": "no strike confirmed for today; check the dates",
+        "red": "a strike is on today",
+    },
+}
+
 # Shape carries the meaning as well as colour: octagon = act now, triangle = keep an eye on it.
 LEVEL_ICONS = {
     "ok": "circle-check",
@@ -355,8 +376,54 @@ def gauge_percent(indicator: dict) -> float | None:
     return round(max(0.0, min(value / gauge_max, 1.0)) * 100, 1)
 
 
+def status_meaning(indicator: dict, thresholds: RhineThresholds, meanings: RhineMeanings) -> str | None:
+    """What the level means for a planner (design review S6, issue #83), or None on No data.
+
+    The Rhine's text comes from config/rhine.toml. Watch and Alert have a low and a high side; the
+    side is read from the value (below or above the middle of the Normal band), so a reading
+    stored under older thresholds still gets the right side's text."""
+    level = indicator.get("level")
+    if level is None or indicator.get("value") is None:
+        return None
+    if indicator["key"] == "rhine":
+        if level == "green":
+            return meanings.normal
+        low = indicator["value"] < (thresholds.watch_at_or_below + thresholds.watch_above) / 2
+        if level == "amber":
+            return meanings.watch_low if low else meanings.watch_high
+        return meanings.alert_low if low else meanings.alert_high
+    return STATUS_MEANINGS.get(indicator["key"], {}).get(level)
+
+
+def gauge_marks(indicator: dict, thresholds: RhineThresholds) -> list[dict]:
+    """Watch and Alert lines on the Kaub gauge, at the thresholds in config/rhine.toml (design
+    review S7, issue #83), lowest first. A threshold above the top of the gauge is left out."""
+    gauge_max = indicator.get("gauge_max")
+    if indicator.get("key") != "rhine" or not gauge_max or indicator.get("value") is None:
+        return []
+    lines = (
+        (thresholds.alert_at_or_below, "alert"),
+        (thresholds.watch_at_or_below, "watch"),
+        (thresholds.watch_above, "watch"),
+        (thresholds.alert_above, "alert"),
+    )
+    return [{"cm": cm, "level_key": key, "percent": round(cm / gauge_max * 100, 1)}
+            for cm, key in lines if cm <= gauge_max]
+
+
+def gauge_label(indicator: dict, thresholds: RhineThresholds) -> str:
+    """What the gauge shows, for screen readers: the reading and where the lines are."""
+    unit = indicator["unit"]
+    return (
+        f"Gauge: {indicator['display_value']} {unit} on a scale of 0 to {indicator['gauge_max']} {unit}. "
+        f"Watch at {thresholds.watch_at_or_below} {unit} or below and above {thresholds.watch_above} {unit}; "
+        f"Alert at {thresholds.alert_at_or_below} {unit} or below and above {thresholds.alert_above} {unit}."
+    )
+
+
 def prepare_indicator(indicator: dict, previous: dict | None, is_first: bool, brief_date: str,
-                      shown_ranks: dict[str, dict[str, int]]) -> None:
+                      shown_ranks: dict[str, dict[str, int]], thresholds: RhineThresholds,
+                      meanings: RhineMeanings) -> None:
     indicator.setdefault("value", None)
     indicator.setdefault("unit", "")
     indicator.setdefault("place", None)
@@ -370,6 +437,9 @@ def prepare_indicator(indicator: dict, previous: dict | None, is_first: bool, br
     indicator["display_value"] = f"{value:g}" if indicator["is_number"] else value
     indicator["change"] = describe_change(indicator, previous, is_first)
     indicator["gauge_pct"] = gauge_percent(indicator)
+    indicator["meaning"] = status_meaning(indicator, thresholds, meanings)
+    indicator["gauge_marks"] = gauge_marks(indicator, thresholds)
+    indicator["gauge_label"] = gauge_label(indicator, thresholds) if indicator["gauge_marks"] else None
     url = indicator["source_url"]
     indicator["is_external"] = bool(url) and url.startswith("http")
     indicator["is_weather"] = indicator["key"] == "weather"
@@ -472,8 +542,10 @@ def map_payload(brief: dict) -> dict:
     }
 
 
-def prepare_briefs(briefs: list[dict]) -> list[dict]:
-    """Add the fields the templates need: edition number, ranked items, status changes, map data."""
+def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.toml") -> list[dict]:
+    """Add the fields the templates need: edition number, ranked items, status changes and
+    meanings, map data. The Rhine's thresholds and meanings come from `rhine_path`."""
+    thresholds, meanings = load_rhine(rhine_path), load_rhine_meanings(rhine_path)
     briefs.sort(key=lambda brief: brief["date"])
     # Items shown on each day's page, {date: {url: rank}}: the strike line links an earlier
     # item's card only if its day page really shows it (spec §5.7 point 10).
@@ -507,7 +579,8 @@ def prepare_briefs(briefs: list[dict]) -> list[dict]:
         # "Since yesterday" only against the day before: after a missing day there is no yesterday.
         yesterday = previous_status if previous_day == brief["day"] - timedelta(days=1) else {}
         for indicator in brief["status"]:
-            prepare_indicator(indicator, yesterday.get(indicator["key"]), number == 1, brief["date"], shown_ranks)
+            prepare_indicator(indicator, yesterday.get(indicator["key"]), number == 1, brief["date"], shown_ranks,
+                              thresholds, meanings)
         previous_status = {indicator["key"]: indicator for indicator in brief["status"]}
         previous_day = brief["day"]
 
@@ -623,8 +696,9 @@ def write_page(env: Environment, template: str, path: Path, **context) -> None:
     path.write_text(html, encoding="utf-8")
 
 
-def render_site(briefs_dir: Path, out_dir: Path) -> int:
-    briefs = prepare_briefs(load_briefs(briefs_dir))
+def render_site(briefs_dir: Path, out_dir: Path, rhine_path: Path | None = None) -> int:
+    rhine_path = rhine_path or CONFIG_DIR / "rhine.toml"
+    briefs = prepare_briefs(load_briefs(briefs_dir), rhine_path)
     if not briefs:
         raise SystemExit(f"No briefs found in {briefs_dir}")
 
@@ -654,7 +728,7 @@ def render_site(briefs_dir: Path, out_dir: Path) -> int:
         root="", active="archive", sample=sample, months=group_by_month(briefs),
     )
     write_page(env, "about.html", out_dir / "about.html", root="", active="method", sample=sample,
-               method=method_page(load_sources(), load_rhine()))
+               method=method_page(load_sources(), load_rhine(rhine_path)))
     return len(briefs)
 
 
