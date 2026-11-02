@@ -256,7 +256,8 @@ haven/                 Python package
   weather.py           weather status: KNMI warnings for Zuid-Holland via MeteoAlarm -> one status reading (§5.11)
   rhine.py             Rhine status: Kaub reading shown (thresholds from config/rhine.toml), Lobith reading stored only (§5.12)
   strike.py            strike flag: worst level over the strikes in kept items (14 days, dated ones up to 60), deciding item(s) linked (§5.7)
-  (status assembly, ais.py — to build)
+  run.py               the morning pipeline: collect → filter → summarise → status → brief, today's three files written once; AI outage → nothing written, or a reduced brief on the last trigger (§5.13)
+  (ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
   filter.toml          off-topic word lists per language (§5.4), small starter lists (football)
@@ -768,6 +769,33 @@ Live run (2 Nov 2026, 12:47, from a desktop, nothing written): read with no fail
 
 Live run (2 Nov 2026, 13:31, from a desktop, nothing written): both read with no failures; Kaub **21 cm → Alert** (measured 13:15), Lobith **669 cm NAP** (measured 10:50).
 
+### 5.13 Pipeline runner (built 2 Nov 2026, issue #22)
+
+**`haven/run.py`.** `python -m haven.run [--last-trigger] [--data-dir DIR]` is what the morning job (#26) runs: steps 1–6 of §5.1, then today's three files (`data/items/`, `data/status/`, `data/briefs/`) **written once**. `run(...)` is the same as a function; every step can be replaced by a fake, so the tests never touch the network or the AI.
+
+**Order:** collect (§5.8) → filter (§5.4, ages counted to `feeds_read_at`) → article text for the **kept** items only → the summariser batch is **sent** (§5.5) → **weather and Rhine are read while the batch runs** → the batch is **collected** (at most 20 minutes after it was sent, Haiku fallback) → strike flag from today's items and the stored days (§5.7) → the three files.
+
+**Exit codes:** `0` brief written (normal or reduced), `1` AI unavailable and nothing written (the run fails, so GitHub notifies the owner and the next trigger retries, §5.6), `2` one of today's files already exists, nothing done.
+
+*Proposed by Claude, **not yet confirmed by the owner** (issue #22):*
+1. **"The AI fully unavailable" = either AI step reports it** (relevance check or summariser: no key, key rejected, the first 3 calls failing, §5.4/§5.5). §5.6 says "filter and summariser both fail"; Claude's reading: if the relevance check is unavailable, the summariser isn't tried at all (nothing kept by the AI to send it, and the likely cause, the key or the API, is the same), and a summariser that is unavailable after a working filter is an outage too (every kept item would be unrated). **A relevance check that is unavailable stops the run at once**: no article pages, no batch, no status requests. With `--last-trigger` the run goes on to the reduced brief instead.
+2. **Weather and Rhine are read during the batch wait**, so they add no time (the 20 minutes count from when the batch was sent, §5.5). Each is read at **its own time** (the weather note says the real read time, §5.11); the strike flag's `observed_at` is `feeds_read_at` (§5.7).
+3. **The brief's `items` holds every kept item**, in collection order; the renderer sorts them and shows at most 5 (§5.3), so "kept" and "shown" can differ on the page. `build.items_kept` = how many are in the brief.
+4. **`build.items_collected` = new items this morning** (the lines in `data/items/<today>.jsonl`), so the number can be checked against the file; **`build.duplicates`** (new field) = items left out because their link was seen in the last 14 days.
+5. **`build.ai_usage`** (new field): calls and tokens per AI step, `{"relevance_check": {calls, input_tokens, output_tokens}, "summariser": {calls, input_tokens, output_tokens, batch_input_tokens, batch_output_tokens}}`, for the week-one cost check (§2), which otherwise only has the Console's total. Not shown on the page.
+6. **`data/status/<today>.json` is a list of readings in the §6 `status[]` shape**: weather, Kaub (`rhine`), Lobith (`rhine-lobith`), strike flag. The brief's `status` has the same entries without Lobith.
+7. **All or nothing, the brief last** (`storage.write_day`, §6.1): every file is checked before any is written; if writing fails half-way, the files this run created are removed again, so the next trigger can retry the whole day (a leftover items file would otherwise block it and the page would skip a day). Files that were there before are never touched. The brief goes last because its file is what the guard (#26) reads as "today is done".
+8. **Any of today's three files already there = stop**, before any request or AI call, exit 2 (`test_second_run_on_the_same_day_fails_cleanly_and_changes_nothing`). The owner removes or fixes a leftover file by hand.
+9. **A step that crashes** (a bug of ours) gives one failure line, `"<step>: unexpected error (<type>)"`, the kind of error only (the traceback goes to the job log, not the public page), and the run goes on with what the step gives on a bad day: collect → no items and **`feeds_read_at` `null`** (so the next PIN gap check doesn't trust a read that didn't happen); filter → nothing kept; article text → items without text (rated from the headline, §5.5); summariser → the kept items unrated, **not** an AI outage; weather / Rhine → No data. The step names: "Collect step", "Relevance filter", "Article text", "AI summariser", "Weather warnings (MeteoAlarm)", "Rhine level", "Strike flag".
+10. **The reduced brief** keeps the AI step's own `"AI unavailable: …"` failure line (no extra line: the page already shows the §5.6 note). In `data/items/` the shown items are stored unrated; items the AI check never decided are stored without a `filter`.
+11. **`ships: null`** in every v1 brief (the AIS snapshot is v2, #31; the page's Ships dial is #23's).
+12. **The summariser's known strikes** are read day by day from the 14 stored days; a broken day is skipped (the duplicate check already reports it, §5.8).
+13. **`--data-dir`** points the run at another folder, for a hand run that must not touch the repo's `data/`.
+
+**Open question for the owner (not built):** on a reduced day the items the AI check never decided are stored in `data/items/`, so the next day's duplicate check (§5.8) treats them as seen and they are never checked. Should the duplicate check ignore stored lines with no `filter` decision, so they come back the next morning (if still under 48 h)?
+
+*Note for #23:* the renderer can't yet show a real brief: a strike reading with nothing linked has `source_url: null`, and `render.prepare_indicator` calls `.startswith` on it. Not a problem until real briefs are rendered (`pages.yml` renders the samples until #26).
+
 ---
 
 ## 6. Data format: one brief per day
@@ -831,6 +859,10 @@ Live run (2 Nov 2026, 13:31, from a desktop, nothing written): both read with no
 | `items[].access` | `"headline-only"` for paywalled and AI-opt-out sources: `summary` and `impact` are `null`, severity, place, `affects` and `strike` taken from the headline only, shown as "rated from headline only" (§2.1) |
 | `items[].strike` | strike details or `null` (§5.7): `state` `announced`/`ongoing`/`cancelled`, `location`, `affects_rotterdam`, `start`/`end` (dates or `null`, never guessed), `match` `same`/`new`/`unsure`, `strike_id` (assigned by code) |
 | `items[].written_by` | which model wrote the summary and via which API: `{"model": "claude-…", "api": "batch" \| "standard"}` (§5.5); `null` for an unrated item |
+| `build.items_collected` | new items this morning, the lines of `data/items/<date>.jsonl` (duplicates of the last 14 days not counted, §5.13 point 4) |
+| `build.duplicates` | items left out because their link was already seen in the last 14 days (§5.13) |
+| `build.items_kept` | items in the brief: every kept item (the page shows at most 5); on a reduced brief the auto-kept ones (§5.13) |
+| `build.ai_usage` | calls and tokens per AI step (`relevance_check`, `summariser` with the batch part apart), for the week-one cost check; not shown (§5.13 point 5) |
 | `build.feeds_read_at` | when this run started reading the sources (ISO 8601, Amsterdam time), from the collect step (§5.8). The next run passes it to the PIN gap check as `previous_run`. Not shown on the page. *(Issue #11.)* |
 | `build.summaries` | how many **rated** items were written in the batch (`written_by.api` = `batch`) vs through the standard API (`fallback`: the Haiku fallback, or a rephrase retry, §5.5 #16); unrated items count in neither |
 | `build.ai_unavailable` | `true` only on a **reduced brief** (§5.6): the AI was down until the last trigger, so all items are unrated and the page shows *"The AI step was unavailable this morning: headlines only, no summaries."* `false` otherwise; a missing field counts as `false`. *(Name proposed by Claude, confirmed by the owner 1 Nov 2026, PR #50.)* |
@@ -849,7 +881,7 @@ Next to the brief, the pipeline keeps the raw material, so nothing it saw is los
 | File | Contents |
 |---|---|
 | `data/items/YYYY-MM-DD.jsonl` | **JSON Lines**: one line per item collected that morning, kept *and* dropped, with its filter decision (`"filter": {kept, stage, reason}`, §5.4). Collected fields (§5.8, issue #9; confirmed by the owner 1 Nov 2026, PR #53): `source` (id), `headline`, `url`, `published`, `language`, `access`. The HTML lists (issue #10) give the same fields; `published` is a timestamp, a date only (`"2026-10-30"`) when the page gives no time, or `null`. The collect step (issue #11) adds no further fields; the relevance filter adds `filter` (§5.4; `{kept, stage, reason}`, set by the rules for items they keep or drop, issue #12, and by the AI check for the rest, #13) and the summariser adds `severity`, `summary`, `impact`, `affects`, `map`, `strike`, `written_by`, and `unlisted` only when something was discarded (§5.5, §5.7, §5.10; issue #15; an unrated item has them as `null` / `[]`). Never `snippet` or `article_text` (in memory only, hard rule 13). |
-| `data/status/YYYY-MM-DD.json` | Every status reading taken that morning (value, level, observed time, source), including failed readings as `null`. |
+| `data/status/YYYY-MM-DD.json` | Every status reading taken that morning (value, level, observed time, source), including failed readings as `null`. *As built (#22):* a list of readings in the §6 `status[]` shape: weather, Kaub, Lobith, strike flag (§5.13). |
 
 Rules:
 - **One file per day per kind, written once by the morning job, never rewritten by the pipeline.** A day's file only changes when the owner edits it by hand.
@@ -862,6 +894,7 @@ Rules:
 - **Stable format:** UTF-8, LF line endings, a newline at the end. Same data → byte-identical file.
 - **Hard rule 13 guard:** any field whose name contains the word `text`, `content`, `snippet` or `body` is refused, at any depth, and the error names the field but never repeats its value.
 - **Read helpers:** one day (`None` if the day has no file) and the last N days (newest first, missing days skipped).
+- **`write_day(day, {kind: data})`** *(added 2 Nov 2026, issue #22)*: one day's files all or nothing, the brief last; nothing written if any of them exists; files created by a call that then fails are removed again (§5.13 point 7).
 
 *Proposed by Claude, confirmed by the owner (1 Nov 2026, PR #51):*
 - **Keys are sorted alphabetically** in every file. Fully deterministic whatever order the code builds a dict in; the cost is that a brief file starts with `"build"` instead of `"date"`. List order is never changed (collection order is information). `.json` files are indented 2 spaces; `.jsonl` has one object per line.

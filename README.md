@@ -67,6 +67,12 @@ To see what the relevance filter keeps and drops today (reads the sources once, 
 .\.venv\Scripts\python.exe -m haven.filter --rules-only  # rules only, no API calls
 ```
 
+The morning pipeline (collect, filter, summarise, status, brief) writes today's `data/items/`, `data/status/` and `data/briefs/` files once. It calls the Claude API (Sonnet through the batch, up to 20 minutes), so it costs real money; to try it without touching the repo's `data/`, point it at another folder:
+
+```powershell
+.\.venv\Scripts\python.exe -m haven.run --data-dir $env:TEMP\haven-data   # exit 0 = written, 1 = AI unavailable, 2 = already written today
+```
+
 The basemap is already built. To rebuild it (for example after changing the map area or place names in `tools/build_basemap.py`):
 
 ```powershell
@@ -87,7 +93,7 @@ It downloads coastlines and water areas, and separately roads, railways, breakwa
 | `status[]` | Status indicators: `key`, `label`, `icon`, `value` (number, text or `null` = no data), `unit`, `place`, `level` (`green`/`amber`/`red`/`null`), `observed_at`, `source_name`, `source_url`, optional `gauge_max`, `note` |
 | `items[]` | `severity` (`high`/`medium`/`low`, or `null` = unrated: the AI failed, headline + link only), `headline`, `url`, `source`, `language`, `published`, `summary`, `impact` (`null` = "Not enough information"), `affects[]`, optional `access: "headline-only"` for paywalled sources, optional `map: {lat, lon, label, side}` to pin the item on the chart, `written_by: {model, api}` (`null` if unrated), `strike` details or `null` |
 | `ships` | AIS snapshot, or `null` when it failed: `snapshot_start`, `snapshot_end`, `source_name`, `vessels[]` with `name`, `type` (`container`/`tanker`/`bulk`), `flag`, `lat`, `lon`, `heading`, `status` (`underway`/`moored`/`anchored`), `speed_kn`, `length_m`, `area`, `destination_raw` (as typed on board), `destination` (cleaned, `null` = unknown), optional `news_item` (item number) |
-| `build` | `sources_checked`, `items_collected`, `items_kept`, `failures[]` (`source`, `error`), `feeds_read_at` (when the sources were read; the next run's PIN gap check uses it), optional `ai_unavailable: true` on a reduced brief (shows "The AI step was unavailable this morning") |
+| `build` | `sources_checked`, `items_collected` (new items this morning), `duplicates` (links already seen in the last 14 days), `items_kept` (items in the brief), `summaries` (`batch`/`fallback`), `failures[]` (`source`, `error`), `feeds_read_at` (when the sources were read; the next run's PIN gap check uses it), `ai_usage` (calls and tokens per AI step, for the cost check), optional `ai_unavailable: true` on a reduced brief (shows "The AI step was unavailable this morning") |
 
 The renderer sorts items by severity (unrated last), keeps at most 5, works out "change since yesterday" from the previous brief, builds the "Read in English" link for non-English items and prepares the chart data.
 
