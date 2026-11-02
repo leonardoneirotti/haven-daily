@@ -70,7 +70,8 @@ def about(site):
 
 
 def source(id, verdict, **fields):
-    defaults = {"urls": (f"https://example.org/{id}",), "access": "rss", "language": "en"}
+    defaults = {"urls": (f"https://example.org/{id}/feed",), "access": "rss", "language": "en",
+                "home": f"https://example.org/{id}"}
     if verdict == "drop":
         defaults = {}
     return Source(id=id, name=fields.pop("name", id.title()), verdict=verdict, **{**defaults, **fields})
@@ -138,11 +139,36 @@ def test_no_draft_thresholds_are_left(about):
 
 
 def test_every_used_and_headline_only_source_from_config_is_listed(about):
-    listed = text_of(section(about, "sources"))
+    listed = section(about, "sources")
     for src in load_sources():
         if src.verdict != "drop":
-            assert src.name in listed, src.id
-            assert f'href="{src.urls[0]}"' in section(about, "sources"), src.id
+            assert src.name in text_of(listed), src.id
+            assert source_links(listed, src.name) == (src.home, src.urls[0]), src.id
+
+
+def source_links(page: str, name: str) -> tuple[str, str]:
+    """The link on a source's name and its "(feed)" link, from one line of the source list
+    (owner, 2 Nov 2026, PR #76)."""
+    line = re.search(rf'<li>\s*<strong><a href="([^"]+)">{re.escape(html_lib.escape(name))}</a></strong>(.*?)</li>',
+                     page, re.S)
+    assert line, f"no linked line for {name!r}"
+    feed = re.search(r'\(<a href="([^"]+)">feed</a>\)', line.group(2))
+    assert feed, f"no (feed) link for {name!r}"
+    return line.group(1), feed.group(1)
+
+
+def test_the_name_links_the_public_page_and_feed_links_what_the_job_reads():
+    sources = (source("checked", "use", home="https://example.org/", urls=("https://example.org/rss.xml",)),
+               source("head", "headline-only", why="Paywalled.", home="https://news.example/",
+                      urls=("https://news.example/tag/port", "https://news.example/feed")))
+    page = section(render_method(sources=sources), "sources")
+    assert source_links(page, "Checked") == ("https://example.org/", "https://example.org/rss.xml")
+    assert source_links(page, "Head") == ("https://news.example/", "https://news.example/tag/port")
+
+
+def test_dropped_sources_have_no_links():
+    page = section(render_method(sources=(source("c-drop", "drop", why="No public feed."),)), "sources")
+    assert "<a " not in re.search(r'id="sources-drop">(.*?)</div>', page, re.S).group(1)
 
 
 def test_sources_are_grouped_by_verdict():

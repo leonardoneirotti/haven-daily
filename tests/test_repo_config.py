@@ -85,3 +85,12 @@ def test_every_headline_only_and_dropped_source_says_why_in_public_words():
     for source in load_sources():
         if source.verdict in ("headline-only", "drop"):
             assert source.why, f"{source.id}: add a one-line public `why`"
+
+
+def test_every_fetched_source_has_a_public_home_page_other_than_what_is_read():
+    # The Method page links a source's name to its normal public page and "(feed)" to what the
+    # job reads (owner, 2 Nov 2026, PR #76).
+    for source in load_sources():
+        if source.fetched:
+            assert source.home, f"{source.id}: add `home`, the source's normal public page"
+            assert source.home not in source.urls, f"{source.id}: `home` repeats a read URL"

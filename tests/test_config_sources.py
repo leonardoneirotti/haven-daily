@@ -205,3 +205,44 @@ def test_why_must_be_one_line_of_text(tmp_path, why):
     """)
     with pytest.raises(ConfigError, match="'why'"):
         load_sources(path)
+
+
+
+# --- `home`: the source's normal public page, linked on the Method page (PR #76) ----------------
+
+
+def test_home_is_read_and_is_none_when_missing(tmp_path):
+    path = write(tmp_path, """
+        [[source]]
+        id = "loadstar"
+        name = "The Loadstar"
+        verdict = "headline-only"
+        home = "https://theloadstar.com/"
+        urls = ["https://theloadstar.com/feed/"]
+        access = "rss"
+        language = "en"
+
+        [[source]]
+        id = "nos"
+        name = "NOS"
+        verdict = "drop"
+    """)
+    loadstar, nos = load_sources(path)
+    assert loadstar.home == "https://theloadstar.com/"
+    assert nos.home is None
+
+
+@pytest.mark.parametrize("home", ['"theloadstar.com"', '""', '["https://theloadstar.com/"]'])
+def test_home_must_be_one_web_address(tmp_path, home):
+    path = write(tmp_path, f"""
+        [[source]]
+        id = "loadstar"
+        name = "The Loadstar"
+        verdict = "headline-only"
+        home = {home}
+        urls = ["https://theloadstar.com/feed/"]
+        access = "rss"
+        language = "en"
+    """)
+    with pytest.raises(ConfigError, match="'home'"):
+        load_sources(path)
