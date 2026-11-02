@@ -23,7 +23,7 @@
       "unit": "cm",
       "place": "Kaub gauge",
       "level": null,
-      "gauge_max": 300,
+      "gauge_max": 700,
       "note": "The water-level service did not respond at 06:30.",
       "observed_at": null,
       "source_name": "Sample source",

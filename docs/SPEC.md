@@ -736,7 +736,7 @@ Live run (2 Nov 2026, 12:47, from a desktop, nothing written): read with no fail
 4. **Lobith: only values marked normal** (`Kwaliteitswaardecode` `"00"`, the only code in the live answer) count; anything else is skipped (e.g. RWS's missing-value marker 999999999). Lobith is stored only, so being strict costs little.
 5. **Location `lobith.bovenrijn.tolkamer`**, the one tested on 31 Oct (`lobith.bovenrijn.haven` also answers, with slightly different values: 680 vs 693 cm in the 31 Oct test, not read at the same moment).
 6. **Whole centimetres are stored as whole numbers** (21, not 21.0). *(Changed by the owner, 2 Nov 2026: **the Kaub value is rounded to whole cm first, half up, and then compared with the thresholds**, so the number shown always matches its level: 150.5 → 151 Normal, 80.5 → 81 Watch, 150.4 → 150 Watch (tested). Half up, not Python's `round()`, which rounds half to even (150.5 → 150). Claude had proposed comparing the unrounded value, which could show "150 cm" next to Normal. Lobith is stored as it comes.)*
-7. *(Changed by the owner, 2 Nov 2026: **`gauge_max` = 700 cm**, above Alert 640, so high-water Watch (above 460) and Alert (above 640) are visible on the gauge instead of a full gauge from 300 up. Claude had proposed keeping the samples' 300. **It can still change in the design review (#25).** The sample briefs keep 300: they are invented preview data.)*
+7. *(Changed by the owner, 2 Nov 2026: **`gauge_max` = 700 cm**, above Alert 640, so high-water Watch (above 460) and Alert (above 640) are visible on the gauge instead of a full gauge from 300 up. Claude had proposed keeping the samples' 300. **It can still change in the design review (#25).** The four sample briefs use 700 too (owner, 2 Nov 2026, PR #72).)*
 8. **A time without a timezone is unreadable**, as in the weather status (§5.11): both APIs always give one.
 9. **Thresholds in config are checked**: four whole numbers, strictly in order (80 < 150 < 460 < 640), unknown or missing fields refused, so a typo or a swapped pair can't turn every reading Normal or Alert.
 10. **The Lobith link on a reading is Rijkswaterstaat's water-data page**, not Waterinfo: it's only a link for the reader, and we never fetch Waterinfo (robots `Disallow: /`, §4).
@@ -759,7 +759,7 @@ Live run (2 Nov 2026, 13:31, from a desktop, nothing written): both read with no
     {
       "key": "rhine", "label": "Rhine water level", "icon": "waves",
       "value": 94, "unit": "cm", "place": "Kaub gauge", "level": "amber",
-      "gauge_max": 300, "observed_at": "2026-10-29T06:15:00+01:00",
+      "gauge_max": 700, "observed_at": "2026-10-29T06:15:00+01:00",
       "source_name": "…", "source_url": "https://…", "note": null
     }
   ],
