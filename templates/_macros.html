@@ -24,8 +24,11 @@
 <span class="num num-{{ severity }}" aria-hidden="true">{{ rank }}</span>
 {%- endmacro %}
 
-{% macro level(key, label) -%}
-<span class="lvl lvl-{{ key }}">{{ icon(level_icons[key]) }}{{ label }}</span>
+{# The level as icon + word. With a meaning (design review S6, #83) the word gets a colon and the
+   meaning follows in plain ink, e.g. "Alert: " + the alert_low text from config/rhine.toml. #}
+{% macro level(key, label, meaning=none) -%}
+<span class="lvl lvl-{{ key }}">{{ icon(level_icons[key]) }}{{ label }}{% if meaning %}:{% endif %}</span>
+{%- if meaning %} <span class="lvl-meaning">{{ meaning }}</span>{% endif %}
 {%- endmacro %}
 
 {# Ship symbols as drawn on the chart, for the legend: turned to point right. #}
@@ -48,10 +51,22 @@
       {% if ind.place %}<p class="dial-place">{{ ind.place }}</p>{% endif %}
     </div>
     {% if ind.gauge_pct is not none %}
-    <div class="gauge" style="--level: {{ ind.gauge_pct }}%" role="img" aria-label="Gauge: {{ ind.display_value }} {{ ind.unit }} on a scale of 0 to {{ ind.gauge_max }} {{ ind.unit }}"><span class="gauge-water"></span></div>
+    {# River gauge board, with lines at the Watch and Alert thresholds from config/rhine.toml
+       (design review S7, #83): dashed = Watch, solid = Alert, each labelled in cm. #}
+    <div class="gauge">
+      <div class="gauge-board" role="img" aria-label="{{ ind.gauge_label or 'Gauge: %s %s on a scale of 0 to %s %s' | format(ind.display_value, ind.unit, ind.gauge_max, ind.unit) }}" style="--level: {{ ind.gauge_pct }}%">
+        <span class="gauge-water"></span>
+        {% for mark in ind.gauge_marks %}<span class="gauge-mark mark-{{ mark.level_key }}" style="bottom: {{ mark.percent }}%"></span>{% endfor %}
+      </div>
+      {% if ind.gauge_marks %}
+      <div class="gauge-scale" aria-hidden="true">
+        {% for mark in ind.gauge_marks %}<span class="gauge-tick tick-{{ mark.level_key }}" style="bottom: {{ mark.percent }}%">{{ mark.cm }}</span>{% endfor %}
+      </div>
+      {% endif %}
+    </div>
     {% endif %}
   </div>
-  <p class="dial-status">{{ level(ind.level_key, ind.level_label) }}{% if ind.change %}<span>{{ ind.change }}</span>{% endif %}</p>
+  <p class="dial-status"><span class="dial-level">{{ level(ind.level_key, ind.level_label, ind.meaning) }}</span>{% if ind.change %}<span>{{ ind.change }}</span>{% endif %}</p>
   {# Weather: KNMI's own level next to ours and the time of issue (MeteoAlarm requirements, spec §2.2). #}
   {% if ind.mapping %}<p class="dial-mapping">{{ ind.mapping }}</p>{% endif %}
   {% if ind.note %}<p class="dial-note">{{ ind.note }}</p>{% endif %}

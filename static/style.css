@@ -447,6 +447,11 @@ html:not(.has-map) .needs-map,
 .lvl-alert { color: var(--high-ink); }
 .lvl-nodata { color: var(--nodata-ink); }
 
+/* What the level means for a planner, after "Alert:" in plain ink (design review S6, #83) */
+.lvl-meaning {
+  color: var(--ink);
+}
+
 /* ---------- Top bar ---------- */
 
 .topbar {
@@ -766,6 +771,13 @@ html:not(.has-map) .needs-map,
   font-weight: 700;
   font-family: var(--font-cond);
   line-height: 1.2;
+}
+
+/* Second small line of a mini status cell: what the level means (design review S6, #83) */
+.mini-meaning {
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  line-height: 1.3;
 }
 
 .panel-more {
@@ -1553,6 +1565,21 @@ html:not(.has-map) .needs-map,
   font-size: 0.8125rem;
 }
 
+/* Level + meaning wrap as one sentence; the change since yesterday goes on its own line */
+.dial-level {
+  flex-basis: 100%;
+  line-height: 1.35;
+}
+
+.dial-level .lvl {
+  display: inline;
+}
+
+.dial-level .lvl .icon {
+  margin-right: 0.35rem;
+  vertical-align: -0.15em;
+}
+
 .dial-meta {
   display: flex;
   flex-wrap: wrap;
@@ -1608,17 +1635,24 @@ html:not(.has-map) .needs-map,
   line-height: 1.4;
 }
 
-/* River gauge board: alternating marks on the left half, water rising from below */
+/* River gauge: a board with alternating marks on its left half, water rising from below, and
+   lines at the Watch and Alert thresholds (design review S7, #83) labelled in cm beside it.
+   Tall enough that the 80 and 150 cm labels don't touch on a 0-700 cm scale. */
 .gauge {
-  position: relative;
+  display: flex;
   flex: none;
-  width: 1rem;
-  height: 3.6rem;
+  gap: 0.25rem;
+  height: 7.5rem;
+}
+
+.gauge-board {
+  position: relative;
+  width: 1.25rem;
   overflow: hidden;
   border: 1px solid var(--ink-2);
   background:
     linear-gradient(to right, transparent 50%, var(--bg) 50%),
-    repeating-linear-gradient(to top, var(--ink) 0 5%, var(--bg) 5% 10%);
+    repeating-linear-gradient(to top, var(--ink) 0 2.5%, var(--bg) 2.5% 5%);
 }
 
 .gauge-water {
@@ -1628,6 +1662,40 @@ html:not(.has-map) .needs-map,
   background: var(--gauge-water);
   border-top: 2px solid var(--gauge-line);
 }
+
+/* Colour and line style both say which: dashed = Watch, solid = Alert (spec §2.2) */
+.gauge-mark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  margin-bottom: -1px;
+}
+
+.gauge-mark.mark-watch {
+  border-top: 2px dashed var(--medium-ink);
+}
+
+.gauge-mark.mark-alert {
+  border-top: 2px solid var(--high-ink);
+}
+
+.gauge-scale {
+  position: relative;
+  width: 1.6rem;
+}
+
+.gauge-tick {
+  position: absolute;
+  left: 0;
+  transform: translateY(50%);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  line-height: 1;
+}
+
+.gauge-tick.tick-watch { color: var(--medium-ink); }
+.gauge-tick.tick-alert { color: var(--high-ink); }
 
 /* ---------- The brief ---------- */
 

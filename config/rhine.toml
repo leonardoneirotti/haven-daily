@@ -23,3 +23,14 @@ alert_at_or_below = 80
 watch_at_or_below = 150
 watch_above = 460
 alert_above = 640
+
+# What each level means for a planner, shown next to the level on the page (issue #83, design
+# review S6): "16 cm · Alert: barge transport no longer guaranteed". One line each, from the same
+# sources as the numbers above, which the Method page links. Change a number and its text together.
+# Wording: Claude's proposal (#83), not yet confirmed by the owner.
+[kaub.meaning]
+normal = "no low-water surcharge or high-water restriction at Kaub"  # between watch_at_or_below and watch_above
+watch_low = "low-water surcharges on barge transport"                 # Contargo / Maersk surcharges start at 150
+alert_low = "barge transport no longer guaranteed"                    # Contargo "by agreement", Maersk "no loading guarantee"
+watch_high = "high-water shipping restrictions"                       # above Marke I
+alert_high = "high water: shipping stops"                             # above Marke II / HSW
