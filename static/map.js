@@ -33,7 +33,9 @@
   // The chart is a fixed "sheet": the area covered by the basemap. It can never pan
   // or zoom past the sheet's edge. On wide screens the news panel floats over its
   // western side (open sea), so the chart opens on the whole port in the space to
-  // the right of the panel. Phones open on the western port.
+  // the right of the panel. Phones open on the western port. On a day with nothing
+  // on the chart (#81) the panel sits beside or above a short strip instead of over
+  // it; panelCover() is then 0, so the strip simply fits the same views.
   var bbox = basemap.bbox; // south, west, north, east
   var sheet = L.latLngBounds([bbox[0], bbox[1]], [bbox[2], bbox[3]]);
   var panel = document.querySelector(".panel");

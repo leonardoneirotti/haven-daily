@@ -496,6 +496,9 @@ def prepare_briefs(briefs: list[dict]) -> list[dict]:
         }
         prepare_ships(brief)
         brief["map"] = map_payload(brief)
+        # Nothing to show on the chart (no shown item has a place, no ships): the page draws
+        # it as a short strip instead of a full screen of empty map (#81, spec §7.4).
+        brief["chart_empty"] = not brief["map"]["callouts"] and not brief["ships"]
     return briefs
 
 

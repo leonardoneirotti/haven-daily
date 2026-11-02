@@ -84,7 +84,7 @@ def test_an_item_with_a_place_beyond_the_five_shown_does_not_count():
 
 def test_empty_day_page_marks_the_stage_and_says_why(tmp_path):
     html = render_day(tmp_path, make_brief(items=[news("medium")]))
-    assert "is-empty" in stage_tag(html)
+    assert "stage-empty" in stage_tag(html)
     assert NO_PLACE_LINE in text_of(legend(html))
 
 
@@ -96,24 +96,24 @@ def test_archived_empty_day_says_on_this_day(tmp_path):
 
 def test_day_with_pins_keeps_the_full_chart(tmp_path):
     html = render_day(tmp_path, make_brief(items=[news("medium", map=dict(PLACE))]))
-    assert "is-empty" not in stage_tag(html)
+    assert "stage-empty" not in stage_tag(html)
     assert "No item has a place" not in html
 
 
 def test_day_with_ships_but_no_pins_keeps_the_full_chart(tmp_path):
     html = render_day(tmp_path, make_brief(ships=SHIPS))
-    assert "is-empty" not in stage_tag(html)
+    assert "stage-empty" not in stage_tag(html)
 
 
 def test_the_stylesheet_makes_the_empty_chart_a_strip():
-    """The class is used: some .is-empty rule sets the chart's height (exact sizes: spec §7.4)."""
-    assert any(".is-empty" in sel and ".chart-map" in sel and re.search(r"(^|;)\s*height\s*:", body)
+    """The class is used: some .stage-empty rule sets the chart's height (exact sizes: spec §7.4)."""
+    assert any(".stage-empty" in sel and ".chart-map" in sel and re.search(r"(^|;)\s*height\s*:", body)
                for sel, body in css_rules(CSS))
 
 
 def test_the_empty_strip_is_not_an_overlay_on_wide_screens():
     """On a wide screen the panel of an empty day is in the page flow, not floating over the chart."""
-    assert any(".is-empty" in sel and ".panel" in sel and re.search(r"position\s*:\s*(static|relative)", body)
+    assert any(".stage-empty" in sel and ".panel" in sel and re.search(r"position\s*:\s*(static|relative)", body)
                for sel, body in css_rules(CSS))
 
 
@@ -132,7 +132,7 @@ def test_phones_no_longer_hide_the_panel_item_list():
     """Only an empty day on a wide screen hides it (the full brief follows right below the strip)."""
     for sel, body in css_rules(CSS):
         if ".panel-items" in sel and re.search(r"display\s*:\s*none", body):
-            assert ".is-empty" in sel, sel
+            assert ".stage-empty" in sel, sel
 
 
 # --- S4: ships note in v1, failure note in v2 ------------------------------------------------
