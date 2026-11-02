@@ -182,7 +182,7 @@ def read_end_date(text: str | None) -> datetime | None:
 
     The End Date is when the *notice* stops being valid, not when the measure started or
     stopped (issue #67). Read as written: day, English month name or abbreviation, four-digit
-    year, then the time. Claude's defaults, not yet confirmed by the owner:
+    year, then the time. Claude's proposals, confirmed by the owner (2 Nov 2026):
     - **no time** ("End Date 1 Nov 2026"): the end of that day (midnight at the start of the
       next), like a date-only published date (§5.4), so a notice is never dropped too early;
     - **an impossible date or time** (31 Nov, 25:10) or a two-digit year: not readable;

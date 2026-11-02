@@ -23,7 +23,7 @@ haven/compare.py          Haiku 5.5 vs Sonnet 5.5 on the same kept items, side b
 config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep
 config/filter.toml        off-topic word lists for the relevance filter (small starter lists, tuned after the first runs)
 config/places.toml        the 41 places an item can be pinned to, coordinates taken once from OpenStreetMap (each with its OSM id)
-config/tags.toml          the 15 "affects" tags, each with a one-line meaning sent to the AI (place labels count as tags too)
+config/tags.toml          the 16 "affects" tags, each with a one-line meaning sent to the AI (place labels count as tags too)
 tests/                    pytest tests; tests/test_repo_config.py keeps sources.toml and SOURCES.md in step
 templates/                Jinja2 page templates (base, day, archive, method page, shared macros)
 static/style.css          the whole design: colour and type tokens, light + dark mode
