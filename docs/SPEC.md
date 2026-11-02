@@ -59,7 +59,7 @@ Owner: Leonardo Neirotti. Compiled 31 October 2026.*
 - "Affects" tags (e.g. Containers · Maasvlakte II · Truck pickups).
 - For Dutch items: "Read in English" link.
 - Optional map pin so the item appears on the chart: the AI picks a place from a fixed list, the code adds `lat`, `lon`, `label` (§5.10). "Affects" tags also come from a fixed list (§5.10).
-- Paywalled sources: headline + link only ("Headline only: this source is paywalled or its terms don't allow a summary."). *(Wording changed from "This source is paywalled, so there is no summary." in #23, Claude's proposal, not yet confirmed by the owner: NL Times, The Loadstar and RTV Rijnmond are headline-only for their AI or RSS terms, not a paywall, so the old sentence was untrue for them.)*
+- Paywalled sources: headline + link only ("Headline only: this source is paywalled or its terms don't allow a summary."). *(Wording changed from "This source is paywalled, so there is no summary." in #23, Claude's proposal, confirmed by the owner 2 Nov 2026, PR #75: NL Times, The Loadstar and RTV Rijnmond are headline-only for their AI or RSS terms, not a paywall, so the old sentence was untrue for them.)*
 - **Headline-only items** (paywalled or AI opt-out, §3 rule 12, §4) still get a **severity, rated by the AI from the headline alone**, shown as **"rated from headline only"** next to the severity tag. From the same headline the AI also picks the **place** and **"affects" tags** (same fixed lists, §5.10) and extracts **strike details** (same rules, §5.7: dates only if the headline states them; an `unsure` match never clears a strike), so a strike reported only by a headline-only source (e.g. NL Times, RTV Rijnmond) still raises the strike flag. No summary; impact stays `null` = "Not enough information". If that AI call fails, the item is unrated like any other. *(Decided by the owner, 1 Nov 2026.)*
 
 ### 2.2 Port status line
@@ -359,7 +359,7 @@ python -m venv .venv
 - **Ships dial in v1**: "No data · Ship positions are not collected yet" (`AIS_SNAPSHOT_BUILT = False` in `render.py`; #31 sets it to `True`, and from then on a missing snapshot reads "The AIS snapshot failed" again).
 - **"How this brief was made"**: sources checked, items collected, kept, shown, summaries in the batch / by the fallback (`build.summaries`), failures per source, correction notes.
 
-*Proposed by Claude, not yet confirmed by the owner (issue #23):*
+*Proposed by Claude, all ten confirmed by the owner 2 Nov 2026 (issue #23, PR #75):*
 1. **"Since yesterday" only against the brief of the day before.** After a missing day the dial says "No reading yesterday" instead of comparing with an older brief and calling it yesterday.
 2. **An item from an earlier day links to its card on that day page** ("In the 30 Oct brief" → `days/2026-10-30.html#item-3`) **only if that day's page shows it** (among its 5 shown items, matched by URL). Otherwise only the original article is linked: a day page that doesn't show the item would confuse the reader. (Answers the "Note for #23" in §5.7 point 10.)
 3. **Role labels on the strike line:** the deciding item has none; an `unsure` cancellation is "Possibly called off" (the §5.7 example); any other `unsure` item is "Possibly the same strike"; the named strike next to a higher unsure item is "Possibly the same as". The item's date is its `published` date (Amsterdam), else its collection day. The strike dial lists these items **instead of** one source link.
