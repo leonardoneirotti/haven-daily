@@ -16,6 +16,7 @@ The reading:
 - **What is kept** for the display MeteoAlarm requires: "KNMI" as the source, the time of
   issue, KNMI's own level and hazard (e.g. Code yellow · Wind), onset/expiry, a link to
   www.meteoalarm.org and "not live". **Never the warning text** (headline, description).
+  With no warnings there is no time of issue, only the read time (owner, 2 Nov 2026).
 
 Any doubt is "No data", never a guess (spec §2.2): the feed down or blocked, not JSON, not
 the warnings feed, no Zuid-Holland entry for today at all (an empty answer could hide a
@@ -102,9 +103,11 @@ def reading_from_feed(data, read_at: datetime) -> dict:
         value = f"Code {colour} · {', '.join(hazards)}"
         issued = min(at_top, key=lambda w: w.onset).issued
     else:
+        # No time of issue: KNMI's green entries are issued days ahead, so their time
+        # would read as stale. The read time (observed_at, note) is shown instead.
         hazards = []
         value = "No warnings"
-        issued = max(w.issued for w in valid)
+        issued = None
 
     reading = _base_reading(read_at)
     reading.update(
@@ -112,7 +115,7 @@ def reading_from_feed(data, read_at: datetime) -> dict:
         level=STATUS_LEVEL[colour],
         knmi_level=colour,
         hazards=hazards,
-        issued_at=_iso(issued),
+        issued_at=_iso(issued) if issued else None,
         note=f"Warnings at {read_at:%H:%M} · not live",
         warnings=[
             {
