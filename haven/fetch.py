@@ -22,6 +22,10 @@ the *first* matching rule instead of the *longest* (RFC 9309), and ignores `*` a
 Failures are raised as `FetchError` (one line, `"<url>: <problem>"`), so a collector catches
 one type and adds `{"source": <id>, "error": str(error)}` to `build.failures`.
 
+Almost every request is a GET. `post_json` sends one JSON body by POST, for an API that
+only answers POST queries (Rijkswaterstaat's water levels, issue #20); robots.txt, the delay
+and the one retry apply to it the same way, but it never follows a redirect.
+
 HTTP itself goes through the standard library (`urllib.request`), so there is no extra
 dependency. The network, the clock and `sleep` are passed in, so tests never touch the
 internet or really wait.
@@ -30,6 +34,7 @@ internet or really wait.
 from __future__ import annotations
 
 import http.client
+import json
 import re
 import time
 import urllib.error
@@ -130,7 +135,8 @@ class SourceAccess:
     note: str | None = None
 
 
-Transport = Callable[[str, dict, float], RawResponse]
+# (url, headers, timeout) for a GET; a fourth argument, the body bytes, makes it a POST.
+Transport = Callable[..., RawResponse]
 
 
 # --- robots.txt (RFC 9309) -----------------------------------------------------------
@@ -236,9 +242,9 @@ class _NoRedirects(urllib.request.HTTPRedirectHandler):
 _OPENER = urllib.request.build_opener(_NoRedirects)
 
 
-def urllib_transport(url: str, headers: dict, timeout: float) -> RawResponse:
-    """One GET request with `urllib.request`. Error statuses are returned, not raised."""
-    request = urllib.request.Request(url, headers=headers, method="GET")
+def urllib_transport(url: str, headers: dict, timeout: float, data: bytes | None = None) -> RawResponse:
+    """One GET request (a POST when `data` is given) with `urllib.request`. Error statuses are returned, not raised."""
+    request = urllib.request.Request(url, data=data, headers=headers, method="GET" if data is None else "POST")
     try:
         with _OPENER.open(request, timeout=timeout) as response:
             return RawResponse(response.status, _lower(response.headers), response.read())
@@ -314,6 +320,20 @@ class Fetcher:
                 return Response(url=current, status=raw.status, headers=raw.headers, body=raw.body)
             raise FetchError(current, f"HTTP {raw.status}")
         raise FetchError(url, f"more than {MAX_REDIRECTS} redirects")
+
+    def post_json(self, url: str, payload) -> Response:
+        """POST `payload` as JSON. Raises RobotsBlocked (no request made) or FetchError.
+
+        A redirect is a failure, not followed: whether to send the body again to the new
+        address would be a guess."""
+        self._check_allowed(url)
+        body = json.dumps(payload).encode("utf-8")
+        raw = self._request(url, data=body, content_type="application/json")
+        if 200 <= raw.status < 300:
+            return Response(url=url, status=raw.status, headers=raw.headers, body=raw.body)
+        if raw.status in _REDIRECT_STATUSES:
+            raise FetchError(url, f"HTTP {raw.status}: redirect not followed for a POST")
+        raise FetchError(url, f"HTTP {raw.status}")
 
     def ai_opt_out(self, url: str) -> str | None:
         """Why this page's site opts out of AI use, or None. None too if robots.txt can't be read."""
@@ -393,14 +413,19 @@ class Fetcher:
 
     # one request: delay, timeout, at most one retry
 
-    def _request(self, url: str) -> RawResponse:
+    def _request(self, url: str, data: bytes | None = None, content_type: str | None = None) -> RawResponse:
         host = urlsplit(url).netloc.lower()
         headers = {"User-Agent": self.user_agent}
+        if content_type:
+            headers["Content-Type"] = content_type
         problem = "not tried"
         for _ in range(2):
             self._wait_for(host)
             try:
-                raw = self.transport(url, headers, self.timeout)
+                if data is None:
+                    raw = self.transport(url, headers, self.timeout)
+                else:
+                    raw = self.transport(url, headers, self.timeout, data)
             except TimeoutError:
                 problem = f"timed out after {self.timeout:g} s"
             except TransportError as error:

@@ -36,8 +36,8 @@ Tested from a desktop, not from GitHub Actions IPs. Some sites may still block t
 |---|---|---|
 | Weather warnings: MeteoAlarm (KNMI's warnings) | https://feeds.meteoalarm.org/api/v1/warnings/feeds-netherlands | No key. Use the Zuid-Holland warning. Terms §5 (read 31 Oct 2026): show "KNMI", time of issue, link to www.meteoalarm.org, their exact disclaimer, original level + hazard. Real-time (≤ 10 min) required for operational use: label "Warnings at 06:45 · not live" until MeteoAlarm answers. https://meteoalarm.org/en/live/page/terms-and-conditions |
 | Weather warnings: KNMI (later) | https://developer.dataplatform.knmi.nl/open-data-api | Switch when `KNMI-public-weather-warnings` leaves TEST. Free registered key (`KNMI_API_KEY`). |
-| Rhine, Kaub (PEGELONLINE): shown | https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/KAUB/W.json?includeCurrentMeasurement=true&includeCharacteristicValues=true | No key. High-water thresholds from its official values (Marke I/II); low-water thresholds from barge operators' surcharge tables (spec §2.2). |
-| Rhine, Lobith (Rijkswaterstaat): stored only | https://ddapi20-waterwebservices.rijkswaterstaat.nl | No key. Use `OphalenWaarnemingen` over a recent window. |
+| Rhine, Kaub (PEGELONLINE): shown | https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/KAUB/W/currentmeasurement.json | No key, no robots.txt (404). Latest value + time only. Thresholds are in `config/rhine.toml`, not read from the API: high water from its official values (Marke I/II, read 31 Oct 2026 via `…/KAUB/W.json?includeCharacteristicValues=true`), low water from barge operators' surcharge tables (spec §2.2). Gauge page linked from the status line: https://pegelonline.wsv.de/gast/stammdaten?pegelnr=25700100 |
+| Rhine, Lobith (Rijkswaterstaat): stored only | https://ddapi20-waterwebservices.rijkswaterstaat.nl/ONLINEWAARNEMINGENSERVICES/OphalenWaarnemingen | No key, no robots.txt (404). POST, location `lobith.bovenrijn.tolkamer`, measurements (`meting`) of the last 24 h; the newest is stored. Measurements arrive ~3 h late; an empty window answers HTTP 204. |
 
 ## Dropped
 

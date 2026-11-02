@@ -254,12 +254,14 @@ haven/                 Python package
   summarise.py         summariser: one Claude call per kept item, structured output, checks; unrated on any bad answer (§5.5)
   compare.py           Haiku 5.5 vs Sonnet 5.5 on the same kept items, side by side, run by hand (§5.5, #17)
   weather.py           weather status: KNMI warnings for Zuid-Holland via MeteoAlarm -> one status reading (§5.11)
-  (rhine, strike, status assembly, ais.py — to build)
+  rhine.py             Rhine status: Kaub reading shown (thresholds from config/rhine.toml), Lobith reading stored only (§5.12)
+  (strike, status assembly, ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
   filter.toml          off-topic word lists per language (§5.4), small starter lists (football)
   places.toml          the fixed place list: 41 places, coordinates + OSM element id (§5.10)
   tags.toml            the fixed "affects" tags: 16 cargo/mode tags, each with a one-line meaning (§5.10)
+  rhine.toml           the Kaub thresholds in cm, each with its public source in a comment (§2.2, §5.12)
 tests/                 pytest; run with `python -m pytest` (settings in pytest.ini). conftest.py: no API keys, no internet in any test
 .github/workflows/
   pages.yml            render + deploy the site on every push to main
@@ -307,7 +309,7 @@ python -m venv .venv
 - **"Today" is the Amsterdam date** (`haven/clock.py`, `zoneinfo("Europe/Amsterdam")`), as the guard in §5.1.1 needs. Tested around midnight UTC and on both 2026 clock-change days.
 
 *Proposed by Claude, confirmed by the owner (1 Nov 2026, PR #47):*
-- `sources.toml` lists **news sources only**. The status-line endpoints (MeteoAlarm, PEGELONLINE, Rijkswaterstaat) are a different kind of source (no use/headline-only verdict, no items) and get their config when the status step is built.
+- `sources.toml` lists **news sources only**. The status-line endpoints (MeteoAlarm, PEGELONLINE, Rijkswaterstaat) are a different kind of source (no use/headline-only verdict, no items) and get their config when the status step is built. *(As built: their URLs are constants in `weather.py` / `rhine.py`; only the Rhine thresholds are config, `config/rhine.toml`, #20.)*
 - **Dropped sources are listed** with a one-line `note` (why), for the record; they need no URL, access type or language and are never fetched.
 - A source has a **list of `urls`**, because Nieuwsblad Transport has two feeds (`/havens/feed/` and `/tag/rotterdam/feed/`, `SOURCES.md`). The collector will merge them and drop duplicates.
 - **Off-topic word lists are per language** (`en`, `nl`): Dutch headlines need Dutch words. An empty word is rejected (it would match every headline).
@@ -570,6 +572,7 @@ Stored on the item as `strike.match` (`same` / `new` / `unsure`) and `strike.str
 - **The one retry** is only for timeouts, network errors, 5xx and 429, after the normal host delay. A 403/404 is not retried (it won't change a few seconds later).
 - **What counts as an AI opt-out:** a robots.txt group that **names** an AI crawler (ClaudeBot, Claude-User, Claude-SearchBot, Claude-Web, anthropic-ai, GPTBot, ChatGPT-User, CCBot, Google-Extended, Applebot-Extended, PerplexityBot, cohere-ai, Bytespider, meta-externalagent) and disallows the source's URL. A crawler only caught by the `*` group doesn't count: a site that blocks everyone except Haven Daily by name has given us permission, not opted out. `ai-input=no` counts as well as `ai-train=no`, because sending text to an AI for a summary is AI input. A `Content-Signal` line anywhere in the file counts (safe side).
 - **The opt-out note goes into `build.failures`** (written there by the collector, issue #11), so it shows on the page and the owner sees it the same morning.
+- **POST** *(added 2 Nov 2026, issue #20; Claude's proposal, confirmed by the owner 2 Nov 2026, PR #72)*: `Fetcher.post_json(url, payload)` sends one JSON body, for Rijkswaterstaat's water-level API, which only answers POST queries. robots.txt, the host delay, the timeout and the one retry apply exactly as for a GET (the query only reads data, so sending it twice is harmless). **A redirect is not followed** for a POST but is a failure: whether to send the body again to another address would be a guess.
 - **The Method page URL in the user agent** is a constant in `haven/fetch.py` (`https://leonardoneirotti.github.io/haven-daily/about.html`) until the site config exists (issue #28).
 
 Checked once against the real robots.txt files (1 Nov 2026, robots.txt only): all five `use` sources are allowed for us and show no opt-out; NL Times (blocks Claude-Web), Nieuwsblad Transport and PortsEurope (`ai-train=no`) and RTV Rijnmond (blocks ClaudeBot) are detected as opt-outs; The Loadstar's robots.txt has no AI rules (it stays headline-only under its RSS terms, §4).
@@ -714,6 +717,32 @@ Examples: terminals (ECT Delta, Euromax, RWG, APMT Maasvlakte II…), areas (Maa
 
 Live run (2 Nov 2026, 12:47, from a desktop, nothing written): read with no failures; Zuid-Holland green → "No warnings" (before the owner's change to 6, the reading still gave the green entries' issue time, 28 Oct 03:08).
 
+### 5.12 Rhine status (built 2 Nov 2026, issue #20)
+
+**`haven/rhine.py`.** `read_rhine(fetcher, read_at, thresholds=None)` makes one request per gauge through the polite `Fetcher` (§5.8) and returns a `RhineResult`: the **Kaub** reading, the **Lobith** reading and failure lines for `build.failures`. `result.shown` = Kaub only (for the brief's status line), `result.stored` = Kaub and Lobith (for `data/status/`); the runner (#22) uses them. `kaub_from_answer` / `lobith_from_answer` are the same without the network (tested on answers we wrote ourselves in the real structure). `python -m haven.rhine` reads both once and prints the readings; it writes nothing.
+
+- **Kaub thresholds** in `config/rhine.toml` (`[kaub]`: `alert_at_or_below = 80`, `watch_at_or_below = 150`, `watch_above = 460`, `alert_above = 640`, each with its source in a comment), checked by `config.load_rhine()`. **Not read from the API's characteristic values** (§2.2). `kaub_level`: Alert at 80 or below or above 640, Watch at 150 or below or above 460, Normal between (151–460). Every edge tested (79/80/81, 149/150/151, 459/460/461, 639/640/641). **A reading below the record low is a valid Alert** (owner, PR #71; 21 cm tested, 0 and negative too).
+- **Kaub request:** GET `…/stations/KAUB/W/currentmeasurement.json` (latest value in cm on the gauge board + its time). **Lobith request:** POST to `OphalenWaarnemingen`, location `lobith.bovenrijn.tolkamer`, water height (`WATHTE`) in surface water (`OW`), `ProcesType` `meting`, period = **the 24 hours before the read time**.
+- **The Kaub reading** (§6 shape, as in the sample briefs): `key` `rhine`, `label` "Rhine water level", `icon` `waves`, `value` (whole cm, see 6 below), `unit` `cm`, `place` "Kaub gauge", `level`, `gauge_max` (700, see 7 below), `observed_at` (**the time of the measurement**, Amsterdam; the page shows it as "Read at"), `source_name` "WSV via PEGELONLINE", `source_url` the gauge's PEGELONLINE page, `note` `null`.
+- **The Lobith reading** (stored only): `key` `rhine-lobith`, `label` "Rhine water level, Lobith", `value` (cm), `unit` `cm NAP` (Rijkswaterstaat measures against NAP, not a gauge board, so the number is not comparable with Kaub's), `place` "Lobith gauge (Tolkamer)", `observed_at`, `source_name` "Rijkswaterstaat", `source_url` rijkswaterstaatdata.nl/waterdata/. **No `level`**: it has no thresholds and is not shown.
+- **No data** (`value`, `observed_at` and Kaub's `level` `null`) **for that reading only**, with one failure line under "Rhine level, Kaub (PEGELONLINE)" or "Rhine level, Lobith (Rijkswaterstaat)", when: the request fails or robots.txt blocks it, the answer is empty or not JSON, or the value or time can't be read. The other reading is unaffected (tested both ways). A bug of ours in either is caught the same way (hard rule 9).
+
+**What the real APIs look like** (checked 2 Nov 2026, ~13:20): Kaub `{"timestamp": "2026-11-02T13:00:00+01:00", "value": 21.0, "stateMnwMhw": "low", "stateNswHsw": "normal"}` (the two states are PEGELONLINE's own classification, not used). Lobith answers one series per `ProcesType`: `meting` (measurement) and `verwachting` (forecast). **Measurements arrive about 3 hours late** (newest 10:10 at 13:20), so a 2-hour window held **only the forecast**, and a window with no measurement at all answers **HTTP 204 with no body**. Neither host has a robots.txt (404 = everything allowed).
+
+*Proposed by Claude, confirmed by the owner 2 Nov 2026, with the changes marked (issue #20, PR #72):*
+1. **Kaub: the small `currentmeasurement.json` answer**, not the station answer with characteristic values that `SOURCES.md` listed: since PR #71 no threshold comes from the API, so there is nothing else to read each morning.
+2. **A Kaub reading older than 6 hours is No data** (failure line "latest reading is from …, older than 6 h (gauge stuck?)"). The gauge reports every 15 minutes, so 6 hours without a new value means the gauge or the API is stuck; showing a stale number as today's level would be a guess. Exactly 6 h still counts (tested).
+3. **Lobith: the newest measurement of the last 24 hours**, never a forecast value, even a newer one (tested). 24 h because of the ~3 h delay above; the stored `observed_at` shows how old it is. The request asks for `meting` only and the code checks it again, plus `WATHTE`, unit `cm` and `NAP`, so a changed answer can't slip in another quantity.
+4. **Lobith: only values marked normal** (`Kwaliteitswaardecode` `"00"`, the only code in the live answer) count; anything else is skipped (e.g. RWS's missing-value marker 999999999). Lobith is stored only, so being strict costs little.
+5. **Location `lobith.bovenrijn.tolkamer`**, the one tested on 31 Oct (`lobith.bovenrijn.haven` also answers, with slightly different values: 680 vs 693 cm in the 31 Oct test, not read at the same moment).
+6. **Whole centimetres are stored as whole numbers** (21, not 21.0). *(Changed by the owner, 2 Nov 2026: **the Kaub value is rounded to whole cm first, half up, and then compared with the thresholds**, so the number shown always matches its level: 150.5 → 151 Normal, 80.5 → 81 Watch, 150.4 → 150 Watch (tested). Half up, not Python's `round()`, which rounds half to even (150.5 → 150). Claude had proposed comparing the unrounded value, which could show "150 cm" next to Normal. Lobith is stored as it comes.)*
+7. *(Changed by the owner, 2 Nov 2026: **`gauge_max` = 700 cm**, above Alert 640, so high-water Watch (above 460) and Alert (above 640) are visible on the gauge instead of a full gauge from 300 up. Claude had proposed keeping the samples' 300. **It can still change in the design review (#25).** The four sample briefs use 700 too (owner, 2 Nov 2026, PR #72).)*
+8. **A time without a timezone is unreadable**, as in the weather status (§5.11): both APIs always give one.
+9. **Thresholds in config are checked**: four whole numbers, strictly in order (80 < 150 < 460 < 640), unknown or missing fields refused, so a typo or a swapped pair can't turn every reading Normal or Alert.
+10. **The Lobith link on a reading is Rijkswaterstaat's water-data page**, not Waterinfo: it's only a link for the reader, and we never fetch Waterinfo (robots `Disallow: /`, §4).
+
+Live run (2 Nov 2026, 13:31, from a desktop, nothing written): both read with no failures; Kaub **21 cm → Alert** (measured 13:15), Lobith **669 cm NAP** (measured 10:50).
+
 ---
 
 ## 6. Data format: one brief per day
@@ -730,7 +759,7 @@ Live run (2 Nov 2026, 12:47, from a desktop, nothing written): read with no fail
     {
       "key": "rhine", "label": "Rhine water level", "icon": "waves",
       "value": 94, "unit": "cm", "place": "Kaub gauge", "level": "amber",
-      "gauge_max": 300, "observed_at": "2026-10-29T06:15:00+01:00",
+      "gauge_max": 700, "observed_at": "2026-10-29T06:15:00+01:00",
       "source_name": "…", "source_url": "https://…", "note": null
     }
   ],
@@ -1072,7 +1101,7 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 - **Before launch, find and check the terms of Kuehne+Nagel SeaNews and RTV Rijnmond** (§4). Downgrade K+N to headline-only, or drop either, if their terms forbid our use.
 - **Permission emails to NL Times and RTV Rijnmond:** Claude drafts one short email per publisher (what Haven Daily is, non-commercial portfolio project, what we'd do with their articles: a 2-line own-words AI summary + link, never the text itself, and that we respect their AI opt-out until they say yes). **The owner sends them.** Both stay headline-only (hard rule 12) unless a publisher replies yes in writing; keep the reply in `docs/permissions/`.
 - ~~Design addition: the unrated item~~ **Done 1 Nov 2026 (issue #6):** outlined square, "UNRATED" tag, card without summary/impact, reduced-brief note driven by `build.ai_unavailable`, archive strip; samples: one unrated item on 27 Oct, a reduced brief on 26 Oct. Design choices confirmed by the owner (§5.3).
-- Finalise Rhine thresholds and weather thresholds from public sources (Method page).
+- Finalise Rhine thresholds and weather thresholds from public sources (Method page). *(Rhine numbers decided 2 Nov 2026, PR #71, and built into `config/rhine.toml`, #20; showing them with their sources on the Method page is #24.)*
 - **Design usability review before launch** (added 31 Oct 2026): the design looks good but doesn't feel user-friendly enough, and the owner can't yet say why. First find the concrete problems: review the pages as a first-time visitor (a planner and a recruiter, on a phone and on a laptop), list what they understand in 5 seconds and what confuses them, then propose changes. **Nothing is implemented until the owner approves the proposals.** The new logo and the social preview tags come after this review.
 - Self-host the IBM Plex font files (`static/fonts/`) instead of Google Fonts, to avoid sending EU visitors' IP addresses to Google.
 - Check aisstream.io terms for public display.

@@ -23,7 +23,7 @@
       "unit": "cm",
       "place": "Kaub gauge",
       "level": "amber",
-      "gauge_max": 300,
+      "gauge_max": 700,
       "observed_at": "2026-10-27T06:15:00+01:00",
       "source_name": "Sample source",
       "source_url": "https://example.com/rhine-kaub"

@@ -1,0 +1,25 @@
+# Haven Daily: thresholds of the Rhine status line at the Kaub gauge (spec §2.2, issue #20).
+#
+# Values in centimetres on the Kaub gauge board (PEGELONLINE "W"), whole numbers only.
+#   Alert  at alert_at_or_below or lower, or above alert_above
+#   Watch  at watch_at_or_below or lower, or above watch_above
+#   Normal in between (151-460 cm with the numbers below)
+#
+# Low side: owner's decision 2 Nov 2026 (PR #71), from the barge operators' low-water
+# surcharge tables, read 2 Nov 2026 (docs/research/barge-surcharge.md):
+#   150 cm  Contargo's first surcharge step (terminals south of Koblenz); Maersk's Rhine
+#           barge surcharge starts at the same level
+#    80 cm  Contargo "by agreement", Maersk "no loading guarantee" below 81 cm
+# High side: WSV's official values for Kaub (PEGELONLINE characteristicValues, read 31 Oct 2026):
+#   460 cm  Marke I (high-water shipping restrictions)
+#   640 cm  Marke II / HSW (shipping stops)
+# The numbers are written here on purpose, not read from the API each morning.
+#
+# A reading below the record low (NNW 25 cm) is a valid Alert, not an error.
+# Read and checked by haven/config.py; used by haven/rhine.py.
+
+[kaub]
+alert_at_or_below = 80
+watch_at_or_below = 150
+watch_above = 460
+alert_above = 640

@@ -75,6 +75,20 @@ class Place:
     osm: str  # the OSM element the coordinates were taken from, e.g. "way/145614140"
 
 
+@dataclass(frozen=True)
+class RhineThresholds:
+    """Kaub thresholds in cm from config/rhine.toml (spec §2.2). Alert/Watch at or below the low
+    edges, above the high edges; Normal in between."""
+
+    alert_at_or_below: int
+    watch_at_or_below: int
+    watch_above: int
+    alert_above: int
+
+
+_RHINE_FIELDS = ("alert_at_or_below", "watch_at_or_below", "watch_above", "alert_above")  # lowest first
+
+
 def _read_toml(path: Path) -> dict:
     path = Path(path)
     try:
@@ -136,6 +150,35 @@ def load_filter(path: Path = CONFIG_DIR / "filter.toml") -> FilterConfig:
                     f"(\"voetbal*\" matches voetbalclub)")
         off_topic[language] = tuple(words)
     return FilterConfig(off_topic=off_topic)
+
+
+def load_rhine(path: Path = CONFIG_DIR / "rhine.toml") -> RhineThresholds:
+    """The Kaub thresholds, checked: four whole numbers of centimetres, lowest first."""
+    path = Path(path)
+    data = _read_toml(path)
+    unknown_top = sorted(set(data) - {"kaub"})
+    if unknown_top:
+        raise ConfigError(f"{path.name}: unknown section {unknown_top[0]!r} (allowed: kaub)")
+    if not isinstance(data.get("kaub"), dict):
+        raise ConfigError(f"{path.name}: missing [kaub] section")
+    kaub = data["kaub"]
+    unknown = sorted(set(kaub) - set(_RHINE_FIELDS))
+    if unknown:
+        raise ConfigError(f"{path.name}, [kaub]: unknown field {unknown[0]!r} (allowed: {', '.join(_RHINE_FIELDS)})")
+    values = []
+    for name in _RHINE_FIELDS:
+        if name not in kaub:
+            raise ConfigError(f"{path.name}, [kaub]: missing {name!r}")
+        value = kaub[name]
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ConfigError(f"{path.name}, [kaub]: {name} must be a whole number of centimetres, e.g. 150")
+        values.append(value)
+    if not all(low < high for low, high in zip(values, values[1:])):
+        raise ConfigError(
+            f"{path.name}, [kaub]: thresholds must be in order, each higher than the one before: "
+            + " < ".join(_RHINE_FIELDS)
+        )
+    return RhineThresholds(*values)
 
 
 def load_places(path: Path = CONFIG_DIR / "places.toml") -> tuple[Place, ...]:
