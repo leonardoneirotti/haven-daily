@@ -236,6 +236,28 @@ Rules and limits:
 - A stopped run (guard said no) ends green, so it doesn't send a failure notification.
 - GitHub disables scheduled workflows in a repo with no activity for 60 days; the daily commit keeps it active.
 
+### 5.1.2 The daily workflow as built (issue #26, 2 Nov 2026)
+
+**`.github/workflows/daily.yml`**, two jobs:
+1. **`brief`** (only on `main`; `contents: write`; at most 45 minutes): checkout of the latest `main` → **guard** (`python -m haven.guard`, standard library only, so it runs before anything is installed and a stopped run takes seconds) → install → **`python -m haven.run`**, with `--last-trigger` when the guard says so; only this step gets `ANTHROPIC_API_KEY` (`secrets.ANTHROPIC_API_KEY`) → **`python -m haven.publish`** (commit `data/` to `main`).
+2. **`site`** (only when the guard said build): calls **`pages.yml`** (`workflow_call`), so a morning deploy uses exactly the steps of a normal one.
+
+**`haven/guard.py`** holds the §5.1.1 rules and is tested on fixed clocks (winter and summer at each trigger, the 06:30 edge, both 2026 clock-change days and the days before, brief already there, manual runs, the Amsterdam date late in the evening): it prints its decision and writes `build`, `last_trigger` and `day` to `$GITHUB_OUTPUT`. A stop exits 0 (green). **`haven/publish.py`** does the commit: on `main` only; `git add --all -- data`; then refuses, before committing, anything but **new files under `data/` with exactly one new brief** (a file staged outside `data/`, a changed or removed earlier day, no brief, two briefs); commits as `github-actions[bot]`, `Brief YYYY-MM-DD (automatic)`; `git pull --rebase --autostash origin main`, `git push origin HEAD:main`, one retry. Tested with real git against a local "origin" (only `data/` committed while other files changed, a correction pushed at the same moment kept underneath, nothing committed on any refusal) and with a fake git for the retries.
+
+**`pages.yml`** is now one job (render + deploy) that checks out the **latest `main`**, renders with `python -m haven.render --out site` and deploys; it runs on the owner's pushes, by hand, and from the daily job.
+
+*Claude's defaults, not yet confirmed by the owner (issue #26):*
+1. **The guard and the commit are Python modules, not shell in the YAML**, so the rules the issue asks to test (summer/winter, "only `data/` ever staged") are tested like the rest of the pipeline. `tests/test_workflows.py` checks the YAML calls them and keeps no copy of their logic (e.g. no `git add` in it, the crons equal `guard.SCHEDULE_CRONS`).
+2. **The last trigger is recognised by its cron** (`github.event.schedule` = `45 6 * * *`). An unknown cron or event **fails the run red** instead of building without the reduced-brief fallback, so a cron edited in one place only shows up the same morning.
+3. **A manual run has a tick box "last trigger", off by default**: §5.6 gives the reduced brief to the last scheduled trigger only. Tick it when running by hand after every scheduled run of the day failed, so an AI outage then gives a reduced brief instead of a skipped day.
+4. **Two concurrency groups, not one** (the issue asked to share one with `pages.yml` or explain why not). GitHub keeps only one *waiting* run per group and cancels the older one, so in one shared group an owner's push arriving while a morning run waits would cancel the morning run. Instead: the whole daily workflow is in group `daily` (a retry waits for a slow run; a running one is never cancelled), and the **deploy job** is in group `pages` with every other deployment. A deploy that is replaced there loses nothing, because **every deploy renders the latest `main` at the moment it starts** (checkout `ref: main`), so the last one always includes both the brief and any correction.
+5. **The site is built from `data/briefs/` as soon as it holds a brief, from the samples until then, never both** (`render.default_briefs_dir`; `--briefs` still overrides). So merging #26 doesn't break the live site before the first morning run, and the samples disappear with the first real brief (real briefs are never deleted, §5.9).
+6. **`haven.publish` adds two checks beyond the spec**: only *new* files (the runner never edits an earlier day; corrections are the owner's pushes, not the job's), and exactly one new brief, whose date names the commit. Also `--autostash`, so a stray change outside `data/` can't block the rebase, and the bot's name is given to the rebase too (it rewrites our commit and the job's checkout has no git user: found by the tests).
+7. **Timeouts:** 45 minutes for `brief` (the batch wait alone can take 22), 10 for the deploy. **Full history** in the checkout (`fetch-depth: 0`) so the rebase never misses a commit. **Runner exit 2** (today's files already there) fails the run red: after the guard it can't normally happen, so the owner should look.
+8. **The ruleset is kept in the repo**, `.github/rulesets/main.json`: default branch, rules `non_fast_forward` (no force-push) and `deletion` only, **no bypass**, so neither the job nor the owner can rewrite `main`'s history by accident. Applied with `gh api --method POST repos/leonardoneirotti/haven-daily/rulesets --input .github/rulesets/main.json` after the owner's OK.
+
+**Still to decide (owner): `tests.yml` as a required status check on `main`?** See the PR for #26.
+
 ### 5.2 Repository layout
 
 ```
@@ -257,6 +279,8 @@ haven/                 Python package
   rhine.py             Rhine status: Kaub reading shown (thresholds from config/rhine.toml), Lobith reading stored only (§5.12)
   strike.py            strike flag: worst level over the strikes in kept items (14 days, dated ones up to 60), deciding item(s) linked (§5.7)
   run.py               the morning pipeline: collect → filter → summarise → status → brief, today's three files written once; AI outage → nothing written, or a reduced brief on the last trigger (§5.13)
+  guard.py             first step of the daily job: build today or stop (too early / brief already there), last trigger or not (§5.1.1, §5.1.2)
+  publish.py           commits only new data/ files (one new brief) to main as github-actions[bot], pull --rebase, one retry (§5.1, §5.1.2)
   (ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
@@ -266,8 +290,11 @@ config/
   rhine.toml           the Kaub thresholds in cm, each with its public source in a comment (§2.2, §5.12)
 tests/                 pytest; run with `python -m pytest` (settings in pytest.ini). conftest.py: no API keys, no internet in any test
 .github/workflows/
-  pages.yml            render + deploy the site on every push to main
+  daily.yml            the morning job: guard → run → commit data/ to main → pages.yml (§5.1.2)
+  pages.yml            render the latest main + deploy, on every push to main, by hand, and from daily.yml
   tests.yml            run all tests on every pull request and push to main; no secrets
+.github/rulesets/
+  main.json            the ruleset on main: no force-push, no deletion (§5.1, §5.1.2)
 templates/             base.html, day.html, archive.html, about.html, _macros.html
 static/
   style.css            the whole design (tokens at the top)
