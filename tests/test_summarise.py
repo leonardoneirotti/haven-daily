@@ -22,7 +22,9 @@ from haven.summarise import (
     SUMMARY_MODEL,
     brief_item,
     known_strikes,
-    stated_in,
+    phrase_in,
+    published_day,
+    resolve_phrase,
     summarise,
     unrated,
 )
@@ -73,7 +75,7 @@ GOOD = {
     "place": "ect-delta",
     "tags": ["Containers", "Labour"],
     "strike": {"state": "announced", "location": "ECT Delta, Maasvlakte", "affects_rotterdam": True,
-               "start": "2026-11-05", "end": "2026-11-05", "match": "new", "strike_id": None},
+               "start_phrase": "5 November", "end_phrase": "5 November", "match": "new", "strike_id": None},
 }
 
 
@@ -192,6 +194,9 @@ def test_the_request_uses_haiku_by_default_structured_output_and_no_sampling_par
     assert schema["additionalProperties"] is False
     assert set(schema["required"]) == {"summary", "impact", "severity", "place", "tags", "strike"}
     assert schema["properties"]["severity"]["enum"] == ["high", "medium", "low"]
+    strike_schema = schema["properties"]["strike"]["anyOf"][0]
+    assert {"start_phrase", "end_phrase"} <= set(strike_schema["required"])  # words as written, not dates
+    assert "start" not in strike_schema["properties"]
     assert call["max_tokens"] >= 4096  # thinking counts toward max_tokens
     for banned in ("temperature", "top_p", "top_k", "thinking"):
         assert banned not in call
@@ -237,7 +242,8 @@ def test_a_headline_only_item_sends_only_its_headline_and_gets_no_summary_or_imp
     it = headline_item(headline="Invented: strike at Maasvlakte terminals")
     it = Item(**{**it.__dict__, "snippet": secret, "article_text": secret})  # even if text were in memory
     result, client = run([it], headline_answer(severity="high", place="maasvlakte", tags=["Labour"],
-                                               strike=strike(start=None, end=None, location="Maasvlakte")))
+                                               strike=strike(start_phrase=None, end_phrase=None,
+                                                             location="Maasvlakte")))
     call = client.messages.calls[0]
     assert secret not in json.dumps(call, default=str)
     assert "<headline>Invented: strike at Maasvlakte terminals</headline>" in user_text(call)
@@ -253,10 +259,17 @@ def test_a_headline_only_item_sends_only_its_headline_and_gets_no_summary_or_imp
 
 def test_a_headline_that_states_no_date_cannot_get_a_strike_date():
     result, _ = run([headline_item(headline="Invented: dockers to strike next week")],
-                    headline_answer(strike=strike(start="2026-11-09", end=None)))
-    assert result.items[0].ai["severity"] is None  # unrated, never a guessed date
-    assert result.failures == [{"source": "AI summariser",
-                                "error": "https://nl-times.test/1: strike start date not stated in the source"}]
+                    headline_answer(strike=strike(start_phrase="9 November", end_phrase=None)))
+    ai = result.items[0].ai
+    assert ai["severity"] == "medium" and ai["strike"]["start"] is None  # rated; the strike stays, no date
+    assert result.failures == [{"source": "AI summariser", "error":
+                                "https://nl-times.test/1: strike start date not stated in the source (left out)"}]
+
+
+def test_a_vague_phrase_in_the_headline_gives_no_date_and_no_failure():
+    result, _ = run([headline_item(headline="Invented: dockers to strike next week")],
+                    headline_answer(strike=strike(start_phrase="next week", end_phrase=None)))
+    assert result.items[0].ai["strike"]["start"] is None and result.failures == []
 
 
 def test_a_use_item_without_article_text_is_rated_from_its_headline_alone():
@@ -291,52 +304,130 @@ def test_same_or_unsure_with_an_unknown_or_missing_id_makes_the_item_unrated(mat
     assert result.failures[0]["error"].endswith(f"strike match '{match}' does not name a known strike")
 
 
-# --- dates: ISO and stated in the source -------------------------------------------------------
+# --- dates: the AI copies the phrase, the code works out the date ------------------------------
+# Owner's decisions (2 Nov 2026): a bad date is left out (the strike stays, so it shows Watch)
+# with a failure line; "today", "tomorrow" and weekdays are resolved against the published date.
+
+MON = date(2026, 11, 2)  # the invented items are published on Monday 2 November 2026
 
 
-def test_an_invented_date_makes_the_item_unrated_and_is_listed():
-    result, _ = run([item()], full(strike=strike(start="2026-11-06", end="2026-11-06")))
+def test_a_date_phrase_not_in_the_source_is_left_out_and_the_strike_kept():
+    result, _ = run([item()], full(strike=strike(start_phrase="6 November")))
     [done] = result.items
-    assert (done.ai["severity"], done.ai["summary"], done.ai["impact"]) == (None, None, None)
-    assert done.ai["strike"] is None and done.ai["map"] is None and done.ai["affects"] == []
-    assert result.failures == [{"source": "AI summariser",
-                                "error": "https://ect-news.test/1: strike start date not stated in the source"}]
+    assert done.ai["severity"] == "high" and done.ai["summary"] == GOOD["summary"]
+    assert done.ai["strike"]["start"] is None and done.ai["strike"]["end"] == "2026-11-05"
+    assert done.ai["strike"]["strike_id"] == "strike-2026-11-02-1"
+    assert result.failures == [{"source": "AI summariser", "error":
+                                "https://ect-news.test/1: strike start date not stated in the source (left out)"}]
 
 
-@pytest.mark.parametrize("bad", ["05/11/2026", "2026-11-31", "next Thursday", 20261105])
-def test_a_date_that_is_not_iso_makes_the_item_unrated(bad):
-    result, _ = run([item()], full(strike=strike(start=bad)))
-    assert result.items[0].ai["severity"] is None
-    assert result.failures[0]["error"].endswith("strike start is not an ISO date")
+@pytest.mark.parametrize("bad", [20261105, ["5 November"], "x" * 81])
+def test_a_date_phrase_that_is_not_short_text_is_left_out(bad):
+    result, _ = run([item()], full(strike=strike(start_phrase=bad)))
+    assert result.items[0].ai["severity"] == "high" and result.items[0].ai["strike"]["start"] is None
+    assert result.failures[0]["error"].endswith("strike start date is not a short phrase (left out)")
 
 
-def test_an_end_before_the_start_makes_the_item_unrated():
+def test_dates_in_the_wrong_order_are_both_left_out():
     text = ARTICLE + " A second stop on 3 November was also mentioned."
-    result, _ = run([item(text=text)], full(strike=strike(start="2026-11-05", end="2026-11-03")))
-    assert result.failures[0]["error"].endswith("strike ends before it starts")
+    result, _ = run([item(text=text)], full(strike=strike(start_phrase="5 November", end_phrase="3 November")))
+    stored = result.items[0].ai["strike"]
+    assert (stored["start"], stored["end"]) == (None, None) and result.items[0].ai["severity"] == "high"
+    assert result.failures[0]["error"].endswith("strike ends before it starts (dates left out)")
 
 
-@pytest.mark.parametrize("text", [
-    "The strike is on 5 November.", "Staking op 5 november.", "Strike on November 5th.",
-    "Strike on Thursday 5 Nov.", "Strike on 05-11-2026.", "Strike on 5/11.", "Strike 2026-11-05.",
-    "Strikes from 5 to 7 November.", "Strikes on 5, 6 and 7 November.", "Staking van 5 t/m 7 november.",
-    "Stop on the 5th of November.",
+def test_the_phrases_are_never_stored():
+    result, _ = run([item()], full())
+    assert set(result.items[0].ai["strike"]) == {"state", "location", "affects_rotterdam", "start", "end",
+                                                 "match", "strike_id"}
+
+
+@pytest.mark.parametrize("words, phrase, expected", [
+    ("will strike tomorrow", "tomorrow", "2026-11-03"),
+    ("will strike on Thursday", "on Thursday", "2026-11-05"),
+    ("gaan donderdag staken", "donderdag", "2026-11-05"),
+    ("are on strike today", "today", "2026-11-02"),
 ])
-def test_stated_in_finds_dates_written_in_english_dutch_and_numbers(text):
-    assert stated_in("2026-11-05", text)
+def test_relative_dates_are_resolved_against_the_published_date(words, phrase, expected):
+    text = f"Invented article. Dockworkers {words}, the union said."
+    result, _ = run([item(text=text)], full(strike=strike(start_phrase=phrase, end_phrase=phrase)))
+    assert (result.items[0].ai["strike"]["start"], result.items[0].ai["strike"]["end"]) == (expected, expected)
+    assert result.failures == []
 
 
-@pytest.mark.parametrize("text", [
-    "The strike is on Thursday.", "Strike next week.", "Strike on 15 November.", "Strike on 5 December.",
-    "Strike on 05-11-2025.", "Strike on 25 November.", "Strike on 11-05.", "Strike tomorrow.",
+def test_without_a_published_date_a_relative_phrase_gives_no_date_and_no_failure():
+    undated = Item(**{**item(text="Invented article. Dockworkers will strike tomorrow.").__dict__, "published": None})
+    result, _ = run([undated], full(strike=strike(start_phrase="tomorrow", end_phrase=None)))
+    assert result.items[0].ai["strike"]["start"] is None and result.failures == []
+
+
+@pytest.mark.parametrize("phrase, first, last", [
+    ("5 November", "2026-11-05", "2026-11-05"),
+    ("on 5th of November", "2026-11-05", "2026-11-05"),
+    ("November 5", "2026-11-05", "2026-11-05"),
+    ("5 november", "2026-11-05", "2026-11-05"),
+    ("from 5 to 7 November", "2026-11-05", "2026-11-07"),
+    ("van 5 t/m 7 november", "2026-11-05", "2026-11-07"),
+    ("5, 6 and 7 November", "2026-11-05", "2026-11-07"),
+    ("Thursday 5 November", "2026-11-05", "2026-11-05"),
+    ("05-11-2026", "2026-11-05", "2026-11-05"),
+    ("5/11", "2026-11-05", "2026-11-05"),
+    ("2026-11-05", "2026-11-05", "2026-11-05"),
+    ("05-11-2025", "2025-11-05", "2025-11-05"),  # a year in the source is taken as written
+    ("today", "2026-11-02", "2026-11-02"),
+    ("vandaag", "2026-11-02", "2026-11-02"),
+    ("tonight", "2026-11-02", "2026-11-02"),
+    ("tomorrow", "2026-11-03", "2026-11-03"),
+    ("tomorrow morning", "2026-11-03", "2026-11-03"),
+    ("morgen", "2026-11-03", "2026-11-03"),
+    ("morgenochtend", "2026-11-03", "2026-11-03"),
+    ("today and tomorrow", "2026-11-02", "2026-11-03"),
+    ("on Thursday", "2026-11-05", "2026-11-05"),
+    ("this Thursday", "2026-11-05", "2026-11-05"),
+    ("aanstaande donderdag", "2026-11-05", "2026-11-05"),
+    ("from Thursday to Saturday", "2026-11-05", "2026-11-07"),
+    ("Sunday", "2026-11-08", "2026-11-08"),
 ])
-def test_stated_in_rejects_dates_the_text_does_not_state(text):
-    assert not stated_in("2026-11-05", text)
+def test_resolve_phrase(phrase, first, last):
+    assert resolve_phrase(phrase, MON, TODAY) == (date.fromisoformat(first), date.fromisoformat(last))
 
 
-def test_a_date_from_another_year_than_this_one_or_the_next_is_refused():
-    assert not stated_in("2031-11-05", "Strike on 5 November.", today=TODAY)
-    assert stated_in("2027-01-05", "Strike on 5 January.", today=TODAY)
+@pytest.mark.parametrize("phrase", [
+    "next week", "soon", "binnenkort", "later this month", "volgende week", "next Thursday",
+    "volgende donderdag", "last Thursday", "Monday", "31 November", "in the coming days",
+])
+def test_vague_ambiguous_or_impossible_phrases_give_no_date(phrase):
+    # "Monday": the item is published on a Monday, so it could mean today or next week.
+    assert resolve_phrase(phrase, MON, TODAY) is None
+
+
+@pytest.mark.parametrize("phrase", ["tomorrow", "Thursday", "today"])
+def test_relative_phrases_need_a_published_date(phrase):
+    assert resolve_phrase(phrase, None, TODAY) is None
+
+
+def test_a_day_and_month_without_a_year_takes_the_nearest_year():
+    assert resolve_phrase("5 January", date(2026, 12, 30), TODAY) == (date(2027, 1, 5),) * 2
+    assert resolve_phrase("28 December", date(2027, 1, 2), TODAY) == (date(2026, 12, 28),) * 2
+    assert resolve_phrase("5 November", None, TODAY) == (date(2026, 11, 5),) * 2  # no published date: today
+
+
+@pytest.mark.parametrize("published, expected", [
+    ("2026-11-02T05:00:00+01:00", MON),
+    ("2026-11-01T23:30:00+00:00", MON),  # 00:30 in Amsterdam
+    ("2026-11-02T00:30:00", MON),  # no timezone: Amsterdam time (as the filter reads it, §5.4)
+    ("2026-11-02", MON),
+    (None, None),
+    ("not a date", None),
+])
+def test_published_day_is_the_amsterdam_date(published, expected):
+    assert published_day(published) == expected
+
+
+def test_phrase_in_ignores_case_and_spacing_but_needs_the_words():
+    assert phrase_in("5  NOVEMBER", "Invented: a stop on 5 November.")
+    assert not phrase_in("6 November", "Invented: a stop on 5 November.")
+    assert not phrase_in("", "anything")
 
 
 # --- every other invalid answer: unrated + failure, never a guess ------------------------------
