@@ -8,7 +8,9 @@
 2. **Duplicates are dropped here, once**: an item whose link is already in `data/items/` of the
    previous 14 days is not returned again, and the same link from two sources today counts
    once (first source in config order wins). Links are compared by `url_key()`, which ignores
-   only spelling differences of one address (see there).
+   only spelling differences of one address (see there). A stored line **with no filter
+   decision** doesn't count (a reduced day, when the AI check never ran): the item comes back
+   and is checked this time; the filter's 48 h rule still applies (owner, 2 Nov 2026, PR #74).
 3. **Feed read time:** the result carries `feeds_read_at`, the moment this run started reading
    the sources. The runner (#22) stores it in the brief as `build.feeds_read_at`; the next run
    reads it back (`previous_feeds_read_at`) and passes it as `previous_run` to the PIN gap check.
@@ -121,8 +123,10 @@ def run_collect(
     if previous_run is None and pin is not None:  # say so, so a missed rollover isn't silently unchecked
         failures.append({"source": pin.name, "error": GAP_CHECK_SKIPPED})
     stored = _stored_items(today, data_dir, failures)
+    # A stored line with no filter decision (a reduced day: the AI check never ran) is not "seen",
+    # so the item comes back and is checked this time (owner, 2 Nov 2026, PR #74).
     seen = {url_key(line["url"]) for _, lines in stored for line in lines
-            if isinstance(line, dict) and isinstance(line.get("url"), str)}
+            if isinstance(line, dict) and isinstance(line.get("url"), str) and isinstance(line.get("filter"), dict)}
 
     fetched = [source for source in sources if source.fetched]
     items: list[Item] = []
