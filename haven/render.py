@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from itertools import groupby
 from pathlib import Path
 from urllib.parse import urlencode
@@ -34,6 +34,15 @@ SITE = {
 }
 
 MAX_ITEMS = 5
+# Ship positions (the AIS snapshot) come in v2 (#31). Until then a brief without ships says
+# they are not collected yet, not that a snapshot failed. Set to True when #31 is built.
+AIS_SNAPSHOT_BUILT = False
+# MeteoAlarm's disclaimer, verbatim (its Terms §5, spec §2.2): shown with the weather dial.
+METEOALARM_DISCLAIMER = (
+    "Time delays between this website and the www.meteoalarm.org website are possible. For the most "
+    "up-to-date awareness information as published by the participating National Meteorological and "
+    "Hydrological Services, please refer to www.meteoalarm.org."
+)
 SEVERITIES = ("high", "medium", "low")
 # severity null = unrated: the AI failed for that item (spec §2.1, §5.6). It sorts after
 # every rated item and still counts toward MAX_ITEMS. "unrated" is its CSS key.
@@ -171,6 +180,100 @@ def publication_line(built_at: str, corrections: list[dict]) -> str:
     return " · ".join(parts)
 
 
+def _day_month(day: date) -> str:
+    """5 Nov (no locale, like the strike flag's value texts)."""
+    return f"{day.day} {day:%b}"
+
+
+def _moment(value) -> datetime | None:
+    """A timestamp as Amsterdam time; a zone-less one is read as Amsterdam time (as the filter does,
+    spec §5.4). None for anything unreadable: the page then shows no time rather than a guess."""
+    if not isinstance(value, str) or "T" not in value:
+        return None
+    try:
+        moment = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return moment.replace(tzinfo=AMSTERDAM) if moment.tzinfo is None else moment.astimezone(AMSTERDAM)
+
+
+def _date(value) -> date | None:
+    """The Amsterdam date of a timestamp, or a date-only value as it is."""
+    moment = _moment(value)
+    if moment is not None:
+        return moment.date()
+    try:
+        return date.fromisoformat(value) if isinstance(value, str) else None
+    except ValueError:
+        return None
+
+
+def _time_on(moment: datetime, brief_date: str) -> str:
+    """ "05:12" on the brief's own day, "19 Nov 21:30" on another day."""
+    if moment.date() == date.fromisoformat(brief_date):
+        return f"{moment:%H:%M}"
+    return f"{_day_month(moment.date())} {moment:%H:%M}"
+
+
+def published_label(published, brief_date: str) -> str | None:
+    """When an item was published, as shown on its card (Amsterdam time; the date too if not the brief's day)."""
+    moment = _moment(published)
+    if moment is not None:
+        return _time_on(moment, brief_date)
+    day = _date(published)
+    return _day_month(day) if day else None
+
+
+def weather_mapping(indicator: dict) -> str | None:
+    """KNMI's own level and hazard next to ours (MeteoAlarm requirement, spec §2.2):
+    "KNMI: Code yellow · Wind → Watch". None on No data or a reading without KNMI's level."""
+    knmi_level = indicator.get("knmi_level")
+    if not knmi_level or indicator.get("level") is None:
+        return None
+    hazards = ", ".join(indicator.get("hazards") or [])
+    original = f"Code {knmi_level}" + (f" · {hazards}" if hazards else "")
+    return f"KNMI: {original} → {LEVELS[indicator['level']][1]}"
+
+
+def issue_time(issued_at, brief_date: str) -> str | None:
+    """The warning's time of issue (MeteoAlarm requirement); None when there are no warnings (§5.11 point 6)."""
+    moment = _moment(issued_at)
+    return f"Issued {_time_on(moment, brief_date)}" if moment else None
+
+
+STRIKE_ROLES = {"decides": None, "possibly the same as": "Possibly the same as"}
+
+
+def strike_link(link: dict, ranks: dict[str, int] | None, today: str) -> dict:
+    """One item linked from the strike line (spec §5.7 point 6): role, "NL Times · 2 Nov", and the
+    item's card on the day page it appeared on, if that day's brief shows it.
+
+    `ranks` = {url: rank} of the items shown on the item's collection day, None if that day has no brief.
+    """
+    role = link.get("role")
+    if role == "unsure":
+        label = "Possibly called off" if link.get("state") == "cancelled" else "Possibly the same strike"
+    else:
+        label = STRIKE_ROLES.get(role)
+    day = _date(link.get("published")) or _date(link.get("day"))
+    meta = " · ".join(part for part in (link.get("source"), _day_month(day) if day else None) if part)
+    rank = (ranks or {}).get(link.get("url"))
+    day_link = None
+    if link.get("day") and link["day"] != today and rank:
+        day_link = {"href": f"days/{link['day']}.html#item-{rank}",
+                    "label": f"In the {_day_month(date.fromisoformat(link['day']))} brief"}
+    return {"headline": link.get("headline"), "url": link.get("url"), "role_label": label, "meta": meta,
+            "day_link": day_link}
+
+
+def failure_groups(failures: list[dict]) -> list[dict]:
+    """Failure lines grouped per source, in the order the sources first appear."""
+    groups: dict[str, list[str]] = {}
+    for failure in failures:
+        groups.setdefault(failure.get("source") or "Unknown step", []).append(failure.get("error") or "")
+    return [{"source": source, "errors": errors} for source, errors in groups.items()]
+
+
 def translate_url(url: str, source_language: str) -> str:
     """Link that opens the original article through Google Translate.
 
@@ -225,23 +328,33 @@ def gauge_percent(indicator: dict) -> float | None:
     return round(max(0.0, min(value / gauge_max, 1.0)) * 100, 1)
 
 
-def prepare_indicator(indicator: dict, previous: dict | None, is_first: bool) -> None:
+def prepare_indicator(indicator: dict, previous: dict | None, is_first: bool, brief_date: str,
+                      shown_ranks: dict[str, dict[str, int]]) -> None:
     indicator.setdefault("value", None)
     indicator.setdefault("unit", "")
     indicator.setdefault("place", None)
     indicator.setdefault("note", None)
     indicator.setdefault("observed_at", None)
     indicator.setdefault("gauge_max", None)
+    indicator.setdefault("source_url", None)  # null when nothing is linked (strike flag, §5.7)
     indicator["level_key"], indicator["level_label"] = LEVELS[indicator.get("level")]
     value = indicator["value"]
     indicator["is_number"] = isinstance(value, (int, float))
     indicator["display_value"] = f"{value:g}" if indicator["is_number"] else value
     indicator["change"] = describe_change(indicator, previous, is_first)
     indicator["gauge_pct"] = gauge_percent(indicator)
-    indicator["is_external"] = indicator["source_url"].startswith("http")
+    url = indicator["source_url"]
+    indicator["is_external"] = bool(url) and url.startswith("http")
+    indicator["is_weather"] = indicator["key"] == "weather"
+    indicator["mapping"] = weather_mapping(indicator)
+    indicator["issued"] = issue_time(indicator.get("issued_at"), brief_date)
+    # Strike flag: the items that decided it are listed instead of one source link.
+    indicator["links"] = [
+        strike_link(link, shown_ranks.get(link.get("day")), brief_date) for link in indicator.get("items") or []
+    ]
 
 
-def prepare_item(item: dict) -> None:
+def prepare_item(item: dict, brief_date: str) -> None:
     item.setdefault("summary", None)
     item.setdefault("impact", None)
     item.setdefault("affects", [])
@@ -249,6 +362,11 @@ def prepare_item(item: dict) -> None:
     item.setdefault("access", "full")  # "headline-only" for paywalled sources
     item.setdefault("map", None)  # {"lat", "lon", "label"} when the item has a place on the map
     item["severity_key"] = severity_key(item["severity"])
+    item["language_name"] = LANGUAGE_NAMES.get(item["language"], item["language"])
+    item["published_label"] = published_label(item["published"], brief_date)
+    # A severity with no summary was rated from the headline alone (spec §2.1, §5.5 point 2): a
+    # headline-only source, or a `use` item whose article couldn't be read.
+    item["rated_from_headline"] = item["severity"] is not None and not item["summary"]
     if item["language"] == "en":
         item["translate_url"] = None
     else:
@@ -308,7 +426,15 @@ def map_payload(brief: dict) -> dict:
 def prepare_briefs(briefs: list[dict]) -> list[dict]:
     """Add the fields the templates need: edition number, ranked items, status changes, map data."""
     briefs.sort(key=lambda brief: brief["date"])
+    # Items shown on each day's page, {date: {url: rank}}: the strike line links an earlier
+    # item's card only if its day page really shows it (spec §5.7 point 10).
+    for brief in briefs:
+        brief["items"] = rank_items(brief.get("items", []))
+    shown_ranks = {
+        brief["date"]: {item["url"]: rank for rank, item in enumerate(brief["items"], start=1)} for brief in briefs
+    }
     previous_status: dict[str, dict] = {}
+    previous_day: date | None = None
     for number, brief in enumerate(briefs, start=1):
         brief["day"] = date.fromisoformat(brief["date"])
         brief["edition"] = number
@@ -326,13 +452,18 @@ def prepare_briefs(briefs: list[dict]) -> list[dict]:
         # True only on a reduced brief: the AI was down all morning (spec §5.6).
         build.setdefault("ai_unavailable", False)
 
-        for indicator in brief["status"]:
-            prepare_indicator(indicator, previous_status.get(indicator["key"]), number == 1)
-        previous_status = {indicator["key"]: indicator for indicator in brief["status"]}
+        build.setdefault("summaries", None)
+        brief["failure_groups"] = failure_groups(build["failures"])
 
-        brief["items"] = rank_items(brief.get("items", []))
+        # "Since yesterday" only against the day before: after a missing day there is no yesterday.
+        yesterday = previous_status if previous_day == brief["day"] - timedelta(days=1) else {}
+        for indicator in brief["status"]:
+            prepare_indicator(indicator, yesterday.get(indicator["key"]), number == 1, brief["date"], shown_ranks)
+        previous_status = {indicator["key"]: indicator for indicator in brief["status"]}
+        previous_day = brief["day"]
+
         for item in brief["items"]:
-            prepare_item(item)
+            prepare_item(item, brief["date"])
         brief["counts"] = {
             key: sum(1 for item in brief["items"] if item["severity_key"] == key) for key in SEVERITY_KEYS
         }
@@ -375,6 +506,8 @@ def make_environment() -> Environment:
         ship_hull=SHIP_HULL,
         ship_decks=SHIP_DECKS,
         max_items=MAX_ITEMS,
+        ais_snapshot_built=AIS_SNAPSHOT_BUILT,
+        meteoalarm_disclaimer=METEOALARM_DISCLAIMER,
     )
     return env
 

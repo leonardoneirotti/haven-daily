@@ -35,8 +35,8 @@
   <path class="hull" d="{{ ship_hull }}"/><path class="deck" d="{{ ship_decks[type] }}"/></g></svg>
 {%- endmacro %}
 
-{% macro dial(ind) -%}
-<li class="dial">
+{% macro dial(ind, root) -%}
+<li class="dial" data-key="{{ ind.key }}">
   <p class="dial-label">{{ icon(ind.icon) }}{{ ind.label }}</p>
   <div class="dial-reading">
     <div>
@@ -52,11 +52,33 @@
     {% endif %}
   </div>
   <p class="dial-status">{{ level(ind.level_key, ind.level_label) }}{% if ind.change %}<span>{{ ind.change }}</span>{% endif %}</p>
+  {# Weather: KNMI's own level next to ours and the time of issue (MeteoAlarm requirements, spec §2.2). #}
+  {% if ind.mapping %}<p class="dial-mapping">{{ ind.mapping }}</p>{% endif %}
   {% if ind.note %}<p class="dial-note">{{ ind.note }}</p>{% endif %}
+  {# Strike flag: the item(s) that decided it (spec §5.7 point 6). #}
+  {% if ind.links %}
+  <ul class="dial-links">
+    {% for link in ind.links %}
+    <li>
+      {% if link.role_label %}<span class="dial-link-role">{{ link.role_label }}</span>{% endif %}
+      <a href="{{ link.url }}">{{ link.headline }}{{ icon("external") }}</a>
+      <span class="dial-link-meta">{{ link.meta }}{% if link.day_link %} · <a href="{{ root }}{{ link.day_link.href }}">{{ link.day_link.label }}</a>{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
   <p class="dial-meta">
+    {% if ind.issued %}<span>{{ ind.issued }}</span>{% endif %}
     {% if ind.observed_at %}<span>Read at <time datetime="{{ ind.observed_at }}">{{ ind.observed_at | clock }}</time></span>{% endif %}
+    {% if ind.links %}
+    {# the linked items above are the sources #}
+    {% elif ind.source_url %}
     <a href="{{ ind.source_url }}">{{ ind.source_name }}{% if ind.is_external %}{{ icon("external") }}{% endif %}</a>
+    {% else %}
+    <span>{{ ind.source_name }}</span>
+    {% endif %}
   </p>
+  {% if ind.is_weather %}<p class="dial-disclaimer">{{ meteoalarm_disclaimer }}</p>{% endif %}
 </li>
 {%- endmacro %}
 
@@ -66,10 +88,11 @@
     <p class="item-top">
       {{ num(rank, item.severity_key) }}
       <span class="sev sev-{{ item.severity_key }}"><span class="visually-hidden">Severity: </span>{{ item.severity_key }}</span>
+      {% if item.rated_from_headline %}<span class="sev-note">rated from headline only</span>{% endif %}
       <span class="item-meta">
         <span>{{ item.source }}</span>
-        <span>{{ language_names[item.language] }}</span>
-        {% if item.published %}<time datetime="{{ item.published }}">{{ item.published | clock }}</time>{% endif %}
+        <span>{{ item.language_name }}</span>
+        {% if item.published_label %}<time datetime="{{ item.published }}">{{ item.published_label }}</time>{% endif %}
       </span>
     </p>
     <h3 class="item-title" id="item-{{ rank }}-title"><a href="{{ item.url }}">{{ item.headline }}</a></h3>
@@ -81,9 +104,9 @@
     {% if item.summary %}
     <p class="item-summary">{{ item.summary }}</p>
     {% elif item.access == "headline-only" %}
-    <p class="item-summary is-empty">Headline only. This source is paywalled, so there is no summary.</p>
+    <p class="item-summary is-empty">Headline only: this source is paywalled or its terms don't allow a summary.</p>
     {% else %}
-    <p class="item-summary is-empty">No summary available.</p>
+    <p class="item-summary is-empty">Headline only: the article couldn't be read, so there is no summary.</p>
     {% endif %}
     <div class="item-impact">
       <p class="impact-label">Impact for planners <em>interpretation</em></p>
@@ -101,7 +124,7 @@
       {% else %}
       <span class="no-place needs-map">No single place on the chart</span>
       {% endif %}
-      <a href="{{ item.url }}">Read original{% if item.language != "en" %} ({{ language_names[item.language] }}){% endif %}{{ icon("external") }}</a>
+      <a href="{{ item.url }}">Read original{% if item.language != "en" %} ({{ item.language_name }}){% endif %}{{ icon("external") }}</a>
       {% if item.translate_url %}<a href="{{ item.translate_url }}">{{ icon("languages") }}Read in English{{ icon("external") }}</a>{% endif %}
     </p>
   </article>

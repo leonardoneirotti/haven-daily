@@ -8,12 +8,27 @@
       "key": "weather",
       "label": "Weather warnings",
       "icon": "wind",
-      "value": "Code yellow · fog",
-      "place": "Rotterdam region",
+      "value": "Code yellow · Fog",
       "level": "amber",
+      "place": "Zuid-Holland",
+      "knmi_level": "yellow",
+      "hazards": [
+        "Fog"
+      ],
+      "issued_at": "2026-10-26T21:30:00+01:00",
+      "warnings": [
+        {
+          "level": "yellow",
+          "hazard": "Fog",
+          "onset": "2026-10-27T03:00:00+01:00",
+          "expires": "2026-10-27T10:00:00+01:00",
+          "issued_at": "2026-10-26T21:30:00+01:00"
+        }
+      ],
       "observed_at": "2026-10-27T06:12:00+01:00",
-      "source_name": "Sample source",
-      "source_url": "https://example.com/weather"
+      "source_name": "KNMI via MeteoAlarm",
+      "source_url": "https://www.meteoalarm.org",
+      "note": "Warnings at 06:12 · not live"
     },
     {
       "key": "rhine",
@@ -32,12 +47,14 @@
       "key": "strike",
       "label": "Strike flag",
       "icon": "megaphone",
-      "value": "None reported",
-      "place": "Derived from today's items",
+      "value": "No active strike",
       "level": "green",
-      "observed_at": "2026-10-27T06:32:00+01:00",
-      "source_name": "Today's items",
-      "source_url": "#items-title"
+      "place": "Derived from kept items",
+      "items": [],
+      "observed_at": "2026-10-27T06:12:00+01:00",
+      "source_name": "Kept items of the last 14 days",
+      "source_url": null,
+      "note": null
     }
   ],
   "items": [

@@ -14,11 +14,16 @@
       "label": "Weather warnings",
       "icon": "wind",
       "value": "No warnings",
-      "place": "Rotterdam region",
       "level": "green",
+      "place": "Zuid-Holland",
+      "knmi_level": "green",
+      "hazards": [],
+      "issued_at": null,
+      "warnings": [],
       "observed_at": "2026-10-29T06:20:00+01:00",
-      "source_name": "Sample source",
-      "source_url": "https://example.com/weather"
+      "source_name": "KNMI via MeteoAlarm",
+      "source_url": "https://www.meteoalarm.org",
+      "note": "Warnings at 06:20 · not live"
     },
     {
       "key": "rhine",
@@ -37,12 +42,26 @@
       "key": "strike",
       "label": "Strike flag",
       "icon": "megaphone",
-      "value": "Strike in progress",
-      "place": "Derived from today's items",
+      "value": "Strike today · Maasvlakte",
       "level": "red",
-      "observed_at": "2026-10-29T06:31:00+01:00",
-      "source_name": "See item 1",
-      "source_url": "#item-1"
+      "place": "Derived from kept items",
+      "items": [
+        {
+          "headline": "Dockworkers strike for 24 hours at a Maasvlakte container terminal",
+          "url": "https://example.com/nl/staking-maasvlakte",
+          "source": "Sample source A",
+          "published": "2026-10-29T05:48:00+01:00",
+          "day": "2026-10-29",
+          "day_page": null,
+          "role": "decides",
+          "state": "announced",
+          "match": "new"
+        }
+      ],
+      "observed_at": "2026-10-29T06:20:00+01:00",
+      "source_name": "Sample source A",
+      "source_url": "https://example.com/nl/staking-maasvlakte",
+      "note": null
     }
   ],
   "items": [

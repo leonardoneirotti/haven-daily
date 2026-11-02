@@ -249,6 +249,13 @@ html:not(.has-map) .needs-map,
 .sev-low { color: var(--low-ink); }
 .sev-unrated { color: var(--nodata-ink); }
 
+/* Next to the severity of a headline-only item: rated from the headline alone (spec §2.1) */
+.sev-note {
+  color: var(--ink-2);
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+}
+
 .lvl {
   display: inline-flex;
   align-items: center;
@@ -1284,6 +1291,48 @@ html:not(.has-map) .needs-map,
   color: var(--ink);
 }
 
+/* Weather: KNMI's own level next to ours (MeteoAlarm requirement) */
+.dial-mapping {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+/* Strike flag: the item(s) that decided it */
+.dial-links {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.1rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.dial-links a { color: var(--ink); }
+.dial-links .icon { margin-left: 0.25em; vertical-align: -0.1em; }
+
+.dial-link-role {
+  display: block;
+  color: var(--medium-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.dial-link-meta {
+  display: block;
+  color: var(--ink-2);
+  font-size: 0.75rem;
+}
+
+.dial-link-meta a { color: var(--ink-2); }
+
+/* MeteoAlarm's disclaimer, verbatim, under the weather dial */
+.dial-disclaimer {
+  color: var(--ink-2);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
 /* River gauge board: alternating marks on the left half, water rising from below */
 .gauge {
   position: relative;
@@ -1669,6 +1718,15 @@ td.ais-text {
 .draft,
 .reduced-note { color: var(--medium-ink); }
 .all-ok { color: var(--ok-ink); }
+
+/* Several failure lines from one source, listed under its name */
+.failure-lines {
+  margin: 0.2rem 0 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.failures .failure-lines li { display: list-item; }
 
 .corrections .icon,
 .failures .icon,

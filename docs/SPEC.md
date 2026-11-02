@@ -59,7 +59,7 @@ Owner: Leonardo Neirotti. Compiled 31 October 2026.*
 - "Affects" tags (e.g. Containers · Maasvlakte II · Truck pickups).
 - For Dutch items: "Read in English" link.
 - Optional map pin so the item appears on the chart: the AI picks a place from a fixed list, the code adds `lat`, `lon`, `label` (§5.10). "Affects" tags also come from a fixed list (§5.10).
-- Paywalled sources: headline + link only ("Headline only. This source is paywalled, so there is no summary.").
+- Paywalled sources: headline + link only ("Headline only: this source is paywalled or its terms don't allow a summary."). *(Wording changed from "This source is paywalled, so there is no summary." in #23, Claude's proposal, confirmed by the owner 2 Nov 2026, PR #75: NL Times, The Loadstar and RTV Rijnmond are headline-only for their AI or RSS terms, not a paywall, so the old sentence was untrue for them.)*
 - **Headline-only items** (paywalled or AI opt-out, §3 rule 12, §4) still get a **severity, rated by the AI from the headline alone**, shown as **"rated from headline only"** next to the severity tag. From the same headline the AI also picks the **place** and **"affects" tags** (same fixed lists, §5.10) and extracts **strike details** (same rules, §5.7: dates only if the headline states them; an `unsure` match never clears a strike), so a strike reported only by a headline-only source (e.g. NL Times, RTV Rijnmond) still raises the strike flag. No summary; impact stays `null` = "Not enough information". If that AI call fails, the item is unrated like any other. *(Decided by the owner, 1 Nov 2026.)*
 
 ### 2.2 Port status line
@@ -351,6 +351,25 @@ python -m venv .venv
 - **A reduced brief with no items** says *"Without the AI step only items from the Rotterdam-specific sources can be shown, and they had nothing new"* instead of "nothing met the bar", which would be untrue when the filter never ran.
 - The **Method page** lists Unrated under the severity rules and explains the reduced brief in two sentences.
 
+*Real briefs on the day page (built 2 Nov 2026, issue #23).* The renderer now takes a brief written by the runner (§5.13) as it is: a status reading with `source_url: null` no longer crashes it (its source is shown as plain text). Tests in `tests/test_render_real.py`, including a brief written by `haven.run` (normal and reduced).
+- **Weather dial** (MeteoAlarm requirements, §2.2): "KNMI: Code yellow · Wind → Watch" (`weather_mapping()`), "Issued 05:12" (`issue_time()`, Amsterdam time), "Read at", "KNMI via MeteoAlarm ↗" linking to www.meteoalarm.org, the note "Warnings at 06:46 · not live", and MeteoAlarm's disclaimer verbatim (test asserts the exact text).
+- **Strike dial** (§5.7 point 6): the reading's value text as it is, then each linked item: role, headline linked to the original ↗, "NL Times · 2 Nov" (`strike_link()`).
+- **Rhine**: the Kaub gauge as before, with the change since yesterday.
+- **Headline-only items**: "rated from headline only" next to the severity tag; impact "Not enough information".
+- **Ships dial in v1**: "No data · Ship positions are not collected yet" (`AIS_SNAPSHOT_BUILT = False` in `render.py`; #31 sets it to `True`, and from then on a missing snapshot reads "The AIS snapshot failed" again).
+- **"How this brief was made"**: sources checked, items collected, kept, shown, summaries in the batch / by the fallback (`build.summaries`), failures per source, correction notes.
+
+*Proposed by Claude, all ten confirmed by the owner 2 Nov 2026 (issue #23, PR #75):*
+1. **"Since yesterday" only against the brief of the day before.** After a missing day the dial says "No reading yesterday" instead of comparing with an older brief and calling it yesterday.
+2. **An item from an earlier day links to its card on that day page** ("In the 30 Oct brief" → `days/2026-10-30.html#item-3`) **only if that day's page shows it** (among its 5 shown items, matched by URL). Otherwise only the original article is linked: a day page that doesn't show the item would confuse the reader. (Answers the "Note for #23" in §5.7 point 10.)
+3. **Role labels on the strike line:** the deciding item has none; an `unsure` cancellation is "Possibly called off" (the §5.7 example); any other `unsure` item is "Possibly the same strike"; the named strike next to a higher unsure item is "Possibly the same as". The item's date is its `published` date (Amsterdam), else its collection day. The strike dial lists these items **instead of** one source link.
+4. **"rated from headline only" is shown for every rated item with no summary**, not only `access: "headline-only"`: a `use` item whose article couldn't be read is rated from its headline too (§5.5 point 2). Its card says "Headline only: the article couldn't be read, so there is no summary." (was "No summary available.").
+5. **KNMI's level with no warnings** reads "KNMI: Code green → Normal"; on No data there is no mapping line, but the meteoalarm.org link and the disclaimer stay.
+6. **An item's time is Amsterdam time, with the date when it isn't the brief's day** ("19 Nov 17:20"): real items can be up to 48 h old, and "17:20" alone would read as this morning. A date-only `published` shows the date ("19 Nov"); a zone-less one is read as Amsterdam time (as the filter does, §5.4); a missing or unreadable one shows nothing.
+7. **Several failure lines from one source are grouped under its name**, sources in the order they first appear.
+8. **The chart legend leaves out the ship symbols when a day has no ships**, and the chart says "No ship positions: ships are not collected yet."
+9. **The four sample briefs use the real weather and strike reading shapes** (§5.11, §5.7), so the sample site shows the MeteoAlarm requirements and a linked strike item (29 Oct: "Strike today · Maasvlakte"; 27 Oct: KNMI yellow fog issued the evening before).
+
 ### 5.4 Relevance filter (decided 31 Oct 2026)
 
 Question it answers per item: *is this relevant to a logistics planner working with the Port of Rotterdam?* Two stages, cheapest first. Only kept items go on to the summariser.
@@ -579,7 +598,7 @@ Stored on the item as `strike.match` (`same` / `new` / `unsure`) and `strike.str
    - naming a strike that **doesn't count** (outside the window, or not found) → judged on its own: it counts only if it would raise the flag by itself.
 8. **Bad stored data never stops the flag:** an item with no `strike_id` counts as a strike of its own (safe side); unreadable `state`, `match` or `affects_rotterdam` → that item is skipped; an unreadable date → no date (so it can't hide a strike as "over"). Each with a failure line naming the item's number and day, never its headline.
 9. **The value texts** (location from the deciding item, left out if missing): Alert "Strike today · Maasvlakte", "Strike ongoing · Maasvlakte", "Strike since 1 Nov · …"; Watch "Strike announced for 5 Nov · …", "Strike announced, no date given · …", "Strike announced until 6 Nov · …", "Strike ongoing as of 30 Oct, no newer report · …"; Normal "No active strike", or "Strike called off · …" when a cancellation is linked. Dates as "5 Nov" (no locale). The renderer (#23) can show them as they are.
-10. **Linked items** (`items`): the deciding item first, then, for an unsure pair, the other one. Each: `headline`, `url`, `source` (the source's name; its id if unknown), `published`, `day` (collection day), `day_page` (`days/<day>.html`, `null` for today's items), `role` (`decides`, `unsure`, `possibly the same as`), `state`, `match`. **On Normal after a cancellation**, the newest confident cancellation of a Rotterdam strike that still counts is linked, so "called off" can show for up to 14 days after it (longer if the strike was dated further ahead). *Note for #23:* an item is linked to the day page of the day it was collected, but it may not have been among that day's 5 shown items; #23 decides how to link it then.
+10. **Linked items** (`items`): the deciding item first, then, for an unsure pair, the other one. Each: `headline`, `url`, `source` (the source's name; its id if unknown), `published`, `day` (collection day), `day_page` (`days/<day>.html`, `null` for today's items), `role` (`decides`, `unsure`, `possibly the same as`), `state`, `match`. **On Normal after a cancellation**, the newest confident cancellation of a Rotterdam strike that still counts is linked, so "called off" can show for up to 14 days after it (longer if the strike was dated further ahead). *Note for #23:* an item is linked to the day page of the day it was collected, but it may not have been among that day's 5 shown items; #23 decides how to link it then. *(#23: the day page is linked, to the item's card, only if it shows the item; §5.3.)*
 
 ### 5.8 Collector (decided 31 Oct 2026)
 
@@ -794,7 +813,7 @@ Live run (2 Nov 2026, 13:31, from a desktop, nothing written): both read with no
 
 **Items the AI check never decided come back** *(owner's decision, 2 Nov 2026, PR #74)*: on a reduced day they are stored without a `filter`, so the **duplicate check (§5.8) doesn't count a stored line with no filter decision** as seen; the next run collects the item again and checks it, and the filter's 48 h rule still applies. *Claude's reading, confirmed by the owner 2 Nov 2026 (PR #74):* a `filter` that is `null` or not an object (a hand edit) is no decision either, so that item comes back once, visibly; a later day's decided line for the same link counts as seen as usual.
 
-*Note for #23:* the renderer can't yet show a real brief: a strike reading with nothing linked has `source_url: null`, and `render.prepare_indicator` calls `.startswith` on it. Not a problem until real briefs are rendered (`pages.yml` renders the samples until #26).
+*Note for #23 (fixed in #23):* the renderer couldn't show a real brief: a strike reading with nothing linked has `source_url: null`, and `render.prepare_indicator` called `.startswith` on it. Now tested on briefs written by the runner (§5.3).
 
 ---
 
@@ -867,7 +886,7 @@ Live run (2 Nov 2026, 13:31, from a desktop, nothing written): both read with no
 | `build.summaries` | how many **rated** items were written in the batch (`written_by.api` = `batch`) vs through the standard API (`fallback`: the Haiku fallback, or a rephrase retry, §5.5 #16); unrated items count in neither |
 | `build.ai_unavailable` | `true` only on a **reduced brief** (§5.6): the AI was down until the last trigger, so all items are unrated and the page shows *"The AI step was unavailable this morning: headlines only, no summaries."* `false` otherwise; a missing field counts as `false`. *(Name proposed by Claude, confirmed by the owner 1 Nov 2026, PR #50.)* |
 | `items[].map.side` | `"left"` puts the label left of the number where the right is crowded |
-| `ships` | `null` when the AIS snapshot failed (page says so) |
+| `ships` | `null` when the AIS snapshot failed (page says so); always `null` in v1, where the page says ship positions are not collected yet (#23) |
 | `vessels[].type` | `container` / `tanker` / `bulk` only |
 | `vessels[].status` | `underway` / `moored` / `anchored` |
 | `vessels[].destination_raw` | as typed on board (`"NL RTM"`, `"ANTWERP>HAMBURG"`, blank) |
