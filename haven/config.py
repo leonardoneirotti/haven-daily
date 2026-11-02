@@ -21,6 +21,16 @@ ACCESS_TYPES = ("rss", "html")
 _SOURCE_FIELDS = {"id", "name", "verdict", "urls", "access", "language", "auto_keep", "note"}
 _LANGUAGE = re.compile(r"^[a-z]{2}$")
 
+# Place list (spec §5.10). "barrier" and "bridge" are Claude's additions to the
+# spec's five kinds, not yet confirmed by the owner.
+PLACE_KINDS = ("terminal", "area", "anchorage", "lock", "barrier", "bridge", "fairway")
+LABEL_SIDES = ("right", "left")
+# The chart sheet (south, west, north, east), spec §8.1: every place must be on it.
+SHEET_BBOX = (51.74, 3.40, 52.16, 4.62)
+_PLACE_FIELDS = {"id", "label", "kind", "lat", "lon", "side", "osm"}
+_PLACE_ID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+_OSM_ID = re.compile(r"^(node|way|relation)/[1-9][0-9]*$")
+
 
 class ConfigError(Exception):
     """A config file is missing, unreadable or breaks one of the rules."""
@@ -50,6 +60,19 @@ class FilterConfig:
     """Word lists for the rule stage of the relevance filter (spec §5.4)."""
 
     off_topic: dict[str, tuple[str, ...]] = field(default_factory=dict)  # language -> words
+
+
+@dataclass(frozen=True)
+class Place:
+    """One place from config/places.toml (GLOSSARY: Place). Coordinates come from OpenStreetMap."""
+
+    id: str
+    label: str
+    kind: str  # one of PLACE_KINDS
+    lat: float
+    lon: float
+    side: str  # "right" / "left": which side of the pin number the label goes
+    osm: str  # the OSM element the coordinates were taken from, e.g. "way/145614140"
 
 
 def _read_toml(path: Path) -> dict:
@@ -113,6 +136,91 @@ def load_filter(path: Path = CONFIG_DIR / "filter.toml") -> FilterConfig:
                     f"(\"voetbal*\" matches voetbalclub)")
         off_topic[language] = tuple(words)
     return FilterConfig(off_topic=off_topic)
+
+
+def load_places(path: Path = CONFIG_DIR / "places.toml") -> tuple[Place, ...]:
+    """The fixed place list, in file order, checked. Raises ConfigError on the first problem."""
+    path = Path(path)
+    data = _read_toml(path)
+    unknown_top = sorted(set(data) - {"place"})
+    if unknown_top:
+        raise ConfigError(f"{path.name}: unknown section {unknown_top[0]!r} (only [[place]] is allowed)")
+    entries = data.get("place")
+    if not entries or not isinstance(entries, list):
+        raise ConfigError(f"{path.name}: no [[place]] entries")
+
+    places: list[Place] = []
+    ids: set[str] = set()
+    labels: set[str] = set()
+    for number, entry in enumerate(entries, start=1):
+        place = _check_place(path.name, number, entry)
+        if place.id in ids:
+            raise ConfigError(f"{path.name}: duplicate id {place.id!r} (place #{number})")
+        if place.label.casefold() in labels:
+            raise ConfigError(f"{path.name}: duplicate label {place.label!r} (place #{number})")
+        ids.add(place.id)
+        labels.add(place.label.casefold())
+        places.append(place)
+    return tuple(places)
+
+
+def _check_place(file: str, number: int, entry: dict) -> Place:
+    where = f"{file}, place #{number}"
+    if isinstance(entry.get("id"), str) and entry["id"]:
+        where = f"{file}, place {entry['id']!r}"
+
+    def fail(problem: str):
+        raise ConfigError(f"{where}: {problem}")
+
+    unknown = sorted(set(entry) - _PLACE_FIELDS)
+    if unknown:
+        fail(f"unknown field {unknown[0]!r} (allowed: {', '.join(sorted(_PLACE_FIELDS))})")
+    for name in ("id", "label", "kind", "lat", "lon", "side", "osm"):
+        if name not in entry:
+            fail(f"missing {name!r}")
+    for name in ("id", "label", "kind", "side", "osm"):
+        if not isinstance(entry[name], str) or not entry[name].strip():
+            fail(f"{name!r} must be non-empty text")
+    if entry["id"] == "none":
+        fail("'none' can't be an id: it is the AI's answer for \"no place\"")
+    if not _PLACE_ID.match(entry["id"]):
+        fail(f"id {entry['id']!r} may only use lowercase letters, digits and - (e.g. \"ect-delta\")")
+    if entry["kind"] not in PLACE_KINDS:
+        fail(f"unknown kind {entry['kind']!r} (allowed: {', '.join(PLACE_KINDS)})")
+    if entry["side"] not in LABEL_SIDES:
+        fail(f"side {entry['side']!r} must be one of: {', '.join(LABEL_SIDES)}")
+    if not _OSM_ID.match(entry["osm"]):
+        fail(f"osm {entry['osm']!r} must name an OpenStreetMap element, e.g. \"way/145614140\"")
+    for name in ("lat", "lon"):
+        if isinstance(entry[name], bool) or not isinstance(entry[name], (int, float)):
+            fail(f"{name!r} must be a number")
+    south, west, north, east = SHEET_BBOX
+    if not (south <= entry["lat"] <= north and west <= entry["lon"] <= east):
+        fail(f"({entry['lat']}, {entry['lon']}) is outside the chart sheet {SHEET_BBOX} (spec §8.1)")
+    return Place(id=entry["id"], label=entry["label"], kind=entry["kind"], lat=float(entry["lat"]),
+                 lon=float(entry["lon"]), side=entry["side"], osm=entry["osm"])
+
+
+def load_tags(path: Path = CONFIG_DIR / "tags.toml") -> tuple[str, ...]:
+    """The fixed "affects" tags (without the place labels, which are added by haven/places.py)."""
+    path = Path(path)
+    data = _read_toml(path)
+    unknown_top = sorted(set(data) - {"affects"})
+    if unknown_top:
+        raise ConfigError(f"{path.name}: unknown key {unknown_top[0]!r} (only 'affects' is allowed)")
+    if "affects" not in data:
+        raise ConfigError(f"{path.name}: missing 'affects' list")
+    tags = data["affects"]
+    if not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
+        raise ConfigError(f"{path.name}: 'affects' must be a list of tags, e.g. [\"Containers\"]")
+    seen: set[str] = set()
+    for tag in tags:
+        if not tag.strip():
+            raise ConfigError(f"{path.name}: 'affects' contains an empty tag")
+        if tag.casefold() in seen:
+            raise ConfigError(f"{path.name}: duplicate tag {tag!r} (tags are matched ignoring upper/lower case)")
+        seen.add(tag.casefold())
+    return tuple(tags)
 
 
 def _check_source(file: str, number: int, entry: dict) -> Source:

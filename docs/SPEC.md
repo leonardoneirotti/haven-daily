@@ -250,10 +250,13 @@ haven/                 Python package
   pages.py             HTML list collectors: same item shape, K+N Rotterdam paragraph only (§5.8)
   collect.py           collect step: every source, duplicates, feed read time, K+N 14-day check, article text (§5.8)
   filter.py            relevance filter: stage 1 rules, stage 2 AI check (Haiku 5.5), kept/dropped report (§5.4)
+  places.py            the AI's place id + tags -> items[].map, affects, unlisted; nothing off the lists gets through (§5.10)
   (summarise.py, status.py, ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
   filter.toml          off-topic word lists per language (§5.4), small starter lists (football)
+  places.toml          the fixed place list: 41 places, coordinates + OSM element id (§5.10)
+  tags.toml            the fixed "affects" tags: 15 cargo/mode tags (§5.10)
 tests/                 pytest; run with `python -m pytest` (settings in pytest.ini). conftest.py: no API keys, no internet in any test
 .github/workflows/
   pages.yml            render + deploy the site on every push to main
@@ -602,6 +605,23 @@ Examples: terminals (ECT Delta, Euromax, RWG, APMT Maasvlakte II…), areas (Maa
 **Affects tags**, a config list of ~15 cargo/mode tags: Containers, Dry bulk, Liquid bulk, Breakbulk, RoRo, Barge, Rail, Truck pickups, Rhine, Hinterland, Sea access, Customs… **plus location tags taken automatically from the place list** (the item's place label, e.g. "Maasvlakte II"). The summariser picks **up to 5**.
 
 **Log what's missing** (both lists): any place or tag the AI mentions that is **not** on its list is discarded from the item and recorded on the item's line in `data/items/` (`"unlisted": {"places": ["Calandkanaal"], "tags": ["Reefers"]}`). The owner reviews these to decide what to add; a list grows when the log shows the same request coming up often.
+
+#### 5.10.1 The lists as built (issue #14, 2 Nov 2026)
+
+- **`config/places.toml`**: 41 places (12 terminals, 10 port areas, 5 North Sea anchorages, 1 lock, 2 storm surge barriers, 2 bridges, 9 fairways). Each has an `osm` field naming the OpenStreetMap element its coordinates were taken from (e.g. `way/145614140` = ECT Delta), so anyone can check it on openstreetmap.org. Coordinates were read **once** with an Overpass query on 2 Nov 2026: a node's own position, or the centre Overpass reports for a way or relation. A test checks every place lies inside the sheet bbox (§8.1); the loader refuses one outside it.
+- **`config/tags.toml`**: 15 tags. Any place label is also a valid tag.
+- **`haven/places.py` `pick(place, tags)`**: returns `map` (or `null`), `affects` and `unlisted` (left out of the item when nothing was discarded). `config.py` checks both files like the other config (unknown field, duplicate id/label/tag, bad OSM id, outside the sheet → stop with a message).
+
+*Proposed by Claude; confirmed by the owner 2 Nov 2026 except where marked (issue #14, PR #59):*
+1. **Two extra place kinds, `barrier` and `bridge`**, next to the five above: the Maeslantkering and Hartelkering (closed in storms: sea access) and the Botlekbrug and Calandbrug (rail/road bridges whose closures and openings delay trains and trucks) are not locks or fairways. Only one lock is listed (Rozenburgsesluis); the port's main waterways have no sea locks.
+2. **The choice of places** and their short labels (e.g. "RWG", "APMT Maasvlakte II"). **Eurogeul** (the deep-water approach channel) has no named area in OSM: its pin is the Eurogeul E13 buoy (`node/1333828109`). **Uniport** stays out (owner). **Rozenburgsesluis** is the OSM lock way named after its canal ("Calandkanaal"): Claude's reading of which lock it is, kept by the owner and checked on the chart in the design review (#25).
+   - **APM Terminals Rotterdam (Maasvlakte I)** added at the owner's request (41st place). APM Terminals agreed in December 2019 to sell this terminal to Hutchison Ports and kept Maasvlakte II (Freightwaves, 19 Dec 2019); OSM now names its area **"Hutchison Delta 2 Terminal"** (`way/607016850`), and the coordinates are that area's centre. *Claude's default, not yet confirmed by the owner:* id `delta-2`, label **"Delta II (ex-APMT Rotterdam)"**, so news using either name finds it. Also checked: the address APM gives for Maasvlakte II (Europaweg 910) is the APMT Maasvlakte II area already on the list, so that pin is right.
+3. **Label `side`**: `right` unless a neighbour sits close on the right (RWG, APMT Maasvlakte II, Maasvlakte II, Nieuwe Waterweg, Hartelkanaal, Hartelkering, Calandbrug, Rozenburgsesluis are `left`). To be checked on the real chart in the design review (#25).
+4. **Tags**: the spec's 12 plus **Shortsea**, **Ferries** and **Labour** (strikes and other labour news, the most common High item). A tag may not have the same name as a place.
+5. **Matching ignores upper/lower case and spaces around the answer**; the item always gets the list's spelling. Repeated tags count once.
+6. **More than 5 tags: the first 5 listed tags are kept**, in the AI's order; listed tags past the fifth are dropped without being logged (they are on the list, so nothing needs adding). Unlisted tags don't use up any of the 5.
+7. **The pinned place's label is added as a location tag** at the end when the AI didn't include it and there is room (fewer than 5 tags): this is how "location tags taken automatically from the place list" is read.
+8. An answer that is **not text** (a number, say) is logged as unlisted, never crashes the run. `"none"`, an empty answer or no answer = no pin, nothing logged.
 
 ---
 

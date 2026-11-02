@@ -25,7 +25,7 @@ One piece of news found in a source on a given morning. Every collected item is 
 _Avoid_: Article, story, post
 
 **Place**:
-A named location in or near the port (terminal, area, anchorage, lock or fairway) from the fixed place list; the only locations an item can be pinned to.
+A named location in or near the port (terminal, area, anchorage, lock, storm surge barrier, bridge or fairway) from the fixed place list (`config/places.toml`); the only locations an item can be pinned to.
 _Avoid_: Location, site, POI
 
 **Affects tag**:

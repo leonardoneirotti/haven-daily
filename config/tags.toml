@@ -1,0 +1,30 @@
+# Haven Daily: the fixed "affects" tags (spec §5.10).
+#
+# The summariser picks up to 5 tags per item. Allowed: the tags below, plus the
+# label of any place in config/places.toml as a location tag (e.g. "Maasvlakte II").
+# A tag the AI names that is on neither list is dropped from the item and logged
+# on the item's line in data/items/ ("unlisted"). Add a tag when the log shows the
+# same one coming up often (build plan step 10). Matching ignores upper/lower case;
+# the item always gets the spelling written here.
+# Read and checked by haven/config.py; used by haven/places.py.
+
+affects = [
+  # Cargo types
+  "Containers",
+  "Dry bulk",
+  "Liquid bulk",
+  "Breakbulk",
+  "RoRo",
+  # Ways cargo moves in and out of the port
+  "Shortsea",
+  "Ferries",
+  "Barge",
+  "Rail",
+  "Truck pickups",
+  "Rhine",
+  "Hinterland",
+  "Sea access",
+  # Rules and people
+  "Customs",
+  "Labour",
+]
