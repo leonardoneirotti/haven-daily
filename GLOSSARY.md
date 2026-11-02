@@ -52,6 +52,10 @@ _Avoid_: Fallback brief, degraded page, emergency edition
 The status indicator saying whether a strike affecting the Port of Rotterdam is happening today (Alert), coming up (Watch) or not active (Normal).
 _Avoid_: Strike alert, strike status, industrial action indicator
 
+**Known strike**:
+A strike found in the stored items of the last 14 days, with the id the code gave it (`strike-YYYY-MM-DD-n`); the summariser says whether a new strike item is the same one, maybe the same one, or a new one.
+_Avoid_: Strike event, case
+
 **Deciding item**:
 The item a status indicator's value is based on, linked from the status line.
 _Avoid_: Trigger item, source item
