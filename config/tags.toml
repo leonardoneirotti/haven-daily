@@ -77,3 +77,10 @@ meaning = "Customs and border checks, inspections and scanning, declarations, an
 [[tag]]
 name = "Labour"
 meaning = "Strikes and other labour action, wage talks and staff shortages at the port or in transport."
+
+# ---------- Systems ----------
+
+# Owner's addition, 2 Nov 2026 (issue #67).
+[[tag]]
+name = "IT systems"
+meaning = "Outages or cyberattacks affecting Portbase, terminal or carrier IT systems, and booking or gate systems."
