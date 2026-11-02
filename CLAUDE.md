@@ -17,7 +17,7 @@
 
 - **Publishing (§2, §5.1):** one GitHub Actions job at ~06:45 Amsterdam collects, builds, commits `data/` straight to `main` and deploys to GitHub Pages. No PR, no review window. Mistakes are fixed afterwards with a visible correction. The page never skips a day.
 - **Schedule (§5.1.1):** triggers at 04:45, 05:45, 06:45 UTC + manual; a guard builds once, on the first run after 06:30 Amsterdam with no brief for today.
-- **Pipeline (§5):** collect → filter (rules, then Claude Haiku 5.5) → summarise (Haiku 5.5 or Sonnet 5.5, chosen by a side-by-side test on the first real run; Batch API with 20-min limit, fallback to Haiku standard) → status (MeteoAlarm/KNMI weather, Kaub Rhine gauge, strike flag) → brief → render → deploy.
+- **Pipeline (§5):** collect → filter (rules, then Claude Haiku 5.5) → summarise (Sonnet 5.5, chosen by the owner after the side-by-side test with Haiku 5.5, #17; Batch API with 20-min limit, fallback to Haiku standard) → status (MeteoAlarm/KNMI weather, Kaub Rhine gauge, strike flag) → brief → render → deploy.
 - **AI budget:** all AI calls under €5/month; check real costs after week one.
 - **AI never invents:** places and "affects" tags are picked from fixed lists (§5.10); severity can be `null` = unrated; strike dates only if stated.
 - **Storage (§6.1):** plain JSON files per day in `data/`, written once; no article text ever.

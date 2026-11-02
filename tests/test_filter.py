@@ -118,6 +118,19 @@ def test_exactly_48_hours_old_is_kept_and_one_second_older_is_dropped():
     assert decision_for(older).outcome == DROP
 
 
+def test_a_wider_age_limit_is_only_used_when_asked_for():
+    # The morning job always uses 48 h; the Haiku vs Sonnet comparison (#17) may look further back.
+    five_days = item(published="2026-10-27T06:45:00+01:00")
+    eight_days = item(published="2026-10-24T06:45:00+02:00")
+    assert decision_for(five_days).outcome == DROP
+    week = timedelta(days=7)
+    assert decide(five_days, CONTARGO, (), RUN, max_age=week).outcome == TO_AI
+    dropped = decide(eight_days, CONTARGO, (), RUN, max_age=week)
+    assert (dropped.outcome, dropped.reason) == (DROP, "older than 7 days")
+    [ruled] = apply_rules([five_days], SOURCES, WORDS, RUN, max_age=week)
+    assert ruled.decision.outcome == TO_AI
+
+
 def test_age_is_compared_as_real_time_whatever_the_offset_is_written_in():
     # 05:45 UTC on 30 Oct is 06:45 Amsterdam: exactly 48 h before the run.
     assert decision_for(item(published="2026-10-30T05:45:00+00:00")).outcome == TO_AI

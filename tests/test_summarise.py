@@ -149,7 +149,7 @@ def test_a_valid_answer_fills_summary_impact_severity_tags_pin_strike_and_writte
     assert done.ai["strike"] == {"state": "announced", "location": "ECT Delta, Maasvlakte", "affects_rotterdam": True,
                                  "start": "2026-11-05", "end": "2026-11-05", "match": "new",
                                  "strike_id": "strike-2026-11-02-1"}
-    assert done.ai["written_by"] == {"model": "claude-haiku-5-5", "api": "standard"}
+    assert done.ai["written_by"] == {"model": "claude-sonnet-5-5", "api": "standard"}
     assert "unlisted" not in done.ai
     assert result.failures == [] and result.unavailable is None
 
@@ -185,10 +185,11 @@ def test_tokens_and_calls_are_counted():
 # --- the request ---------------------------------------------------------------------------
 
 
-def test_the_request_uses_haiku_by_default_structured_output_and_no_sampling_parameters():
+def test_the_request_uses_sonnet_by_default_structured_output_and_no_sampling_parameters():
+    # Sonnet 5.5 chosen by the owner after the side-by-side test (#17, 2 Nov 2026).
     _, client = run([item()], full())
     [call] = client.messages.calls
-    assert call["model"] == SUMMARY_MODEL == "claude-haiku-5-5"
+    assert call["model"] == SUMMARY_MODEL == "claude-sonnet-5-5"
     assert call["output_config"]["format"]["type"] == "json_schema"
     schema = call["output_config"]["format"]["schema"]
     assert schema["additionalProperties"] is False

@@ -94,31 +94,33 @@ class Ruled:
     decision: Decision
 
 
-def apply_rules(items: list[Item], sources, config: FilterConfig, now: datetime) -> list[Ruled]:
+def apply_rules(items: list[Item], sources, config: FilterConfig, now: datetime,
+                max_age: timedelta = MAX_AGE) -> list[Ruled]:
     """Stage 1 for every item, in the order given.
 
     `now` is the moment ages are counted to. The runner (#22) passes the collect step's
     `feeds_read_at`, when the sources were read: an earlier moment can only keep an item longer,
-    never drop it too early.
+    never drop it too early. `max_age` is always 48 h in the morning job; only the Haiku vs
+    Sonnet comparison (#17, `python -m haven.compare --max-age-days`) passes a longer one.
     """
     by_id = {source.id: source for source in sources}
     ruled = []
     for item in items:
-        decision = decide(item, by_id.get(item.source), config.off_topic.get(item.language, ()), now)
+        decision = decide(item, by_id.get(item.source), config.off_topic.get(item.language, ()), now, max_age)
         if decision.outcome != TO_AI:
             item = replace(item, filter=decision.record())
         ruled.append(Ruled(item=item, decision=decision))
     return ruled
 
 
-def decide(item: Item, source: Source | None, words, now: datetime) -> Decision:
+def decide(item: Item, source: Source | None, words, now: datetime, max_age: timedelta = MAX_AGE) -> Decision:
     """The rules for one item. `source` is None for a source not in the config (never auto-kept)."""
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("The run time has no timezone; it must be timezone-aware (Amsterdam or UTC).")
 
     start = age_start(item.published)
-    if start is not None and _utc(now) - _utc(start) > MAX_AGE:
-        return Decision(DROP, TOO_OLD)
+    if start is not None and _utc(now) - _utc(start) > max_age:
+        return Decision(DROP, TOO_OLD if max_age == MAX_AGE else f"older than {max_age.days} days")
 
     if source is not None and source.auto_keep:
         return Decision(KEEP, AUTO_KEEP)
@@ -369,9 +371,10 @@ class FilterResult:
     output_tokens: int = 0
 
 
-def run_filter(items: list[Item], sources, config: FilterConfig, now: datetime, client) -> FilterResult:
+def run_filter(items: list[Item], sources, config: FilterConfig, now: datetime, client,
+               max_age: timedelta = MAX_AGE) -> FilterResult:
     """Step 2 of the morning job: the rules, then the AI check for what they couldn't decide."""
-    ruled = apply_rules(items, sources, config, now)
+    ruled = apply_rules(items, sources, config, now, max_age)
     result = [r.item for r in ruled]
     to_ai = [n for n, r in enumerate(ruled) if r.decision.outcome == TO_AI]
     if not to_ai:

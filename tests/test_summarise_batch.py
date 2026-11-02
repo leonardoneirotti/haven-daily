@@ -166,6 +166,7 @@ HAIKU_STANDARD = {"model": FALLBACK_MODEL, "api": "standard"}
 def test_the_limits_are_the_specs():
     assert BATCH_WAIT == 20 * 60
     assert FALLBACK_MODEL == "claude-haiku-5-5"
+    assert SUMMARY_MODEL == "claude-sonnet-5-5"  # the batch model, owner's choice (#17); the fallback stays Haiku
     assert 0 < CANCEL_WAIT <= 5 * 60  # the page still publishes around 07:05 (§5.5 step 4)
 
 
