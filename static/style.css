@@ -5,9 +5,11 @@
    coast, textured land, teal ships, an orange accent. map.js reads the chart
    colours from the same tokens.
 
-   Layout: the chart fills the first screen. On wide screens today's items sit
-   in a panel over its western side (open sea); selecting one flies the chart
-   there. The full brief and the port status follow below the chart.
+   Layout: on wide screens the chart fills the first screen and today's items
+   sit in a panel over its western side (open sea); selecting one flies the
+   chart there. On phones the panel comes first and the chart follows. On a day
+   with nothing on the chart it is only a short strip. The full brief and the
+   port status follow below.
    Type: IBM Plex. Condensed for headlines and readings, Mono for labels and
    data (like an instrument panel), Serif only for the planner impact (with a
    rose label), so interpretation never looks like fact.
@@ -798,14 +800,70 @@ html:not(.has-map) .needs-map,
   }
 }
 
-/* Phones and tablets: the panel follows the chart; the full list of items is just below it */
+/* Phones and tablets: the brief comes first (#81). The panel, with its item list, sits above
+   the chart in the page flow; the chart follows as the index of the list just read. */
 @media (max-width: 63.99rem) {
-  .panel-items {
+  .panel-item {
+    padding-right: var(--gutter);
+    padding-left: calc(var(--gutter) - 3px);
+  }
+}
+
+/* ---------- A day with nothing on the chart: a short strip (#81) ----------
+   No item of the day has a place and there are no ships, so a full screen of empty map would
+   push the brief down. Phones: about a third of the screen, enough for the zoom buttons.
+   Wide screens: the panel stops floating and sits beside the strip; its item list is left out,
+   because the full brief starts right below. */
+.stage-empty .chart-map {
+  height: 30vh;
+  min-height: 15rem;
+  max-height: 20rem;
+}
+
+.stage-empty .chart-frame::after {
+  box-shadow: inset 0 0 60px 8px rgba(0, 0, 0, 0.55);
+}
+
+@media (min-width: 64rem) {
+  .stage-empty {
+    display: grid;
+    grid-template-columns: var(--panel-width) minmax(0, 1fr);
+    height: auto;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .stage-empty .panel {
+    position: static;
+    width: auto;
+    background: var(--bg);
+    border: 0;
+    border-right: 1px solid var(--rule);
+    box-shadow: none;
+  }
+
+  .stage-empty .panel-items {
     display: none;
   }
 
-  .panel-status {
-    border-top: 0;
+  .stage-empty .chart {
+    position: relative;
+    inset: auto;
+    min-height: 18rem;
+  }
+
+  .stage-empty .chart-map {
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .stage-empty .chart-legend,
+  .stage-empty .chart-note {
+    left: 1rem;
+  }
+
+  .stage-empty .chart-legend {
+    max-width: calc(100% - 9rem);
   }
 }
 
@@ -955,18 +1013,28 @@ html:not(.has-map) .needs-map,
   }
 }
 
+/* v2 only: the day's AIS snapshot failed (hard rule 9). Pinned to the chart's top-left corner,
+   where the ship filter would be, so it never covers the port (#81). In v1 there is no box:
+   the legend says in grey that ship positions are not collected yet. */
 .chart-note {
   position: absolute;
-  top: 45%;
-  left: 50%;
+  top: 10px;
+  left: 10px;
   z-index: 450;
-  width: min(22rem, calc(100% - 2rem));
-  padding: 0.8rem 1rem;
-  transform: translate(-50%, -50%);
+  max-width: min(22rem, calc(100% - 20px));
+  padding: 0.45rem 0.7rem;
   background: var(--surface);
   border: 1px solid var(--medium-ink);
+  box-shadow: 0 4px 14px var(--shadow);
+  font-size: 0.8125rem;
   font-weight: 600;
-  text-align: center;
+}
+
+@media (min-width: 64rem) {
+  .chart-note {
+    top: 1rem;
+    left: calc(var(--panel-width) + 2rem);
+  }
 }
 
 .chart-legend {
@@ -995,6 +1063,11 @@ html:not(.has-map) .needs-map,
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+/* Plain grey notes in the legend: why the chart is empty, ships not collected yet (v1) */
+.chart-legend > .legend-note {
+  color: var(--ink-2);
 }
 
 .ship-symbol {

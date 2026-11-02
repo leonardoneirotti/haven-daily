@@ -9,44 +9,10 @@
 {% set items = brief["items"] %}
 {% set ships = brief.ships %}
 <main id="main">
-  {# The stage: the chart fills the screen; on wide screens the news panel sits over its western (open sea) side. #}
-  <section class="stage" aria-labelledby="brief-title">
-    <div class="chart" id="chart">
-      <h2 class="visually-hidden">Chart of the port</h2>
-      <div class="chart-frame">
-        <div id="port-map" class="chart-map" role="region" aria-label="Chart of the Port of Rotterdam{% if ships %} with {{ ships.count }} ships{% endif %}{% if brief.map.callouts %} and today's numbered items{% endif %}. Everything on the chart is also listed on this page."></div>
-        <script type="application/json" id="map-data">{{ brief.map | tojson }}</script>
-        {% if ships %}
-        <div class="chart-filter needs-map" role="group" aria-label="Show ships">
-          <button type="button" data-ship-filter="all" aria-pressed="true">All <span>{{ ships.count }}</span></button>
-          {% for kind, count in ships.by_type.items() if count %}
-          <button type="button" data-ship-filter="{{ kind }}" aria-pressed="false">{{ ship_type_plurals[kind] }} <span>{{ count }}</span></button>
-          {% endfor %}
-        </div>
-        {% elif ais_snapshot_built %}
-        <p class="chart-note">No ship positions for this day. The AIS snapshot failed.</p>
-        {% else %}
-        <p class="chart-note">No ship positions: ships are not collected yet.</p>
-        {% endif %}
-        <div class="chart-focus" id="chart-focus" hidden>
-          <p class="chart-focus-text" id="chart-focus-text"></p>
-          <button type="button" data-action="overview">{{ m.icon("expand") }}Overview</button>
-        </div>
-        <p class="visually-hidden" id="chart-announcer" aria-live="polite"></p>
-      </div>
-      <div class="chart-legend">
-        {% if ships %}
-        <span>{{ m.ship_symbol("container") }}Container</span>
-        <span>{{ m.ship_symbol("tanker") }}Tanker</span>
-        <span>{{ m.ship_symbol("bulk") }}Bulk</span>
-        <span>{{ m.ship_symbol("container", "underway") }}Under way</span>
-        <span>{{ m.ship_symbol("container", "anchored") }}At anchor</span>
-        {% endif %}
-        {% if ships and ships.linked %}<span>{{ m.ship_symbol("container", "moored", true) }}At a terminal in the news</span>{% endif %}
-        {% if brief.map.callouts %}<span><span class="legend-num" aria-hidden="true">1</span>Item</span>{% endif %}
-      </div>
-    </div>
-
+  {# The stage. The brief comes first: the panel (date, items, port status), then the chart as its
+     index. On wide screens the panel floats over the chart's western side (open sea). On a day with
+     nothing to show on the chart (no placed item, no ships) the chart is a short strip (#81). #}
+  <section class="stage{% if brief.chart_empty %} stage-empty{% endif %}" aria-labelledby="brief-title">
     <div class="panel">
       <header class="panel-head">
         <p class="kicker">
@@ -89,6 +55,44 @@
       </ul>
       <a class="panel-more" href="#brief">{{ m.icon("arrow-down") }}Full brief and port status</a>
     </div>
+
+    <div class="chart" id="chart">
+      <h2 class="visually-hidden">Chart of the port</h2>
+      <div class="chart-frame">
+        <div id="port-map" class="chart-map" role="region" aria-label="Chart of the Port of Rotterdam{% if ships %} with {{ ships.count }} ships{% endif %}{% if brief.map.callouts %} and today's numbered items{% endif %}. Everything on the chart is also listed on this page."></div>
+        <script type="application/json" id="map-data">{{ brief.map | tojson }}</script>
+        {% if ships %}
+        <div class="chart-filter needs-map" role="group" aria-label="Show ships">
+          <button type="button" data-ship-filter="all" aria-pressed="true">All <span>{{ ships.count }}</span></button>
+          {% for kind, count in ships.by_type.items() if count %}
+          <button type="button" data-ship-filter="{{ kind }}" aria-pressed="false">{{ ship_type_plurals[kind] }} <span>{{ count }}</span></button>
+          {% endfor %}
+        </div>
+        {% elif ais_snapshot_built %}
+        {# A real failure (hard rule 9), so it stays on the chart, but in its corner, off the port. #}
+        <p class="chart-note">No ship positions for this day. The AIS snapshot failed.</p>
+        {% endif %}
+        <div class="chart-focus" id="chart-focus" hidden>
+          <p class="chart-focus-text" id="chart-focus-text"></p>
+          <button type="button" data-action="overview">{{ m.icon("expand") }}Overview</button>
+        </div>
+        <p class="visually-hidden" id="chart-announcer" aria-live="polite"></p>
+      </div>
+      <div class="chart-legend">
+        {% if ships %}
+        <span>{{ m.ship_symbol("container") }}Container</span>
+        <span>{{ m.ship_symbol("tanker") }}Tanker</span>
+        <span>{{ m.ship_symbol("bulk") }}Bulk</span>
+        <span>{{ m.ship_symbol("container", "underway") }}Under way</span>
+        <span>{{ m.ship_symbol("container", "anchored") }}At anchor</span>
+        {% endif %}
+        {% if ships and ships.linked %}<span>{{ m.ship_symbol("container", "moored", true) }}At a terminal in the news</span>{% endif %}
+        {% if brief.map.callouts %}<span><span class="legend-num" aria-hidden="true">1</span>Item</span>{% endif %}
+        {% if brief.chart_empty %}<span class="legend-note">No item has a place on the chart {% if is_latest %}today{% else %}on this day{% endif %}.</span>{% endif %}
+        {# v1: ships are not built yet (#31), so this is expected, not a failure: grey text, no box. #}
+        {% if not ships and not ais_snapshot_built %}<span class="legend-note">Ship positions are not collected yet.</span>{% endif %}
+      </div>
+    </div>
   </section>
 
   <div class="wrap brief-layout" id="brief">
@@ -96,7 +100,7 @@
       <h2 id="items-title" class="section-title">The brief</h2>
       {{ m.reduced_note(brief) }}
       {% if items %}
-      <p class="brief-intro">{{ items | length }} {{ "item" if items | length == 1 else "items" }}, most severe first.<span class="needs-map"> "Show on chart" moves the chart at the top of the page.</span></p>
+      <p class="brief-intro">{{ items | length }} {{ "item" if items | length == 1 else "items" }}, most severe first.<span class="needs-map"> "Show on chart" moves the chart above the brief.</span></p>
       <ol class="items">
         {% for item in items %}
         {{ m.news_item(item, loop.index) }}
