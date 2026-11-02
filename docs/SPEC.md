@@ -304,6 +304,7 @@ static/
   basemap.js           generated: land, detail, labels (window.HAVEN_BASEMAP)
   site.js              adds the "js" class to <html>
   favicon.svg
+  fonts/               IBM Plex woff2 files + OFL.txt, self-hosted (§7.3, #27)
   vendor/leaflet/      Leaflet 1.9.4, self-hosted
 tools/build_basemap.py builds basemap.js from OpenStreetMap (run once)
 data/basemap/          land.geojson + raw Overpass caches (caches git-ignored)
@@ -1015,7 +1016,7 @@ Reference: Dribbble shot **"Pergamum University Map"** (dark warm map, contour l
 
 Reference colours sampled from the Dribbble shot: frame `#1a1816`, water `#2e2925`, land `#4a403a`, orange `#ff801d`, teal `#5a9f8e`, peach `#fae8d9`, ivory `#fdfbfc`.
 
-### 7.3 Typography — IBM Plex (Google Fonts; self-host before launch for EU privacy)
+### 7.3 Typography — IBM Plex (self-hosted in `static/fonts/`, #27)
 
 | Role | Font |
 |---|---|
@@ -1025,6 +1026,14 @@ Reference colours sampled from the Dribbble shot: frame `#1a1816`, water `#2e292
 | **Planner impact only** (+ water names in italic on the map) | IBM Plex Serif |
 
 Principle: **fact vs interpretation in two typefaces** — the impact is the only serif text, with a rose label "IMPACT FOR PLANNERS *interpretation*". Max weight 700.
+
+**Self-hosted, no Google Fonts** *(#27, 2 Nov 2026)*: the font files sit in `static/fonts/` and `style.css` loads them with `@font-face` rules, so a page never asks Google for a font and no visitor's IP address is sent to Google (EU privacy; checked again by #68). The pages look exactly as before: headless Edge screenshots before/after are pixel-identical outside the map (the map's texture differs between any two renders, also before the change). `tests/test_fonts.py` checks: no page, template or static file mentions `fonts.googleapis.com` / `fonts.gstatic.com`; every family, weight and style above has a rule pointing at a real woff2 file; no unused files; the licence ships with the site. *Claude's defaults, not yet confirmed by the owner:*
+1. **The exact files Google Fonts served** (downloaded 2 Nov 2026), not IBM's own release, so the letters render the same as before.
+2. **Latin and Latin Extended only** (22 files, 452 KB in the repo; a visitor downloads only the files whose letters a page uses). Greek, Cyrillic and Vietnamese are left out: no page shows them today (checked), and such a letter would fall back to Helvetica/Arial.
+3. **Plex Sans upright is one variable file** covering weights 400–700, as Google serves it; every other weight/style is its own file.
+4. **`font-display: swap` kept** (as the old `&display=swap`): text shows at once in the fallback font and swaps when Plex has loaded.
+5. **The SIL Open Font License is in `static/fonts/OFL.txt`** (IBM's licence file, copyright line included), published with the site; the Method page credit links it and says the fonts are served from this site.
+6. **No download script:** the files are a one-off copy and don't change; updating them means downloading them again by hand. Where they came from is written in the comment above the rules in `style.css`.
 
 ### 7.4 Layout
 
@@ -1224,7 +1233,7 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 - ~~Design addition: the unrated item~~ **Done 1 Nov 2026 (issue #6):** outlined square, "UNRATED" tag, card without summary/impact, reduced-brief note driven by `build.ai_unavailable`, archive strip; samples: one unrated item on 27 Oct, a reduced brief on 26 Oct. Design choices confirmed by the owner (§5.3).
 - Finalise Rhine thresholds and weather thresholds from public sources (Method page). *(Rhine numbers decided 2 Nov 2026, PR #71, and built into `config/rhine.toml`, #20; shown with their sources on the Method page since 2 Nov 2026, #24.)*
 - **Design usability review before launch** (added 31 Oct 2026): the design looks good but doesn't feel user-friendly enough, and the owner can't yet say why. First find the concrete problems: review the pages as a first-time visitor (a planner and a recruiter, on a phone and on a laptop), list what they understand in 5 seconds and what confuses them, then propose changes. **Nothing is implemented until the owner approves the proposals.** The new logo and the social preview tags come after this review.
-- Self-host the IBM Plex font files (`static/fonts/`) instead of Google Fonts, to avoid sending EU visitors' IP addresses to Google.
+- ~~Self-host the IBM Plex font files (`static/fonts/`) instead of Google Fonts, to avoid sending EU visitors' IP addresses to Google.~~ **Done 2 Nov 2026 (#27), §7.3.**
 - Check aisstream.io terms for public display.
 - New logo (§7.6) and a social preview image (§7.7); add `og:image` / `og:title` / `og:description` meta tags.
 - Fill in LinkedIn URL and repository URL in the site config (footer + Method page).

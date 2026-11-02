@@ -35,6 +35,7 @@ templates/                Jinja2 page templates (base, day, archive, method page
 static/style.css          the whole design: colour and type tokens, light + dark mode
 static/map.js             draws the chart with Leaflet: land, ships, numbered items
 static/basemap.js         port land shapes + place names (generated, see below)
+static/fonts/             IBM Plex font files + their licence (OFL.txt), self-hosted: no request to Google Fonts
 static/vendor/leaflet/    Leaflet 1.9.4, self-hosted
 tools/build_basemap.py    builds the basemap from OpenStreetMap (run once)
 data/basemap/             basemap output as GeoJSON
@@ -113,11 +114,11 @@ The renderer sorts items by severity (unrated last), keeps at most 5, works out 
 - **Colour only where it means something:** severity, status and linked ships. Status also uses shapes (octagon, triangle, circle), so it still works for colour-blind readers.
 - **Logo:** the letters H and D in maritime signal flags. It looks maritime without any Port of Rotterdam branding.
 - **No map service at runtime.** The basemap is a file in the repo and Leaflet is self-hosted. The page never depends on a tile server and stays fast.
+- **Fonts served from the site itself.** The IBM Plex files are in `static/fonts/`, so no visitor's IP address goes to Google Fonts.
 - **Relative links** so the site works under GitHub Pages' `/<repo>/` address.
 
 ## Before launch
 
-- Fonts load from Google Fonts. For an EU site, self-host the font files (`static/fonts/`) to avoid sending visitor IP addresses to Google.
 - Check aisstream.io's terms for showing their data publicly (see `CLAUDE.md`).
 - Fill in `SITE["linkedin_url"]` and `SITE["repo_url"]` in `haven/render.py`.
 
