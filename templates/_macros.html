@@ -88,7 +88,6 @@
     <p class="item-top">
       {{ num(rank, item.severity_key) }}
       <span class="sev sev-{{ item.severity_key }}"><span class="visually-hidden">Severity: </span>{{ item.severity_key }}</span>
-      {% if item.rated_from_headline %}<span class="sev-note">rated from headline only</span>{% endif %}
       <span class="item-meta">
         <span>{{ item.source }}</span>
         <span>{{ item.language_name }}</span>
@@ -96,18 +95,13 @@
       </span>
     </p>
     <h3 class="item-title" id="item-{{ rank }}-title"><a href="{{ item.url }}">{{ item.headline }}</a></h3>
-    {% if item.severity is none %}
-    {# Unrated: the AI failed for this item, so there is nothing to interpret (spec §5.6). #}
-    <p class="item-summary is-empty">Headline only. The AI step failed for this item, so there is no summary, impact or severity. Read the original for the details.</p>
+    {% if item.headline_note %}
+    {# The short card (S5, #82): no summary, so nothing to interpret either. One grey line says
+       why (headline-only source, article not read, or unrated: the AI failed, spec §5.6). #}
+    <p class="item-summary is-empty">{{ item.headline_note }}</p>
     {% if item.affects %}<p class="affects"><strong>Affects</strong> {{ item.affects | join(" · ") }}</p>{% endif %}
     {% else %}
-    {% if item.summary %}
     <p class="item-summary">{{ item.summary }}</p>
-    {% elif item.access == "headline-only" %}
-    <p class="item-summary is-empty">Headline only: this source is paywalled or its terms don't allow a summary.</p>
-    {% else %}
-    <p class="item-summary is-empty">Headline only: the article couldn't be read, so there is no summary.</p>
-    {% endif %}
     <div class="item-impact">
       <p class="impact-label">Impact for planners <em>interpretation</em></p>
       {% if item.impact %}
@@ -121,8 +115,6 @@
     <p class="item-actions">
       {% if item.map %}
       <button type="button" class="chart-button needs-map" data-action="show-item" data-rank="{{ rank }}" aria-pressed="false">{{ icon("map-pin") }}Show on chart</button>
-      {% else %}
-      <span class="no-place needs-map">No single place on the chart</span>
       {% endif %}
       <a href="{{ item.url }}">Read original{% if item.language != "en" %} ({{ item.language_name }}){% endif %}{{ icon("external") }}</a>
       {% if item.translate_url %}<a href="{{ item.translate_url }}">{{ icon("languages") }}Read in English{{ icon("external") }}</a>{% endif %}

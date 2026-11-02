@@ -84,7 +84,8 @@
   L.control.scale({ position: "bottomright", imperial: false, maxWidth: 110 }).addTo(map);
   L.control.zoom({ position: "bottomright" }).addTo(map);
 
-  // Above the zoom buttons: back to the whole port.
+  // Above the zoom buttons: back to the whole port. Wide screens show the words "Whole port"
+  // next to the icon (#82); phones show the icon only (style.css), with the same spoken name.
   var HomeControl = L.Control.extend({
     options: { position: "bottomright" },
     onAdd: function () {
@@ -94,7 +95,8 @@
       button.setAttribute("aria-label", "Show the whole port");
       button.innerHTML =
         '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
-        'stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/></svg>';
+        'stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/></svg>' +
+        '<span class="chart-home-label">Whole port</span>';
       L.DomEvent.disableClickPropagation(button);
       L.DomEvent.on(button, "click", overview);
       return button;
@@ -480,7 +482,14 @@
       if (button) button.setAttribute("aria-pressed", "true");
     }
     if (entry) entry.classList.add("is-active");
-    if (!callout) return;
+    // No place on the chart: the item opens in the panel like any other (#82), the chart
+    // stays where it is, and the focus box of an earlier item is taken away.
+    if (!callout) {
+      hideFocus();
+      announcer.textContent = "Item " + rank + " has no place on the chart.";
+      setHash("item-" + rank);
+      return;
+    }
 
     el.classList.add("is-focused");
     markerEl(callout.marker).classList.add("is-active");
