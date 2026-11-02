@@ -190,7 +190,7 @@ def test_unrated_card_has_tag_and_outlined_square_but_no_summary_or_impact(tmp_p
     assert "Terminal closes gate early" in card
     assert "Not enough information" not in card
     assert "Impact for planners" not in card
-    assert "The AI step failed for this item" in text_of(card)  # says why, instead of a summary
+    assert "the AI step failed for this item" in text_of(card)  # says why, instead of a summary
     assert "-None" not in html  # a null severity never leaks into a class name
 
 

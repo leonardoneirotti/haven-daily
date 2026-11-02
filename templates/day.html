@@ -25,14 +25,19 @@
       </header>
       {% if items %}
       <ol class="panel-items" aria-label="Today's items">
+        {# Every entry behaves the same (M3, #82): with JavaScript a click opens it here (its
+           summary, or the short card's line) and moves the chart only if the item has a place.
+           Without JavaScript it is a plain link to the full card. No "affects" tag here (S11):
+           the first of several tags read like a category; the full card lists them all. #}
         {% for item in items %}
         <li>
-          <a class="panel-item" href="#item-{{ loop.index }}" data-rank="{{ loop.index }}"{% if item.map %} data-action="show-item"{% endif %}>
+          <a class="panel-item" href="#item-{{ loop.index }}" data-rank="{{ loop.index }}" data-action="show-item">
             {{ m.num(loop.index, item.severity_key) }}
             <span class="panel-text">
-              <span class="panel-meta"><span class="sev sev-{{ item.severity_key }}">{{ item.severity_key }}</span>{% if item.affects %}<span>{{ item.affects[0] }}</span>{% endif %}</span>
+              <span class="panel-meta"><span class="sev sev-{{ item.severity_key }}">{{ item.severity_key }}</span></span>
               <span class="panel-title">{{ item.headline }}</span>
-              {% if item.summary %}<span class="panel-summary">{{ item.summary }}</span>{% endif %}
+              {% if item.headline_note %}<span class="panel-summary is-empty">{{ item.headline_note }}</span>
+              {% else %}<span class="panel-summary">{{ item.summary }}</span>{% endif %}
             </span>
           </a>
         </li>
@@ -100,7 +105,7 @@
       <h2 id="items-title" class="section-title">The brief</h2>
       {{ m.reduced_note(brief) }}
       {% if items %}
-      <p class="brief-intro">{{ items | length }} {{ "item" if items | length == 1 else "items" }}, most severe first.<span class="needs-map"> "Show on chart" moves the chart above the brief.</span></p>
+      <p class="brief-intro">{{ items | length }} {{ "item" if items | length == 1 else "items" }}, most severe first.{% if brief.map.callouts %}<span class="needs-map"> "Show on chart" moves the chart above the brief.</span>{% endif %}</p>
       <ol class="items">
         {% for item in items %}
         {{ m.news_item(item, loop.index) }}
@@ -157,7 +162,8 @@
   {% if ships %}
   <section class="wrap ship-list" aria-labelledby="ships-title">
     <details>
-      <summary><h2 id="ships-title">All {{ ships.count }} ships in the snapshot</h2><span>As sent over AIS. Select a name to find the ship on the chart.</span></summary>
+      {# The ▸ turns down when the list is open; drawn as SVG, so it doesn't depend on the font (S10). #}
+      <summary><svg class="summary-marker" viewBox="0 0 10 10" aria-hidden="true" focusable="false"><path d="M3 1.5 8 5l-5 3.5z"/></svg><h2 id="ships-title">All {{ ships.count }} ships in the snapshot</h2><span>As sent over AIS. Select a name to find the ship on the chart.</span></summary>
       <div class="table-scroll" tabindex="0" role="region" aria-labelledby="ships-title">
         <table>
           <thead>

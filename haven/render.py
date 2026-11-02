@@ -381,6 +381,27 @@ def prepare_indicator(indicator: dict, previous: dict | None, is_first: bool, br
     ]
 
 
+# The one grey line of a short card, an item with no summary (design review S5, #82, spec §7.5).
+# The headline-only wording is the owner's (PR #80, paywall added in PR #88, spec §2.1); the panel
+# shows the same line when opened.
+HEADLINE_NOTES = {
+    "headline-only": "Headline only (paywalled, or the source's terms don't allow a summary) · severity rated from the headline",
+    "unread": "Headline only (the article couldn't be read) · severity rated from the headline",
+    "unrated": "Headline only (the AI step failed for this item) · no summary, impact or severity",
+}
+
+
+def headline_note(item: dict) -> str | None:
+    """Why an item has no summary, or None when it has one (then the card is the full card)."""
+    if item["summary"]:
+        return None
+    if item["severity"] is None:
+        return HEADLINE_NOTES["unrated"]
+    if item["access"] == "headline-only":
+        return HEADLINE_NOTES["headline-only"]
+    return HEADLINE_NOTES["unread"]
+
+
 def prepare_item(item: dict, brief_date: str) -> None:
     item.setdefault("summary", None)
     item.setdefault("impact", None)
@@ -394,6 +415,7 @@ def prepare_item(item: dict, brief_date: str) -> None:
     # A severity with no summary was rated from the headline alone (spec §2.1, §5.5 point 2): a
     # headline-only source, or a `use` item whose article couldn't be read.
     item["rated_from_headline"] = item["severity"] is not None and not item["summary"]
+    item["headline_note"] = headline_note(item)
     if item["language"] == "en":
         item["translate_url"] = None
     else:

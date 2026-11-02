@@ -435,13 +435,6 @@ html:not(.has-map) .needs-map,
 .sev-low { color: var(--low-ink); }
 .sev-unrated { color: var(--nodata-ink); }
 
-/* Next to the severity of a headline-only item: rated from the headline alone (spec §2.1) */
-.sev-note {
-  color: var(--ink-2);
-  font-size: 0.75rem;
-  font-family: var(--font-mono);
-}
-
 .lvl {
   display: inline-flex;
   align-items: center;
@@ -698,8 +691,13 @@ html:not(.has-map) .needs-map,
   font-size: 0.75rem;
 }
 
+/* Panel text a step bigger (S11, #82): 13 px, where the 5-second reading happens. */
 .panel-meta .sev {
-  font-size: 0.6875rem;
+  font-size: 0.8125rem;
+}
+
+.panel .kicker {
+  font-size: 0.8125rem;
 }
 
 .panel-title {
@@ -757,7 +755,7 @@ html:not(.has-map) .needs-map,
   align-items: center;
   gap: 0.35rem;
   color: var(--ink-2);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
 }
 
 .mini-value {
@@ -1139,6 +1137,26 @@ html:not(.has-map) .needs-map,
 
 .chart-home:hover {
   filter: brightness(1.1);
+}
+
+/* "Whole port" in words on wide screens only (S10, #82); phones keep the icon square. */
+.chart-home-label {
+  display: none;
+}
+
+@media (min-width: 64rem) {
+  .chart-home {
+    grid-auto-flow: column;
+    gap: 0.4rem;
+    width: auto;
+    padding: 0 0.7rem 0 0.55rem;
+  }
+
+  .chart-home-label {
+    display: inline;
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
 }
 
 .leaflet-container .leaflet-control-scale-line {
@@ -1784,12 +1802,6 @@ html:not(.has-map) .needs-map,
   color: var(--bg);
 }
 
-.no-place {
-  color: var(--ink-2);
-  font-size: 0.8125rem;
-  font-weight: 500;
-}
-
 .quiet {
   display: grid;
   gap: 0.75rem;
@@ -1824,6 +1836,25 @@ html:not(.has-map) .needs-map,
   border-top: 3px solid var(--ink);
   border-bottom: 1px solid var(--rule);
   cursor: pointer;
+  list-style: none;
+}
+
+/* display: flex hides the browser's own marker, so the summary draws its own ▸ (S10, #82). */
+.ship-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.summary-marker {
+  flex: none;
+  align-self: center;
+  width: 0.75rem;
+  height: 0.75rem;
+  fill: currentColor;
+  transition: transform 0.2s;
+}
+
+.ship-list details[open] > summary .summary-marker {
+  transform: rotate(90deg);
 }
 
 .ship-list summary h2 {
