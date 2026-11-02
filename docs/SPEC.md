@@ -86,7 +86,7 @@ Thresholds (decided 31 Oct 2026; every number comes from a public source, cited 
 
 | Indicator | Normal | Watch | Alert | Source |
 |---|---|---|---|---|
-| Weather warnings | Highest level for Zuid-Holland valid at any time today (Amsterdam date) is green / none | … is **yellow** | … is **orange or red** | KNMI warnings via MeteoAlarm (later: KNMI directly) |
+| Weather warnings | Highest level for Zuid-Holland valid at any time **during the rest of today** (from when the feed is read until midnight, Amsterdam date; a warning that already expired doesn't count, owner's decision 2 Nov 2026, #18) is green / none | … is **yellow** | … is **orange or red** | KNMI warnings via MeteoAlarm (later: KNMI directly) |
 | Rhine water level, Kaub | 77–460 cm | **below GlW 77 cm** (official low-water reference for navigation) or **above Marke I 460 cm** (high-water shipping restrictions) | **below MNW 65 cm** (mean yearly low) or **above Marke II / HSW 640 cm** (shipping stops) | WSV official gauge values via PEGELONLINE (`characteristicValues`, read 31 Oct 2026) |
 | Strike flag | No active Rotterdam strike (none found, all over, or cancelled) | Rotterdam strike announced for a later date, or with no stated dates | Rotterdam strike today (dates include today, or ongoing) | Kept items of the last 14 days (§5.7) |
 
@@ -253,7 +253,8 @@ haven/                 Python package
   places.py            the AI's place id + tags -> items[].map, affects, unlisted; nothing off the lists gets through (§5.10)
   summarise.py         summariser: one Claude call per kept item, structured output, checks; unrated on any bad answer (§5.5)
   compare.py           Haiku 5.5 vs Sonnet 5.5 on the same kept items, side by side, run by hand (§5.5, #17)
-  (status.py, ais.py — to build)
+  weather.py           weather status: KNMI warnings for Zuid-Holland via MeteoAlarm -> one status reading (§5.11)
+  (rhine, strike, status assembly, ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
   filter.toml          off-topic word lists per language (§5.4), small starter lists (football)
@@ -685,6 +686,34 @@ Examples: terminals (ECT Delta, Euromax, RWG, APMT Maasvlakte II…), areas (Maa
 7. **The pinned place's label is added as a location tag** at the end when the AI didn't include it and there is room (fewer than 5 tags): this is how "location tags taken automatically from the place list" is read.
 8. An answer that is **not text** (a number, say) is logged as unlisted, never crashes the run. `"none"`, an empty answer or no answer = no pin, nothing logged.
 
+### 5.11 Weather status (built 2 Nov 2026, issue #18)
+
+**`haven/weather.py`.** `read_weather(fetcher, read_at)` makes one request (through the polite `Fetcher`, §5.8) to `feeds.meteoalarm.org/api/v1/warnings/feeds-netherlands` and returns one status reading in the §6 `status[]` shape, plus failure lines for `build.failures`. `reading_from_feed(data, read_at)` is the same without the network (tested on feeds we wrote ourselves in the real structure). `python -m haven.weather` reads the live feed once and prints the reading; it writes nothing.
+
+**What the real feed looks like** (checked 2 Nov 2026): ~700 entries, one per warning **version**, per province **and per hazard**, including KNMI's daily **green** ("no warning") entries, published several days ahead. Each entry has an `alert` (`identifier`, `msgType` Alert/Update, `status`, `sent`, `references`) and two `info` blocks (nl-NL, en-GB) with the area (`areaDesc` + `EMMA_ID` geocode), `onset`/`expires` and the parameters `awareness_level` (`"2; yellow; Moderate"`) and `awareness_type` (`"1; Wind"`). **Old versions stay in the feed**: one fog warning appeared six times, each `Update` naming the one before it in `references`.
+
+**Owner's decisions (2 Nov 2026):**
+- **A warning that already expired when the feed is read doesn't count** ("valid at any time during the rest of today", §2.2), so a night fog warning that ended at 05:00 doesn't show Watch at 06:45; a warning starting later today does.
+- **Zuid-Holland only, for now.** The feed also has KNMI **coastal** warnings for sea areas, among them **Hook of Holland** (`NL802`, the port's sea entrance), which had a yellow wind warning on 2 Nov while Zuid-Holland was green. Not counted; adding it later is one constant (`AREA_CODE`) plus the display naming the area. *Open item (§11).*
+
+**The reading** (`key` `weather`, `label` "Weather warnings", `icon` `wind`, `place` "Zuid-Holland"): `value` (`"Code yellow · Wind"` or `"No warnings"`), `level` (`green`/`amber`/`red`), `knmi_level` (KNMI's own colour) and `hazards` (at the deciding level), `issued_at` (time of issue; `null` when there are no warnings, see 6), `warnings` (every yellow/orange/red warning that counts: level, hazard, onset, expires, issued_at, highest first), `observed_at` (when the feed was read), `source_name` "KNMI via MeteoAlarm", `source_url` www.meteoalarm.org, `note` "Warnings at 06:45 · not live". All times Amsterdam, ISO 8601. **Never the warning text** (headline, description, event name), tested.
+
+**No data** (`value`, `level`, `knmi_level`, `issued_at`, `note` `null`, empty lists) with **one failure line** under "Weather warnings (MeteoAlarm)" when: the fetch fails or robots.txt blocks it, the answer is not JSON or not the warnings feed, **there is no Zuid-Holland entry for today at all**, or a Zuid-Holland warning has an unreadable level, colour, hazard or time.
+
+*Proposed by Claude, confirmed by the owner 2 Nov 2026, with the change marked (issue #18, PR #70):*
+1. **Only the newest version of each warning counts**: a version named in another message's `references` (an `Update` replaces it, a `Cancel` withdraws it) is ignored; a `Cancel` itself is never a warning. Only `status` "Actual" counts (not Test, Exercise, …).
+2. **Zuid-Holland is matched by its code `NL009` or its name**, so a renamed area is still found.
+3. **No Zuid-Holland entry for today = No data, not Normal.** KNMI always publishes green day entries, so an empty answer means the feed or the area changed; Normal would hide that forever (the same reason as the K+N 14-day check, §5.8).
+4. **Any unreadable level, hazard or time in a Zuid-Holland entry = No data for the whole reading**, not "skip that entry": a skipped orange warning would show Normal.
+5. **Valid during the rest of today** = onset before midnight tonight (Amsterdam) **and** expiry after the moment the feed was read; **expiring exactly at that moment = over**; no expiry = still valid; no onset = from when it became `effective` (else `sent`). A time without a timezone is unreadable.
+   - A time without a timezone is unreadable here **on purpose** (MeteoAlarm always gives one), unlike the news filter, which reads such times as Amsterdam time (§5.4).
+6. **Several hazards at the deciding level are all named** in the value, in onset order, once each ("Code yellow · Fog, Wind"); the time of issue is that of the **earliest-starting** one. *(Changed by the owner, 2 Nov 2026: **with no warnings there is no time of issue** (`issued_at` `null`); the reading shows only "No warnings" plus the read time. Claude had proposed the newest `sent` among today's green entries, but KNMI issues those days ahead, so it read as stale: "28 Oct" on 2 Nov. Tested.)*
+7. **Hazard names as KNMI writes them, first letter capitalised** ("Wind", "Fog", "Snow-ice"), no translation table of our own.
+8. **The note uses the real read time**, "Warnings at HH:MM · not live", not a fixed "06:45", so a late retry run says so.
+9. **The module is `weather.py`**, one per indicator (Rhine #20 and strike flag #21 get their own); the runner (#22) puts the readings into `data/status/` and the brief.
+
+Live run (2 Nov 2026, 12:47, from a desktop, nothing written): read with no failures; Zuid-Holland green → "No warnings" (before the owner's change to 6, the reading still gave the green entries' issue time, 28 Oct 03:08).
+
 ---
 
 ## 6. Data format: one brief per day
@@ -1037,6 +1066,7 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 - Summariser model: ~~run the Haiku 5.5 vs Sonnet 5.5 comparison~~ **run 2 Nov 2026 (#17), written up in `docs/model-comparison.md`; the owner chose Sonnet 5.5 through the batch** (§5.5).
 - **After the first week of daily runs: check real AI costs** in the Anthropic Console against the §5.4 estimates.
 - **MeteoAlarm daily snapshot:** email **meteoalarm@geosphere.at** asking whether a daily, dated snapshot (06:45, labelled "not live", linking to meteoalarm.org) is allowed, given the ≤ 10 min real-time requirement for operational use. **The owner sends it.** Keep the reply in `docs/permissions/`. If refused: switch to KNMI directly sooner, or weather = "No data".
+- **Weather: count the Hook of Holland coastal area too?** KNMI's coastal warning for Hook of Holland (`NL802`, the port's sea entrance) is in the same feed; v1 counts Zuid-Holland only (owner, 2 Nov 2026, §5.11). Decide after watching a few weeks of readings.
 - **Switch weather warnings to KNMI directly** once `KNMI-public-weather-warnings` leaves TEST (check monthly); register a free KNMI key then.
 - **Barge low-water surcharge table:** Claude researches (owner's decision, 31 Oct 2026): find whether a barge operator (e.g. Contargo) publishes a Kaub-based low-water surcharge table. If so, use its first step as the Rhine **Watch** level (instead of GlW 77 cm), citing that table on the Method page.
 - **Before launch, find and check the terms of Kuehne+Nagel SeaNews and RTV Rijnmond** (§4). Downgrade K+N to headline-only, or drop either, if their terms forbid our use.
