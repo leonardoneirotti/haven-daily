@@ -1,0 +1,46 @@
+# Run the whole test suite on every pull request and every push to main.
+# A red cross on a pull request means a test failed: don't merge until it's green.
+#
+# No secrets: this job never gets the Claude API key or any other key, and the
+# tests never reach the internet (tests/conftest.py blocks it), so the run costs
+# nothing and can't fail because a website is down.
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Read the code, nothing else.
+permissions:
+  contents: read
+
+# A newer push to the same pull request cancels the older, now pointless run.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Get a copy of the code being tested.
+      - uses: actions/checkout@v7
+
+      # The same Python as the publishing job; cache pip downloads between runs.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # requirements-dev.txt = everything the daily build needs + pytest + shapely.
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      # Explicitly empty, so a key can never leak in here by accident.
+      - name: Run the tests
+        env:
+          ANTHROPIC_API_KEY: ""
+        run: python -m pytest

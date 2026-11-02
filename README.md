@@ -51,6 +51,8 @@ Run all tests:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
+The tests never need an API key and never use the internet (`tests/conftest.py` removes the keys and blocks outside connections). GitHub Actions runs them on every pull request and every push to `main` (`.github/workflows/tests.yml`).
+
 For local runs that need API keys: copy `.env.example` to `.env` and fill in the values. `.env` is git-ignored; online, the keys are GitHub Actions secrets. The Claude API key is `ANTHROPIC_API_KEY`.
 
 To see what the relevance filter keeps and drops today (reads the sources once, writes nothing; the AI check costs a fraction of a cent):

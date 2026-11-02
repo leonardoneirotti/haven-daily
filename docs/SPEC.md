@@ -257,7 +257,10 @@ config/
   filter.toml          off-topic word lists per language (§5.4), small starter lists (football)
   places.toml          the fixed place list: 40 places, coordinates + OSM element id (§5.10)
   tags.toml            the fixed "affects" tags: 15 cargo/mode tags (§5.10)
-tests/                 pytest; run with `python -m pytest` (settings in pytest.ini)
+tests/                 pytest; run with `python -m pytest` (settings in pytest.ini). conftest.py: no API keys, no internet in any test
+.github/workflows/
+  pages.yml            render + deploy the site on every push to main
+  tests.yml            run all tests on every pull request and push to main; no secrets
 templates/             base.html, day.html, archive.html, about.html, _macros.html
 static/
   style.css            the whole design (tokens at the top)
