@@ -255,7 +255,8 @@ haven/                 Python package
   compare.py           Haiku 5.5 vs Sonnet 5.5 on the same kept items, side by side, run by hand (§5.5, #17)
   weather.py           weather status: KNMI warnings for Zuid-Holland via MeteoAlarm -> one status reading (§5.11)
   rhine.py             Rhine status: Kaub reading shown (thresholds from config/rhine.toml), Lobith reading stored only (§5.12)
-  (strike, status assembly, ais.py — to build)
+  strike.py            strike flag: worst level over the strikes in kept items (14 days, dated ones up to 60), deciding item(s) linked (§5.7)
+  (status assembly, ais.py — to build)
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
   filter.toml          off-topic word lists per language (§5.4), small starter lists (football)
@@ -554,6 +555,30 @@ Stored on the item as `strike.match` (`same` / `new` / `unsure`) and `strike.str
 **5. The flag** = the worst level over all strikes, Normal if none. If the AI was unavailable (§5.6): **No data**.
 
 **6. The status line links the item that decided it**: headline, source and date, linking to the original article, plus the day page where the item appeared if it isn't today's ("Strike at Maasvlakte today · NL Times, 2 Nov ↗"). With several strikes at the same level, the one with the newest deciding item is linked. On Normal after a cancellation, the cancellation item is linked ("Maasvlakte strike called off · NL Times, 4 Nov ↗").
+
+**Strike flag module (`haven/strike.py`, built 2 Nov 2026, issue #21).** No network, no AI: it reads back the strike details the summariser stored (§5.5) and applies the rules above. `flag_from_items(days, today, sources, ai_unavailable)` is the pure logic over (collection day, records) pairs; `read_strike_flag(today_records, today, observed_at, sources, ai_unavailable)` adds today's records (not stored yet when the runner calls it) to `storage.read_recent("items", before=today, days=60)` and **never raises** (hard rule 9); `reading(flag, observed_at)` gives the §6 `status[]` entry. The runner (#22) passes the collect step's `feeds_read_at` as `observed_at`. Every row of the table above has a test, plus "announced 18 days ahead is still Alert on its day".
+
+- **The reading:** `key` `strike`, `label` "Strike flag", `icon` `megaphone`, `place` "Derived from kept items", `value` (short text, see 9 below), `level` (`green`/`amber`/`red`, `null` = No data), `items` (the linked item(s), see 10), `observed_at`, `source_name` / `source_url` (the first linked item's source name and URL; with nothing linked "Kept items of the last 14 days" and `null`), `note` ("Can't be judged without the AI step." when the AI was unavailable, else `null`).
+- **No data** when the AI was unavailable (§5.6; nothing is read), or when the stored items can't be read (a broken file, or a bug of ours), then with one failure line under "Strike flag". Not Normal: Normal could hide a strike.
+
+*Proposed by Claude, **not yet confirmed by the owner** (issue #21):*
+1. **"The last 14 days" = today + the 14 days before**: the same 14 days the summariser's known-strike list covers (§5.5), so a `same` or `unsure` match always finds its strike in the window. "Up to 60 days back" = the 60 days before today.
+2. **Once a strike counts, all its items of the 60 days count.** A strike counts when one of its confident (`new` / `same`) items is in the 14-day window or has a `start` or `end` today or later. Then its newest item is looked for among all its items of the 60 days, so a cancellation collected 16 days ago (no dates of its own, so outside the window by itself) still cancels a strike announced 20 days ago for today (tested). An `unsure` item never makes an old strike count again.
+3. **"Newest item"** = latest collection day, then latest `published` time (read as in the filter, §5.4), then later in the day's file.
+4. **An item's age for the 2-day rule** = days from its published date (Amsterdam) to today; the collection day when it has no readable date. Published 2 days ago = Alert, 3 days ago = Watch (both tested). "As of" shows that date.
+5. **Cases the table doesn't name:**
+   - `announced`, start today, no end → **Alert** ("Strike today").
+   - `announced`, start **before** today, no end → **read as `ongoing` with no end date** (it has started by its own words; nothing says it has stopped): Alert while the newest item is ≤ 2 days old, then Watch ("Strike since 1 Nov, no newer report").
+   - `announced`, only an **end** date, today or later → **Watch** ("Strike announced until 6 Nov"): with no start we can't say today is a strike day. End before today → over.
+   - `ongoing` with a `start` after today (an odd answer) → Alert, as the table's "ongoing, end date not yet passed".
+6. **"Never drops to Normal by itself" holds inside the 14-day window:** an undated `ongoing` strike with no newer item for 15 days leaves the window and the flag goes back to Normal (tested). Otherwise it could never clear.
+7. **`unsure` items, compared with the strike they name** (its level from its confident items):
+   - **higher** level → a strike of its own; the status line shows it and, as "possibly the same as", the named strike's newest item;
+   - **same or lower** (e.g. a possible cancellation) → the strike stays as it was, and the unsure item is shown next to it ("unsure") **only if it is newer** than the strike's newest confident item: an older one has been overtaken by a confident report (tested);
+   - naming a strike that **doesn't count** (outside the window, or not found) → judged on its own: it counts only if it would raise the flag by itself.
+8. **Bad stored data never stops the flag:** an item with no `strike_id` counts as a strike of its own (safe side); unreadable `state`, `match` or `affects_rotterdam` → that item is skipped; an unreadable date → no date (so it can't hide a strike as "over"). Each with a failure line naming the item's number and day, never its headline.
+9. **The value texts** (location from the deciding item, left out if missing): Alert "Strike today · Maasvlakte", "Strike ongoing · Maasvlakte", "Strike since 1 Nov · …"; Watch "Strike announced for 5 Nov · …", "Strike announced, no date given · …", "Strike announced until 6 Nov · …", "Strike ongoing as of 30 Oct, no newer report · …"; Normal "No active strike", or "Strike called off · …" when a cancellation is linked. Dates as "5 Nov" (no locale). The renderer (#23) can show them as they are.
+10. **Linked items** (`items`): the deciding item first, then, for an unsure pair, the other one. Each: `headline`, `url`, `source` (the source's name; its id if unknown), `published`, `day` (collection day), `day_page` (`days/<day>.html`, `null` for today's items), `role` (`decides`, `unsure`, `possibly the same as`), `state`, `match`. **On Normal after a cancellation**, the newest confident cancellation of a Rotterdam strike that still counts is linked, so "called off" can show for up to 14 days after it (longer if the strike was dated further ahead). *Note for #23:* an item is linked to the day page of the day it was collected, but it may not have been among that day's 5 shown items; #23 decides how to link it then.
 
 ### 5.8 Collector (decided 31 Oct 2026)
 
