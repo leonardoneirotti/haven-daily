@@ -143,17 +143,18 @@ def test_every_used_and_headline_only_source_from_config_is_listed(about):
     for src in load_sources():
         if src.verdict != "drop":
             assert src.name in text_of(listed), src.id
-            assert source_links(listed, src.name) == (src.home, src.urls[0]), src.id
+            label = "page" if src.access == "html" else "feed"
+            assert source_links(listed, src.name, label) == (src.home, src.urls[0]), src.id
 
 
-def source_links(page: str, name: str) -> tuple[str, str]:
-    """The link on a source's name and its "(feed)" link, from one line of the source list
-    (owner, 2 Nov 2026, PR #76)."""
+def source_links(page: str, name: str, label: str = "feed") -> tuple[str, str]:
+    """The link on a source's name and its "(feed)" or "(page)" link, from one line of the
+    source list (owner, 2 Nov 2026, PR #76)."""
     line = re.search(rf'<li>\s*<strong><a href="([^"]+)">{re.escape(html_lib.escape(name))}</a></strong>(.*?)</li>',
                      page, re.S)
     assert line, f"no linked line for {name!r}"
-    feed = re.search(r'\(<a href="([^"]+)">feed</a>\)', line.group(2))
-    assert feed, f"no (feed) link for {name!r}"
+    feed = re.search(rf'\(<a href="([^"]+)">{label}</a>\)', line.group(2))
+    assert feed, f"no ({label}) link for {name!r}"
     return line.group(1), feed.group(1)
 
 
@@ -164,6 +165,19 @@ def test_the_name_links_the_public_page_and_feed_links_what_the_job_reads():
     page = section(render_method(sources=sources), "sources")
     assert source_links(page, "Checked") == ("https://example.org/", "https://example.org/rss.xml")
     assert source_links(page, "Head") == ("https://news.example/", "https://news.example/tag/port")
+
+
+def test_a_web_page_source_says_page_and_an_rss_source_says_feed():
+    # "(page)" when the job reads a web page, "(feed)" for an RSS/Atom feed (owner, 2 Nov 2026, PR #76).
+    sources = (source("html-news", "use", access="html", home="https://html.example/",
+                      urls=("https://html.example/news",)),
+               source("rss-news", "use", access="rss", home="https://rss.example/",
+                      urls=("https://rss.example/feed",)))
+    page = section(render_method(sources=sources), "sources")
+    assert source_links(page, "Html-News", "page") == ("https://html.example/", "https://html.example/news")
+    assert source_links(page, "Rss-News", "feed") == ("https://rss.example/", "https://rss.example/feed")
+    assert ">feed</a>" not in re.search(r"Html-News.*?</li>", page, re.S).group(0)
+    assert ">page</a>" not in re.search(r"Rss-News.*?</li>", page, re.S).group(0)
 
 
 def test_dropped_sources_have_no_links():
