@@ -12,8 +12,11 @@ What the AI sees:
 - a `use` item whose article couldn't be read (#11): the headline alone too, rated like a
   headline-only item.
 
-Plus the source id, language, publication time, today's date, the fixed place and tag lists
-(§5.10) and the strikes known from the last 14 days (§5.7).
+Plus the source id, language, publication time, today's date and the time the sources were read,
+the fixed place list and the tag list **with each tag's meaning** (§5.10, issue #67), and the
+strikes known from the last 14 days (§5.7). The prompt says something already over is Low and
+what a PIN notice's "End Date" means; a PIN notice whose End Date is at or before the time the
+sources were read is made Low **by the code**, whatever the AI answered (owner, 2 Nov 2026).
 
 What it answers: `summary` (2 short sentences, own words) and `impact` (or null = "Not enough
 information"), only when it had the article; always `severity` (high/medium/low by the §2.1
@@ -67,9 +70,9 @@ from typing import Callable
 import anthropic
 
 from haven.clock import AMSTERDAM
-from haven.config import Place, Source, load_places, load_tags
+from haven.config import Place, Source, Tag, load_places, load_tag_list
 from haven.feeds import Item
-from haven.filter import BREAKER, NO_KEY
+from haven.filter import BREAKER, NO_KEY, notice_ended
 from haven.places import pick
 
 __all__ = ["BATCH_WAIT", "BREAKER", "CANCEL_WAIT", "FALLBACK_MODEL", "SUMMARY_MODEL", "BatchRun", "SummaryResult",
@@ -156,14 +159,21 @@ severity:
 - High: directly affects operations in the Port of Rotterdam and has a timeframe (for example a \
 strike at a terminal this week, or a fairway closed today).
 - Medium: affects a European route, carrier or hinterland connection serving Rotterdam.
-- Low: background trend or long-term news.
+- Low: background trend or long-term news, or something that is already over when the brief is \
+made (a closure lifted, a measure ended, a delay cleared): it no longer affects anyone's plans today.
+
+PIN notices to shipping (source pin-notices): the "End Date" in a notice is when the notice itself \
+stops being valid, not when the measure started or stopped. A notice named "Activate" starts the \
+measure (for example a visibility or pilot capacity arrangement) and one named "De-activate" ends \
+it, each at the time the notice was published. So a measure that a De-activate notice has ended \
+is already over.
 
 place: the id of the one place below that the item is mainly about, or "none" if it is about \
 none of them or about the port as a whole. Only ids from this list:
 {places}
 
-tags: up to 5 of these for what the item affects, most important first. Only these, or the label \
-of a place from the list above:
+tags: up to 5 of these for what the item affects, most important first. Each tag only for what \
+its meaning says. Only these, or the label of a place from the list above:
 {tags}
 
 strike: null unless the item is about a strike or other labour action (a work stoppage, walkout \
@@ -185,9 +195,10 @@ Then answer from the headline only, by the same rules: severity, place, tags and
 is no summary or impact for these items."""
 
 
-def system_prompt(places: tuple[Place, ...], tags: tuple[str, ...]) -> str:
+def system_prompt(places: tuple[Place, ...], tags: tuple[Tag, ...]) -> str:
     place_lines = "\n".join(f"- {p.id}: {p.label} ({p.kind})" for p in places)
-    return _PROMPT.format(places=place_lines, tags=", ".join(tags))
+    tag_lines = "\n".join(f"- {t.name}: {t.meaning}" for t in tags)  # the meaning stops guesses from the name (#67)
+    return _PROMPT.format(places=place_lines, tags=tag_lines)
 
 
 _NULLABLE_TEXT = {"anyOf": [{"type": "string"}, {"type": "null"}]}
@@ -247,13 +258,15 @@ _RETRY_NOTE = (
 )
 
 
-def _request(item: Item, model: str, system: str, known: list[dict], today: date,
+def _request(item: Item, model: str, system: str, known: list[dict], today: date, read_at: datetime,
              retry_reason: str | None = None) -> dict:
     headline_only = _headline_only(item)
     task = "Rate this item from its headline only." if headline_only else "Summarise and rate this item."
+    read = read_at.astimezone(AMSTERDAM)
     parts = [
         f"{task} Source: {item.source}, language: {item.language}, published: {item.published or 'unknown'}. "
-        f"Today is {today.isoformat()}.",
+        f"Today is {today.isoformat()}. "
+        f"The sources were read at {read:%H:%M} Amsterdam time on {read:%Y-%m-%d}.",
         f"<headline>{_escape(item.headline)}</headline>",
     ]
     if not headline_only:  # never for headline-only items (hard rule 12)
@@ -301,14 +314,18 @@ class _Run:
     answer is checked the same way whichever route it came by.
     """
 
-    def __init__(self, client, known: list[dict], today: date, places, tags):
+    def __init__(self, client, known: list[dict], today: date, read_at: datetime, places, tags):
+        if read_at.tzinfo is None or read_at.utcoffset() is None:
+            raise ValueError("read_at has no timezone; pass the collect step's feeds_read_at")
         self.client = client
         self.known = known
         self.known_ids = {strike["id"] for strike in known}
         self.today = today
+        self.read_at = read_at
         self.places = load_places() if places is None else places
-        self.tags = load_tags() if tags is None else tags
-        self.system = system_prompt(self.places, self.tags)
+        tag_list = load_tag_list() if tags is None else tags
+        self.tags = tuple(t.name for t in tag_list)  # names, as places.pick matches them
+        self.system = system_prompt(self.places, tag_list)
         self.failures: list[dict] = []
         self.calls = self.input_tokens = self.output_tokens = 0
         self.batch_input_tokens = self.batch_output_tokens = 0
@@ -316,7 +333,7 @@ class _Run:
         self.streak = 0  # failed standard calls in a row
 
     def request(self, item: Item, model: str, retry_reason: str | None = None) -> dict:
-        return _request(item, model, self.system, self.known, self.today, retry_reason)
+        return _request(item, model, self.system, self.known, self.today, self.read_at, retry_reason)
 
     def fail(self, item: Item, problem: str) -> Item:
         self.failures.append({"source": SUMMARISER, "error": f"{item.url}: {problem}"})
@@ -348,6 +365,8 @@ class _Run:
             return self.fail(item, after(str(problem)))
         except Exception as error:  # a bug of ours in the checks
             return self.fail(item, after(_problem(error)))
+        if notice_ended(item, self.read_at):  # owner, 2 Nov 2026 (#67): an ended notice is Low, in code
+            ai["severity"] = "low"
         ai["written_by"] = {"model": model, "api": api}
         self.failures.extend({"source": SUMMARISER, "error": f"{item.url}: {note}"} for note in notes)
         return replace(item, ai=ai)
@@ -399,16 +418,19 @@ class _Run:
 
 
 def summarise(items: list[Item], client, known: list[dict], today: date, model: str = SUMMARY_MODEL,
-              places: tuple[Place, ...] | None = None, tags: tuple[str, ...] | None = None) -> SummaryResult:
+              places: tuple[Place, ...] | None = None, tags: tuple[Tag, ...] | None = None, *,
+              read_at: datetime) -> SummaryResult:
     """The kept items through the standard API, one call each. Never raises for an API problem.
 
     The morning job uses `summarise_batch`; this is its fallback route and what the Haiku vs
     Sonnet comparison (#17) can run directly. `known` is `known_strikes(...)` of the last 14 days
-    of stored items; `today` is the Amsterdam date of the run (new strike ids and the date check).
+    of stored items; `today` is the Amsterdam date of the run (new strike ids and the date check);
+    `read_at` is when the sources were read (the collect step's `feeds_read_at`, as for the 48 h
+    rule): it goes into the prompt, and a PIN notice whose End Date is at or before it is Low (#67).
     """
     if client is None:
         return _unavailable(items, NO_KEY, calls=0)
-    run = _Run(client, known, today, places, tags)
+    run = _Run(client, known, today, read_at, places, tags)
     try:
         done = [run.standard(item, model) for item in items]
     except _Unavailable as why:
@@ -436,8 +458,8 @@ def _custom_id(index: int) -> str:
 
 
 def start_batch(items: list[Item], client, known: list[dict], today: date, model: str = SUMMARY_MODEL,
-                places: tuple[Place, ...] | None = None, tags: tuple[str, ...] | None = None,
-                clock: Callable[[], float] | None = None) -> BatchRun:
+                places: tuple[Place, ...] | None = None, tags: tuple[Tag, ...] | None = None,
+                clock: Callable[[], float] | None = None, *, read_at: datetime) -> BatchRun:
     """Send all kept items as one batch (§5.5 step 1) and return at once, without waiting.
 
     The runner can do other work (in v2 the AIS snapshot, #31) before `finish_batch`; the
@@ -448,7 +470,7 @@ def start_batch(items: list[Item], client, known: list[dict], today: date, model
     items = list(items)
     if client is None:
         return BatchRun(items, model, clock(), clock, unavailable=NO_KEY)
-    run = _Run(client, known, today, places, tags)
+    run = _Run(client, known, today, read_at, places, tags)
     batch_id = None
     if items:  # an empty batch is not allowed, and there is nothing to wait for
         requests = [{"custom_id": _custom_id(i), "params": run.request(item, model)} for i, item in enumerate(items)]
@@ -494,11 +516,12 @@ def finish_batch(pending: BatchRun, sleep: Callable[[float], None] | None = None
 
 
 def summarise_batch(items: list[Item], client, known: list[dict], today: date, model: str = SUMMARY_MODEL,
-                    places: tuple[Place, ...] | None = None, tags: tuple[str, ...] | None = None,
+                    places: tuple[Place, ...] | None = None, tags: tuple[Tag, ...] | None = None,
                     clock: Callable[[], float] | None = None,
-                    sleep: Callable[[float], None] | None = None) -> SummaryResult:
+                    sleep: Callable[[float], None] | None = None, *, read_at: datetime) -> SummaryResult:
     """Step 3 of the morning job: `start_batch` and `finish_batch` with nothing in between."""
-    return finish_batch(start_batch(items, client, known, today, model, places, tags, clock), sleep)
+    pending = start_batch(items, client, known, today, model, places, tags, clock, read_at=read_at)
+    return finish_batch(pending, sleep)
 
 
 def _collect(pending: BatchRun, sleep: Callable[[float], None]) -> dict[int, object]:
