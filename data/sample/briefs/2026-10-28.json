@@ -9,11 +9,16 @@
       "label": "Weather warnings",
       "icon": "wind",
       "value": "No warnings",
-      "place": "Rotterdam region",
       "level": "green",
+      "place": "Zuid-Holland",
+      "knmi_level": "green",
+      "hazards": [],
+      "issued_at": null,
+      "warnings": [],
       "observed_at": "2026-10-28T06:18:00+01:00",
-      "source_name": "Sample source",
-      "source_url": "https://example.com/weather"
+      "source_name": "KNMI via MeteoAlarm",
+      "source_url": "https://www.meteoalarm.org",
+      "note": "Warnings at 06:18 · not live"
     },
     {
       "key": "rhine",
@@ -33,12 +38,14 @@
       "key": "strike",
       "label": "Strike flag",
       "icon": "megaphone",
-      "value": "None reported",
-      "place": "Derived from today's items",
+      "value": "No active strike",
       "level": "green",
-      "observed_at": "2026-10-28T06:30:00+01:00",
-      "source_name": "Today's items",
-      "source_url": "#items-title"
+      "place": "Derived from kept items",
+      "items": [],
+      "observed_at": "2026-10-28T06:18:00+01:00",
+      "source_name": "Kept items of the last 14 days",
+      "source_url": null,
+      "note": null
     }
   ],
   "items": [],

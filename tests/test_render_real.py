@@ -7,6 +7,7 @@ every step faked as in tests/test_run.py), so the page is tested on what the mor
 job really writes. Headlines are invented.
 """
 
+import html as html_lib
 import json
 import re
 
@@ -57,13 +58,14 @@ def render_day(tmp_path, brief):
 
 
 def text_of(html):
-    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()
+    return html_lib.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip())
 
 
 def dial(html, key):
     """One status dial in the full "Port status" section."""
     start = html.index(f'data-key="{key}"')
-    return html[start : html.index("</li>\n", start)]
+    ends = [i for i in (html.find('<li class="dial"', start), html.find("</section>", start)) if i != -1]
+    return html[start : min(ends)]
 
 
 def section(html, title_id):
@@ -394,6 +396,16 @@ def test_headline_only_item_with_a_severity_says_rated_from_headline_only(tmp_pa
     assert re.search(r"medium rated from headline only", card)
     assert "Not enough information" in card
     assert "Headline only: this source is paywalled or its terms don't allow a summary." in card
+
+
+def test_full_item_whose_article_could_not_be_read_is_rated_from_headline_only(tmp_path):
+    # Spec §5.5 point 2: a `use` item without article text is rated from its headline alone;
+    # it has a severity but no summary, and keeps access "full".
+    item = news("low", "Invented unreadable story", summary=None, impact=None)
+    card = text_of(news_card(render_day(tmp_path, make_brief(items=[item])), 1))
+    assert re.search(r"low rated from headline only", card)
+    assert "Headline only: the article couldn't be read, so there is no summary." in card
+    assert "paywalled" not in card
 
 
 def test_unrated_headline_only_item_is_not_called_rated(tmp_path):

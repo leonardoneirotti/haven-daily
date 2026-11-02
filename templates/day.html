@@ -23,8 +23,10 @@
           <button type="button" data-ship-filter="{{ kind }}" aria-pressed="false">{{ ship_type_plurals[kind] }} <span>{{ count }}</span></button>
           {% endfor %}
         </div>
-        {% else %}
+        {% elif ais_snapshot_built %}
         <p class="chart-note">No ship positions for this day. The AIS snapshot failed.</p>
+        {% else %}
+        <p class="chart-note">No ship positions: ships are not collected yet.</p>
         {% endif %}
         <div class="chart-focus" id="chart-focus" hidden>
           <p class="chart-focus-text" id="chart-focus-text"></p>
@@ -33,11 +35,13 @@
         <p class="visually-hidden" id="chart-announcer" aria-live="polite"></p>
       </div>
       <div class="chart-legend">
+        {% if ships %}
         <span>{{ m.ship_symbol("container") }}Container</span>
         <span>{{ m.ship_symbol("tanker") }}Tanker</span>
         <span>{{ m.ship_symbol("bulk") }}Bulk</span>
         <span>{{ m.ship_symbol("container", "underway") }}Under way</span>
         <span>{{ m.ship_symbol("container", "anchored") }}At anchor</span>
+        {% endif %}
         {% if ships and ships.linked %}<span>{{ m.ship_symbol("container", "moored", true) }}At a terminal in the news</span>{% endif %}
         {% if brief.map.callouts %}<span><span class="legend-num" aria-hidden="true">1</span>Item</span>{% endif %}
       </div>
@@ -117,9 +121,9 @@
       </div>
       <ul class="dials">
         {% for ind in brief.status %}
-        {{ m.dial(ind) }}
+        {{ m.dial(ind, root) }}
         {% endfor %}
-        <li class="dial">
+        <li class="dial" data-key="ships">
           <p class="dial-label">{{ m.icon("ship") }}Ships in the port area</p>
           <div class="dial-reading">
             <div>
@@ -128,7 +132,7 @@
               <p class="dial-place">Seagoing cargo ships, AIS snapshot</p>
               {% else %}
               <p class="dial-value is-text is-missing">No data</p>
-              <p class="dial-place">The AIS snapshot failed</p>
+              <p class="dial-place">{% if ais_snapshot_built %}The AIS snapshot failed{% else %}Ship positions are not collected yet{% endif %}</p>
               {% endif %}
             </div>
           </div>
@@ -187,11 +191,17 @@
         {% if brief.build.items_collected is not none %}<div><dt>Items collected</dt><dd>{{ brief.build.items_collected }}</dd></div>{% endif %}
         {% if brief.build.items_kept is not none %}<div><dt>Kept as relevant</dt><dd>{{ brief.build.items_kept }}</dd></div>{% endif %}
         <div><dt>Shown (max {{ max_items }})</dt><dd>{{ items | length }}</dd></div>
+        {% if brief.build.summaries %}
+        <div><dt>Summaries in the batch</dt><dd>{{ brief.build.summaries.batch }}</dd></div>
+        <div><dt>Summaries by the fallback</dt><dd>{{ brief.build.summaries.fallback }}</dd></div>
+        {% endif %}
       </dl>
-      {% if brief.build.failures %}
+      {% if brief.failure_groups %}
       <ul class="failures">
-        {% for failure in brief.build.failures %}
-        <li>{{ m.icon("triangle-alert") }}<span><strong>{{ failure.source }}:</strong> {{ failure.error }}</span></li>
+        {% for group in brief.failure_groups %}
+        <li>{{ m.icon("triangle-alert") }}<span><strong>{{ group.source }}:</strong>
+          {%- if group.errors | length == 1 %} {{ group.errors[0] }}
+          {%- else %}<ul class="failure-lines">{% for error in group.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</span></li>
         {% endfor %}
       </ul>
       {% else %}
