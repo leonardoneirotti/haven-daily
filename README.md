@@ -21,6 +21,9 @@ haven/places.py           checks the AI's place and tags against the fixed lists
 haven/summarise.py        summariser: Claude writes summary, impact, severity, place, tags, strike details; the code checks every answer (Sonnet 5.5 in one batch, 20-min limit, Haiku fallback)
 haven/weather.py          weather status: KNMI warnings for Zuid-Holland via MeteoAlarm, highest level for the rest of today; No data on any doubt
 haven/rhine.py            Rhine status: Kaub (PEGELONLINE) shown with Normal/Watch/Alert, Lobith (Rijkswaterstaat) stored only; No data on any doubt
+haven/guard.py            first step of the daily job: build today's brief or stop (before 06:30 Amsterdam, or brief already there)
+haven/publish.py          commits only today's new data/ files to main as github-actions[bot], rebase + one retry
+.github/workflows/        daily.yml (the morning job), pages.yml (render + deploy), tests.yml (tests on every PR)
 haven/compare.py          Haiku 5.5 vs Sonnet 5.5 on the same kept items, side by side; one model through the batch for the re-run (run by hand; docs/model-comparison.md)
 config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep, public `home` page and `why` (Method page)
 config/filter.toml        off-topic word lists for the relevance filter (small starter lists, tuned after the first runs)
@@ -47,7 +50,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m haven.render
 ```
 
-Then open `site/index.html` in a browser.
+Then open `site/index.html` in a browser. Without `--briefs` the renderer uses the real briefs in `data/briefs/` once there is one, and the sample briefs until then.
 
 Run all tests:
 

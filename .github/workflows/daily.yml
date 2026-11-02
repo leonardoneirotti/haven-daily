@@ -1,0 +1,109 @@
+# The morning job: build today's brief, commit data/ straight to main, publish the site.
+# Spec §5.1 (pipeline, writing to main) and §5.1.1 (schedule, guard, retries).
+#
+# GitHub cron runs in UTC, often starts 5-30 minutes late and sometimes drops a run, so there are
+# three scheduled triggers plus a manual one. The guard (first step) builds once a day, on the
+# first run after 06:30 Amsterdam time that finds no brief for today:
+#
+#   UTC     winter (UTC+1)            summer (UTC+2)
+#   04:45   05:45 -> too early, stops  06:45 -> builds
+#   05:45   06:45 -> builds            07:45 -> retry if needed
+#   06:45   07:45 -> retry if needed   08:45 -> retry if needed (last trigger)
+#
+# A run that stops (too early, or brief already there) ends green: no failure notification.
+# A failed run (AI unavailable, a crash, a push that failed twice) ends red, so GitHub notifies
+# the owner, and the next trigger tries again. The last trigger publishes a reduced brief instead
+# of failing when the AI is down (§5.6).
+name: Daily brief
+
+on:
+  schedule:
+    # Must be exactly haven.guard.SCHEDULE_CRONS, in this order (tests/test_workflows.py).
+    - cron: "45 4 * * *"
+    - cron: "45 5 * * *"
+    - cron: "45 6 * * *"
+  # By hand: Actions tab or the GitHub mobile app -> "Daily brief" -> Run workflow.
+  workflow_dispatch:
+    inputs:
+      last_trigger:
+        description: "If the AI is unavailable, publish a reduced brief instead of failing (tick when no scheduled run is left today)"
+        type: boolean
+        default: false
+
+# Nothing by default; each job asks for what it needs.
+permissions: {}
+
+# One daily run at a time; a retry waits for a slow run instead of overlapping it, and a running
+# job is never cancelled (it may be in the middle of the 20-minute batch wait).
+concurrency:
+  group: daily
+  cancel-in-progress: false
+
+jobs:
+  brief:
+    # Only from main: a manual run started on another branch does nothing.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Collect (a few seconds per request) + filter + batch wait (at most 20 + 2 minutes) +
+    # Haiku fallback + status. 45 minutes leaves room; a stuck run is stopped and retried.
+    timeout-minutes: 45
+    # Write access to the code, so the job can push data/ (only data/: haven.publish checks it).
+    permissions:
+      contents: write
+    outputs:
+      built: ${{ steps.guard.outputs.build }}
+    steps:
+      # The latest main, with full history so "git pull --rebase" always has what it needs.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # Standard library only, so it runs before installing anything: a stopped run is quick.
+      # Values from GitHub go in through env, never pasted into the command line.
+      - name: Guard (build today, or stop?)
+        id: guard
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          MANUAL_LAST_TRIGGER: ${{ inputs.last_trigger }}
+        run: python -m haven.guard --event "$EVENT" --schedule "$SCHEDULE" --manual-last-trigger "$MANUAL_LAST_TRIGGER"
+
+      - name: Install dependencies
+        if: steps.guard.outputs.build == 'true'
+        run: python -m pip install -r requirements.txt
+
+      # Writes today's three files in data/ (or nothing, exit 1, if the AI is unavailable).
+      # The key comes from the repository's Actions secrets and only this step gets it.
+      - name: Build the brief
+        if: steps.guard.outputs.build == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LAST_TRIGGER: ${{ steps.guard.outputs.last_trigger }}
+        run: |
+          if [ "$LAST_TRIGGER" = "true" ]; then
+            python -m haven.run --last-trigger
+          else
+            python -m haven.run
+          fi
+
+      # Stages only data/, commits as github-actions[bot], pull --rebase, push, one retry.
+      - name: Commit data/ to main
+        if: steps.guard.outputs.build == 'true'
+        run: python -m haven.publish
+
+  # Render and deploy the site with the same steps as a normal push (pages.yml), after the brief
+  # is on main. Skipped when the guard stopped the run.
+  site:
+    needs: brief
+    if: needs.brief.outputs.built == 'true'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml

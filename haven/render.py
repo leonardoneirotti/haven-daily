@@ -5,7 +5,8 @@ This module only turns briefs into HTML. Collecting, filtering, summarising and
 the AIS snapshot happen in earlier steps of the pipeline.
 
 Usage, from the project folder:
-    python -m haven.render --briefs data/sample/briefs --out site
+    python -m haven.render --out site                             # real briefs, or the samples if none yet
+    python -m haven.render --briefs data/sample/briefs --out site  # the samples, always
 """
 
 from __future__ import annotations
@@ -632,13 +633,27 @@ def render_site(briefs_dir: Path, out_dir: Path) -> int:
     return len(briefs)
 
 
+def default_briefs_dir(data_dir: Path = PROJECT_DIR / "data") -> Path:
+    """The real briefs (`data/briefs/`) as soon as there is one, else the samples (#26).
+
+    Never both: a site of real days with invented ones mixed in would break hard rule 10. Real
+    briefs are never deleted (§5.9), so once the first morning run has committed one, the site
+    never falls back to the samples."""
+    real = Path(data_dir) / "briefs"
+    if real.is_dir() and any(real.glob("*.json")):
+        return real
+    return Path(data_dir) / "sample" / "briefs"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Render the Haven Daily site from brief files.")
-    parser.add_argument("--briefs", type=Path, default=PROJECT_DIR / "data" / "sample" / "briefs")
+    parser.add_argument("--briefs", type=Path, default=None,
+                        help="default: data/briefs once it holds a brief, else data/sample/briefs")
     parser.add_argument("--out", type=Path, default=PROJECT_DIR / "site")
     args = parser.parse_args()
-    count = render_site(args.briefs, args.out)
-    print(f"Rendered {count} briefs to {args.out}")
+    briefs = args.briefs if args.briefs is not None else default_briefs_dir()
+    count = render_site(briefs, args.out)
+    print(f"Rendered {count} briefs from {briefs} to {args.out}")
 
 
 if __name__ == "__main__":
