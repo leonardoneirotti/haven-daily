@@ -28,7 +28,7 @@ CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 THRESHOLDS = RhineThresholds(alert_at_or_below=80, watch_at_or_below=150, watch_above=460, alert_above=640)
 MEANINGS = load_rhine_meanings()
 
-# Wording confirmed by the owner 3 Nov 2026 (PR #89); alert_high still under discussion there.
+# Wording confirmed by the owner 3 Nov 2026 (PR #89).
 RHINE_MEANINGS = {
     "normal": "no low-water surcharge or high-water restriction at Kaub",
     "watch_low": "low-water surcharges on barge transport",
