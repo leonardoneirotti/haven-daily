@@ -201,26 +201,56 @@ def _check_place(file: str, number: int, entry: dict) -> Place:
                  lon=float(entry["lon"]), side=entry["side"], osm=entry["osm"])
 
 
-def load_tags(path: Path = CONFIG_DIR / "tags.toml") -> tuple[str, ...]:
-    """The fixed "affects" tags (without the place labels, which are added by haven/places.py)."""
+TAG_MEANING_MAX = 240  # characters: one line in the summariser prompt
+_TAG_FIELDS = {"name", "meaning"}
+
+
+@dataclass(frozen=True)
+class Tag:
+    """One "affects" tag from config/tags.toml and what it means (spec §5.10; issue #67)."""
+
+    name: str
+    meaning: str  # one line, sent with the tag in the summariser prompt
+
+
+def load_tag_list(path: Path = CONFIG_DIR / "tags.toml") -> tuple[Tag, ...]:
+    """The fixed "affects" tags with their meanings, in file order (place labels are added by haven/places.py)."""
     path = Path(path)
     data = _read_toml(path)
-    unknown_top = sorted(set(data) - {"affects"})
+    unknown_top = sorted(set(data) - {"tag"})
     if unknown_top:
-        raise ConfigError(f"{path.name}: unknown key {unknown_top[0]!r} (only 'affects' is allowed)")
-    if "affects" not in data:
-        raise ConfigError(f"{path.name}: missing 'affects' list")
-    tags = data["affects"]
-    if not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
-        raise ConfigError(f"{path.name}: 'affects' must be a list of tags, e.g. [\"Containers\"]")
+        raise ConfigError(f"{path.name}: unknown key {unknown_top[0]!r} (only [[tag]] entries are allowed)")
+    entries = data.get("tag")
+    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+        raise ConfigError(f"{path.name}: missing the [[tag]] list (each tag: name = ..., meaning = ...)")
+    tags: list[Tag] = []
     seen: set[str] = set()
-    for tag in tags:
-        if not tag.strip():
-            raise ConfigError(f"{path.name}: 'affects' contains an empty tag")
-        if tag.casefold() in seen:
-            raise ConfigError(f"{path.name}: duplicate tag {tag!r} (tags are matched ignoring upper/lower case)")
-        seen.add(tag.casefold())
+    for number, entry in enumerate(entries, start=1):
+        name = entry.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ConfigError(f"{path.name}: tag #{number} has no name")
+        where = f"{path.name}: tag {name!r}"
+        unknown = sorted(set(entry) - _TAG_FIELDS)
+        if unknown:
+            raise ConfigError(f"{where}: unknown field {unknown[0]!r}")
+        if name.casefold() in seen:
+            raise ConfigError(f"{path.name}: duplicate tag {name!r} (tags are matched ignoring upper/lower case)")
+        seen.add(name.casefold())
+        meaning = entry.get("meaning")
+        if meaning is not None and not isinstance(meaning, str):
+            raise ConfigError(f"{where}: 'meaning' must be text")
+        meaning = " ".join((meaning or "").split())
+        if not meaning:
+            raise ConfigError(f"{where} has no meaning (one line saying what the tag is for)")
+        if len(meaning) > TAG_MEANING_MAX:
+            raise ConfigError(f"{where}: meaning longer than {TAG_MEANING_MAX} characters")
+        tags.append(Tag(name=name, meaning=meaning))
     return tuple(tags)
+
+
+def load_tags(path: Path = CONFIG_DIR / "tags.toml") -> tuple[str, ...]:
+    """The tag names only, as `places.pick` matches them."""
+    return tuple(tag.name for tag in load_tag_list(path))
 
 
 def _check_source(file: str, number: int, entry: dict) -> Source:
