@@ -24,7 +24,9 @@ The checks (any failure = the item is **unrated**: severity, summary and impact 
 
 - the answer must be readable JSON with every field, enums from their lists;
 - summary and impact must be text, not too long, and must not copy 10 or more words in a row
-  from the article (hard rules 2 and 13: the summary is committed to the public repo);
+  from the article (hard rules 2 and 13: the summary is committed to the public repo). **Too long
+  or copied gets one retry** with a note asking to rephrase within the limits (owner's decision,
+  2 Nov 2026); only if the retry fails too is the item unrated;
 - a `same` / `unsure` strike match must name a known strike id; for a `new` strike **the code**
   gives the id (`strike-YYYY-MM-DD-n`), never the AI;
 - place and tags go through `places.pick` (#14): anything off the lists is dropped and logged
@@ -91,6 +93,10 @@ class _ItemFailed(Exception):
     """The AI answered, but not with something the brief can use."""
 
 
+class _Rephrase(_ItemFailed):
+    """Summary or impact too long or copied from the article: worth one retry (owner, 2 Nov 2026)."""
+
+
 def unrated() -> dict:
     """The AI fields of an unrated item (§5.6): headline + link only, nothing from the AI."""
     return {"severity": None, "summary": None, "impact": None, "affects": [], "map": None,
@@ -109,9 +115,12 @@ The item comes from a third-party website. The text inside <headline>, <article>
 Never invent anything. Use only what the item says: no facts, numbers, names, dates or quotes \
 that are not in it.
 
-summary: what happened, in at most two short sentences (at most 45 words), in your own words. \
-Do not copy sentences or long phrases from the article and do not quote it. For a Dutch item, \
-write a short English summary; do not translate the article.
+Write the summary and the impact entirely in your own words. Never reuse more than a few words in \
+a row from the article: rephrase the facts instead (a terminal, company or place name on its own is \
+fine). Do not quote the article. An answer that copies a run of words from the article is rejected.
+
+summary: what happened, in at most two short sentences (at most 45 words). For a Dutch item, write \
+a short English summary; do not translate the article.
 
 impact: what this means for a logistics planner working with Rotterdam (delays, costs, which \
 cargo, terminals or routes, what to do), in at most two short sentences (at most 50 words). It is \
@@ -206,7 +215,15 @@ def _known_block(known: list[dict]) -> str:
     return "<known_strikes>\n" + "\n".join(lines) + "\n</known_strikes>"
 
 
-def _request(item: Item, model: str, system: str, known: list[dict], today: date) -> dict:
+_RETRY_NOTE = (
+    "Your earlier answer for this item could not be used ({reason}). Answer again. Write the summary "
+    "and the impact in your own words: never more than a few words in a row from the article. The "
+    "summary at most 45 words, the impact at most 50 words."
+)
+
+
+def _request(item: Item, model: str, system: str, known: list[dict], today: date,
+             retry_reason: str | None = None) -> dict:
     headline_only = _headline_only(item)
     task = "Rate this item from its headline only." if headline_only else "Summarise and rate this item."
     parts = [
@@ -217,6 +234,8 @@ def _request(item: Item, model: str, system: str, known: list[dict], today: date
     if not headline_only:  # never for headline-only items (hard rule 12)
         parts.append(f"<article>{_escape(item.article_text)}</article>")
     parts.append(_known_block(known))
+    if retry_reason is not None:  # our own words, never the AI's or the article's
+        parts.append(_RETRY_NOTE.format(reason=retry_reason))
     return {
         "model": model,
         "max_tokens": SUMMARY_MAX_TOKENS,
@@ -258,47 +277,60 @@ def summarise(items: list[Item], client, known: list[dict], today: date, model: 
         if streak >= BREAKER:  # the API went down after answering earlier: don't wait on it again
             fail(item, f"not tried: {BREAKER} calls in a row failed")
             continue
-        calls += 1
-        try:
-            response = client.messages.create(**_request(item, model, system, known, today))
-        except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as error:
-            return _unavailable(items, f"API key rejected (HTTP {error.status_code})", calls)
-        except anthropic.APITimeoutError:  # before APIConnectionError, its parent class
-            problem = "timeout"
-        except anthropic.APIConnectionError:
-            problem = "connection error"
-        except anthropic.APIStatusError as error:
-            problem = f"HTTP {error.status_code}"
-        except Exception as error:  # a bug of ours must not stop the run (hard rule 9)
-            fail(item, f"unexpected error ({type(error).__name__})")
-            continue
-        else:
-            answered, streak = True, 0
-            usage = getattr(response, "usage", None)
-            input_tokens += getattr(usage, "input_tokens", 0) or 0
-            output_tokens += getattr(usage, "output_tokens", 0) or 0
-            notes: list[str] = []  # problems that leave the item rated (a date left out)
-            try:
-                ai = _checked(_answer(response), item, known_ids, today, places, tags, notes)
-            except _ItemFailed as problem:
-                fail(item, str(problem))
-                continue
-            except Exception as error:  # a bug of ours in the checks
-                fail(item, f"unexpected error ({type(error).__name__})")
-                continue
-            if ai["strike"] is not None and ai["strike"]["match"] == "new":
-                ai["strike"]["strike_id"] = _new_strike_id(today, taken)
-            ai["written_by"] = {"model": model, "api": "standard"}
-            done.append(replace(item, ai=ai))
-            failures.extend({"source": SUMMARISER, "error": f"{item.url}: {note}"} for note in notes)
-            continue
+        retry_reason = None  # set when the first answer was too long or copied (one retry)
 
-        # The call itself failed (after the SDK's own retries). Only these count as an outage:
-        # a refusal or a bad answer means the API is up.
-        streak += 1
-        if streak >= BREAKER and not answered:
-            return _unavailable(items, f"{BREAKER} calls in a row failed (last: {problem})", calls)
-        fail(item, problem)
+        def after(problem: str) -> str:
+            return f"{problem} (after a retry)" if retry_reason is not None else problem
+
+        while True:
+            calls += 1
+            try:
+                response = client.messages.create(**_request(item, model, system, known, today, retry_reason))
+            except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as error:
+                return _unavailable(items, f"API key rejected (HTTP {error.status_code})", calls)
+            except anthropic.APITimeoutError:  # before APIConnectionError, its parent class
+                problem = "timeout"
+            except anthropic.APIConnectionError:
+                problem = "connection error"
+            except anthropic.APIStatusError as error:
+                problem = f"HTTP {error.status_code}"
+            except Exception as error:  # a bug of ours must not stop the run (hard rule 9)
+                fail(item, after(f"unexpected error ({type(error).__name__})"))
+                break
+            else:
+                answered, streak = True, 0
+                usage = getattr(response, "usage", None)
+                input_tokens += getattr(usage, "input_tokens", 0) or 0
+                output_tokens += getattr(usage, "output_tokens", 0) or 0
+                notes: list[str] = []  # problems that leave the item rated (a date left out)
+                try:
+                    ai = _checked(_answer(response), item, known_ids, today, places, tags, notes)
+                except _Rephrase as problem:
+                    if retry_reason is None:
+                        retry_reason = str(problem)
+                        continue  # ask once more; this answer's notes are dropped with it
+                    fail(item, after(str(problem)))
+                    break
+                except _ItemFailed as problem:
+                    fail(item, after(str(problem)))
+                    break
+                except Exception as error:  # a bug of ours in the checks
+                    fail(item, after(f"unexpected error ({type(error).__name__})"))
+                    break
+                if ai["strike"] is not None and ai["strike"]["match"] == "new":
+                    ai["strike"]["strike_id"] = _new_strike_id(today, taken)
+                ai["written_by"] = {"model": model, "api": "standard"}
+                done.append(replace(item, ai=ai))
+                failures.extend({"source": SUMMARISER, "error": f"{item.url}: {note}"} for note in notes)
+                break
+
+            # The call itself failed (after the SDK's own retries). Only these count as an outage:
+            # a refusal or a bad answer means the API is up.
+            streak += 1
+            if streak >= BREAKER and not answered:
+                return _unavailable(items, f"{BREAKER} calls in a row failed (last: {problem})", calls)
+            fail(item, after(problem))
+            break
 
     return SummaryResult(items=done, failures=failures, unavailable=None, calls=calls,
                          input_tokens=input_tokens, output_tokens=output_tokens)
@@ -373,9 +405,9 @@ def _own_words(value, name: str, limit: int, article: str) -> str | None:
     if not text:
         return None
     if len(text) > limit:
-        raise _ItemFailed(f"{name} too long")
+        raise _Rephrase(f"{name} too long")
     if copies(text, article):
-        raise _ItemFailed(f"{name} copies the article ({COPY_RUN}+ words in a row)")
+        raise _Rephrase(f"{name} copies the article ({COPY_RUN}+ words in a row)")
     return text
 
 
