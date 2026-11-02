@@ -393,9 +393,9 @@ def test_headline_only_item_with_a_severity_says_rated_from_headline_only(tmp_pa
     item = news("medium", "Invented headline-only story", source="NL Times", access="headline-only",
                 summary=None, impact=None)
     card = text_of(news_card(render_day(tmp_path, make_brief(items=[item])), 1))
-    assert re.search(r"medium rated from headline only", card)
-    assert "Not enough information" in card
-    assert "Headline only: this source is paywalled or its terms don't allow a summary." in card
+    # The short card (#82, S5): one line instead of a tag, no impact block (spec §7.5).
+    assert "Headline only (the source's terms don't allow a summary) · severity rated from the headline" in card
+    assert "Not enough information" not in card
 
 
 def test_full_item_whose_article_could_not_be_read_is_rated_from_headline_only(tmp_path):
@@ -403,16 +403,15 @@ def test_full_item_whose_article_could_not_be_read_is_rated_from_headline_only(t
     # it has a severity but no summary, and keeps access "full".
     item = news("low", "Invented unreadable story", summary=None, impact=None)
     card = text_of(news_card(render_day(tmp_path, make_brief(items=[item])), 1))
-    assert re.search(r"low rated from headline only", card)
-    assert "Headline only: the article couldn't be read, so there is no summary." in card
-    assert "paywalled" not in card
+    assert "Headline only (the article couldn't be read) · severity rated from the headline" in card
+    assert "terms" not in card
 
 
 def test_unrated_headline_only_item_is_not_called_rated(tmp_path):
     item = news(None, "Invented headline-only story", access="headline-only")
     card = text_of(news_card(render_day(tmp_path, make_brief(items=[item])), 1))
-    assert "rated from headline only" not in card
-    assert "The AI step failed for this item" in card
+    assert "rated from the headline" not in card
+    assert "the AI step failed for this item" in card
 
 
 def test_full_item_is_not_called_headline_only(tmp_path):

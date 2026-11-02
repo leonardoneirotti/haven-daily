@@ -276,7 +276,7 @@ def test_the_no_article_text_rule_is_stated(about):
 def test_severity_rules_follow_the_spec(about):
     text = text_of(section(about, "severity"))
     assert "already over" in text  # Low, spec §2.1 (#67)
-    assert "rated from headline only" in text  # spec §2.1
+    assert "severity rated from the headline" in text  # spec §2.1, the card's words since #82
     assert "Not enough information" in text
 
 
