@@ -79,6 +79,48 @@ def write(kind: str, day: date, data: Any, data_dir: Path = DATA_DIR) -> Path:
     return target
 
 
+WRITE_ORDER = ("items", "status", "briefs")  # the brief last: its file means "today is done" (§5.1.1 guard)
+
+
+def write_day(day: date, files: dict[str, Any], data_dir: Path = DATA_DIR) -> list[Path]:
+    """Write one day's files (`{kind: data}`) all or nothing, the brief last. Returns their paths.
+
+    Everything is checked first, and none is written if any of them already exists, so a refused
+    run leaves nothing behind. If writing fails half-way (disk full, a folder in the way), the
+    files this call created are removed again, so the next trigger can retry the whole day.
+    Files that were there before the call are never touched.
+    """
+    kinds = [kind for kind in WRITE_ORDER if kind in files]
+    unknown = set(files) - set(WRITE_ORDER)
+    if unknown:
+        raise ValueError(f"unknown kind {sorted(unknown)[0]!r} (allowed: {', '.join(WRITE_ORDER)})")
+    prepared = []
+    for kind in kinds:
+        target = path(kind, day, data_dir)
+        _check(kind, day, files[kind])
+        prepared.append((target, _serialise(kind, files[kind])))
+    existing = [f"{target.parent.name}/{target.name}" for target, _ in prepared if target.exists()]
+    if existing:
+        raise AlreadyWrittenError(f"{', '.join(existing)} already exists; a day's files are written once "
+                                  f"(only the owner edits them by hand)")
+    written: list[Path] = []
+    try:
+        for target, content in prepared:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                f = target.open("xb")  # create only, as in write()
+            except FileExistsError:  # appeared since the check above
+                raise AlreadyWrittenError(f"{target.parent.name}/{target.name} already exists") from None
+            written.append(target)  # from here on the file is ours, even if the write fails
+            with f:
+                f.write(content)
+    except BaseException:
+        for done in written:
+            done.unlink(missing_ok=True)
+        raise
+    return written
+
+
 def read(kind: str, day: date, data_dir: Path = DATA_DIR) -> Any:
     """The day's data, or None if that day has no file."""
     source = path(kind, day, data_dir)
