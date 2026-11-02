@@ -12,7 +12,7 @@ haven/config.py           reads and checks the config files; a mistake stops the
 haven/clock.py            "today" and "now" in Amsterdam time (a brief belongs to an Amsterdam date)
 haven/env.py              loads API keys from a local .env file (names only in .env.example; never printed)
 haven/storage.py          daily files in data/ (items, status, briefs): written once, never rewritten; no article text
-haven/fetch.py            polite HTTP for every collector: own user agent, robots.txt, AI opt-outs, delays, one retry
+haven/fetch.py            polite HTTP for every collector: own user agent, robots.txt, AI opt-outs, delays, one retry (GET; POST with a JSON body for Rijkswaterstaat)
 haven/feeds.py            reads the RSS sources into one item shape; headline-only feed text is never read; PIN gap check
 haven/pages.py            reads the HTML news lists into the same item shape; K+N: only the Rotterdam paragraph of the weekly update
 haven/collect.py          the collect step: every source, 14-day duplicate check, feed read time, article text in memory only
@@ -20,11 +20,13 @@ haven/filter.py           relevance filter: rules (older than 48 h, auto-keep, o
 haven/places.py           checks the AI's place and tags against the fixed lists; adds coordinates; logs anything not listed
 haven/summarise.py        summariser: Claude writes summary, impact, severity, place, tags, strike details; the code checks every answer (Sonnet 5.5 in one batch, 20-min limit, Haiku fallback)
 haven/weather.py          weather status: KNMI warnings for Zuid-Holland via MeteoAlarm, highest level for the rest of today; No data on any doubt
+haven/rhine.py            Rhine status: Kaub (PEGELONLINE) shown with Normal/Watch/Alert, Lobith (Rijkswaterstaat) stored only; No data on any doubt
 haven/compare.py          Haiku 5.5 vs Sonnet 5.5 on the same kept items, side by side; one model through the batch for the re-run (run by hand; docs/model-comparison.md)
 config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep
 config/filter.toml        off-topic word lists for the relevance filter (small starter lists, tuned after the first runs)
 config/places.toml        the 41 places an item can be pinned to, coordinates taken once from OpenStreetMap (each with its OSM id)
 config/tags.toml          the 16 "affects" tags, each with a one-line meaning sent to the AI (place labels count as tags too)
+config/rhine.toml         the Kaub thresholds in cm (Alert ≤ 80 or > 640, Watch ≤ 150 or > 460), each with its public source
 tests/                    pytest tests; tests/test_repo_config.py keeps sources.toml and SOURCES.md in step
 templates/                Jinja2 page templates (base, day, archive, method page, shared macros)
 static/style.css          the whole design: colour and type tokens, light + dark mode
@@ -109,6 +111,6 @@ The renderer sorts items by severity (unrated last), keeps at most 5, works out 
 - Fonts load from Google Fonts. For an EU site, self-host the font files (`static/fonts/`) to avoid sending visitor IP addresses to Google.
 - Check aisstream.io's terms for showing their data publicly (see `CLAUDE.md`).
 - Fill in `SITE["linkedin_url"]` and `SITE["repo_url"]` in `haven/render.py`.
-- Set the Rhine thresholds on the Method page (`templates/about.html`) from a public source.
+- Show the Rhine thresholds on the Method page (`templates/about.html`) with their public sources (the numbers are in `config/rhine.toml`).
 
 Credits: map data © OpenStreetMap contributors (ODbL). [Leaflet](https://leafletjs.com) (BSD-2). Icons: [Lucide](https://lucide.dev) (ISC). Fonts: IBM Plex Sans, Sans Condensed, Mono and Serif (SIL Open Font License).

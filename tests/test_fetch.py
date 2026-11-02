@@ -46,8 +46,8 @@ class FakeTransport:
         self.duration = duration
         self.calls = []
 
-    def __call__(self, url, headers, timeout):
-        self.calls.append({"url": url, "at": self.clock.now, "headers": headers, "timeout": timeout})
+    def __call__(self, url, headers, timeout, data=None):
+        self.calls.append({"url": url, "at": self.clock.now, "headers": headers, "timeout": timeout, "data": data})
         answers = self.routes.get(url)
         if answers is None:
             answers = [ok(b"", status=404)] if url.endswith("/robots.txt") else [TransportError("no route in test")]
@@ -473,6 +473,59 @@ def test_redirect_loop_stops():
     assert transport.urls().count(PAGE) <= 6
 
 
+# --- POST with a JSON body (Rijkswaterstaat's water-level API, issue #20) -------------
+
+API = "https://api.test/OphalenWaarnemingen"
+
+
+def test_post_json_sends_the_body_as_json_with_our_user_agent():
+    fetcher, transport, _ = make({API: ok(b'{"Succesvol": true}', headers={"content-type": "application/json"})})
+    response = fetcher.post_json(API, {"Locatie": {"Code": "lobith"}})
+    assert response.body == b'{"Succesvol": true}'
+    call = [c for c in transport.calls if c["url"] == API][0]
+    assert call["data"] == b'{"Locatie": {"Code": "lobith"}}'
+    assert call["headers"]["Content-Type"] == "application/json"
+    assert call["headers"]["User-Agent"].startswith("HavenDaily/")
+
+
+def test_post_json_checks_robots_txt_first():
+    routes = {"https://api.test/robots.txt": robots("User-agent: *\nDisallow: /Ophalen\n")}
+    fetcher, transport, _ = make(routes)
+    with pytest.raises(RobotsBlocked):
+        fetcher.post_json(API, {})
+    assert API not in transport.urls()
+
+
+def test_post_json_keeps_the_host_delay_and_the_one_retry():
+    fetcher, transport, _ = make({API: [ok(b"", status=503), ok(b"{}")]}, min_delay=3)
+    fetcher.post_json(API, {})
+    first, second = [c for c in transport.calls if c["url"] == API]
+    assert second["at"] - (first["at"] + 0.5) >= 3  # the retry waits the host delay too
+    assert second["data"] == first["data"]
+
+
+def test_post_json_does_not_follow_a_redirect():
+    # Following it would mean deciding whether to send the body again: we don't guess.
+    fetcher, transport, _ = make({API: ok(b"", status=307, headers={"location": "/elsewhere"})})
+    with pytest.raises(FetchError) as e:
+        fetcher.post_json(API, {})
+    assert "redirect" in str(e.value)
+    assert "https://api.test/elsewhere" not in transport.urls()
+
+
+def test_post_json_error_status_is_a_fetch_error():
+    fetcher, _, _ = make({API: ok(b"", status=400)})
+    with pytest.raises(FetchError) as e:
+        fetcher.post_json(API, {})
+    assert "HTTP 400" in str(e.value)
+
+
+def test_get_requests_send_no_body():
+    fetcher, transport, _ = make({PAGE: ok()})
+    fetcher.fetch(PAGE)
+    assert all(c["data"] is None for c in transport.calls)
+
+
 # --- response text ------------------------------------------------------------------
 
 
@@ -492,6 +545,15 @@ def test_text_falls_back_to_utf8():
 class _Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
+
+    def do_POST(self):
+        # Echo the method, content type and body, so the test sees what was sent.
+        body = self.rfile.read(int(self.headers["Content-Length"]))
+        answer = f"{self.command} {self.headers['Content-Type']} ".encode() + body
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(answer)
 
     def do_GET(self):
         if self.path == "/ok":
@@ -528,6 +590,14 @@ def test_urllib_transport_sends_headers_and_returns_the_body(local_server):
     assert raw.status == 200
     assert raw.body == b"HavenDaily/test"
     assert raw.headers["content-type"].startswith("text/plain")
+
+
+def test_urllib_transport_posts_a_body_when_given_one(local_server):
+    raw = fetch.urllib_transport(
+        local_server + "/api", {"Content-Type": "application/json"}, timeout=5, data=b'{"a": 1}'
+    )
+    assert raw.status == 200
+    assert raw.body == b'POST application/json {"a": 1}'
 
 
 def test_urllib_transport_returns_error_statuses_instead_of_raising(local_server):
