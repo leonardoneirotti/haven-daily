@@ -246,3 +246,11 @@ def test_a_pipe_in_an_answer_does_not_break_the_table():
 def test_the_view_lists_items_left_out_by_the_cap():
     text = view([item(1), item(2)], [full()], [sonnet_answer()], max_items=1)
     assert "Not compared" in text and item(2).headline in text
+
+
+def test_the_morning_job_keeps_the_48_hour_limit():
+    from haven.filter import MAX_AGE, apply_rules, run_filter
+    import inspect
+    assert MAX_AGE.total_seconds() == 48 * 3600
+    assert inspect.signature(apply_rules).parameters["max_age"].default == MAX_AGE
+    assert inspect.signature(run_filter).parameters["max_age"].default == MAX_AGE
