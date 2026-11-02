@@ -165,10 +165,10 @@ def test_nothing_to_check_gives_nothing():
 
 
 def test_the_check_runs_on_summary_and_impact_against_headline_and_article():
-    said = sonnet_answer(summary="Dock staff at Euromax plan a stoppage.", impact="Book 7 extra barges.")
+    said = sonnet_answer(summary="Dock staff at Antwerp plan a stoppage.", impact="Book 7 extra barges.")
     client = Client(haiku=[full()], sonnet=[said])
     result = compare([item(1)], client, known=[], today=TODAY)
-    assert result.checks[SONNET][0] == ["Euromax", "7"]
+    assert result.checks[SONNET][0] == ["Antwerp", "7"]
     assert result.checks[HAIKU][0] == []
 
 
@@ -228,14 +228,14 @@ def test_the_view_marks_headline_only_items():
 
 
 def test_the_view_shows_unlisted_places_and_tags():
-    off_list = sonnet_answer(tags=["Containers", "Reefers"], place="calandkanaal")
+    off_list = sonnet_answer(tags=["Containers", "Reefers"], place="antwerp-gateway")
     text = view([item(1)], [full()], [off_list])
-    assert "Reefers" in text and "calandkanaal" in text
+    assert "Reefers" in text and "antwerp-gateway" in text
 
 
 def test_the_view_lists_words_to_check():
-    text = view([item(1)], [full()], [sonnet_answer(summary="Dock staff at Euromax plan a stoppage.")])
-    assert "Euromax" in text
+    text = view([item(1)], [full()], [sonnet_answer(summary="Dock staff at Antwerp plan a stoppage.")])
+    assert "Antwerp" in text
 
 
 def test_a_pipe_in_an_answer_does_not_break_the_table():
