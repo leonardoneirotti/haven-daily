@@ -22,7 +22,7 @@ haven/summarise.py        summariser: Claude writes summary, impact, severity, p
 haven/weather.py          weather status: KNMI warnings for Zuid-Holland via MeteoAlarm, highest level for the rest of today; No data on any doubt
 haven/rhine.py            Rhine status: Kaub (PEGELONLINE) shown with Normal/Watch/Alert, Lobith (Rijkswaterstaat) stored only; No data on any doubt
 haven/compare.py          Haiku 5.5 vs Sonnet 5.5 on the same kept items, side by side; one model through the batch for the re-run (run by hand; docs/model-comparison.md)
-config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep
+config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep, public `why` (Method page)
 config/filter.toml        off-topic word lists for the relevance filter (small starter lists, tuned after the first runs)
 config/places.toml        the 41 places an item can be pinned to, coordinates taken once from OpenStreetMap (each with its OSM id)
 config/tags.toml          the 16 "affects" tags, each with a one-line meaning sent to the AI (place labels count as tags too)
@@ -117,6 +117,5 @@ The renderer sorts items by severity (unrated last), keeps at most 5, works out 
 - Fonts load from Google Fonts. For an EU site, self-host the font files (`static/fonts/`) to avoid sending visitor IP addresses to Google.
 - Check aisstream.io's terms for showing their data publicly (see `CLAUDE.md`).
 - Fill in `SITE["linkedin_url"]` and `SITE["repo_url"]` in `haven/render.py`.
-- Show the Rhine thresholds on the Method page (`templates/about.html`) with their public sources (the numbers are in `config/rhine.toml`).
 
 Credits: map data © OpenStreetMap contributors (ODbL). [Leaflet](https://leafletjs.com) (BSD-2). Icons: [Lucide](https://lucide.dev) (ISC). Fonts: IBM Plex Sans, Sans Condensed, Mono and Serif (SIL Open Font License).
