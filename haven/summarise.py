@@ -1,7 +1,7 @@
 """Summariser (spec §5.1 step 3, §2.1, §5.6, §5.7, §5.10; issue #15).
 
-For each kept item, one call to Claude (Haiku 5.5 by default; the model is a parameter, so the
-Haiku vs Sonnet comparison, #17, can run the same code) with **structured output**. The answer
+For each kept item, one call to Claude (Sonnet 5.5 by default, the owner's choice after the Haiku vs
+Sonnet comparison, #17; the model is a parameter, so that comparison ran the same code) with **structured output**. The answer
 is then checked by the code; nothing the AI writes reaches the brief unchecked.
 
 What the AI sees:
@@ -76,7 +76,7 @@ __all__ = ["BATCH_WAIT", "BREAKER", "CANCEL_WAIT", "FALLBACK_MODEL", "SUMMARY_MO
            "brief_item", "finish_batch", "known_strikes", "phrase_in", "published_day", "resolve_phrase",
            "start_batch", "summarise", "summarise_batch", "unrated"]
 
-SUMMARY_MODEL = "claude-haiku-5-5"  # spec §5.5: the default unless Sonnet 5.5 is clearly better (#17)
+SUMMARY_MODEL = "claude-sonnet-5-5"  # spec §5.5: chosen by the owner after the side-by-side test (#17, 2 Nov 2026)
 FALLBACK_MODEL = "claude-haiku-5-5"  # items the batch didn't answer, whatever the batch model (§5.5 step 3)
 BATCH_WAIT = 20 * 60  # seconds from sending the batch to cancelling what is unfinished (§5.5 step 2)
 CANCEL_WAIT = 2 * 60  # seconds to wait for a cancelled batch to end (its results can be read only then)

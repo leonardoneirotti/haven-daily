@@ -2,7 +2,7 @@
 
 *Issue #17 · spec §5.5, §10 step 6 · run on Monday 2 November 2026, 02:28 Amsterdam time.*
 
-**Owner's decision: pending** (checklist #43). Haiku 5.5 is the default unless Sonnet 5.5 is clearly better (§5.5).
+**Owner's decision (2 Nov 2026): Sonnet 5.5, through the batch** (checklist #43). The rule was: Haiku 5.5 unless Sonnet 5.5 is clearly better (§5.5). Set in `SUMMARY_MODEL` (`haven/summarise.py`); items the batch doesn't answer still go to Haiku 5.5 (§5.5 step 3).
 
 ## How it was run
 
@@ -43,12 +43,11 @@ Total cost of the comparison run, filter included: **about $0.155** at list pric
 
 ## Claude's recommendation (not a decision)
 
-**Sonnet 5.5**, through the batch as built (#16), because its advantage is consistent where it matters most (severity and impact of time-limited items, 9 of 10 notices) and the measured cost (~$1.63/month in batch) is well inside the budget. Two prompt fixes help whichever model is chosen, and could be a small follow-up (proposed in the PR, not done here):
+**Sonnet 5.5**, through the batch as built (#16), because its advantage is consistent where it matters most (severity and impact of time-limited items, 9 of 10 notices) and the measured cost (~$1.63/month in batch) is well inside the budget. Two prompt fixes help whichever model is chosen; **the owner made them issue #67**, right after #17 in build order, with a re-run of the same 15 items with Sonnet 5.5:
 
 1. **A one-line meaning for each "affects" tag** in `config/tags.toml`, sent with the list (e.g. *Sea access: ships reaching or leaving the port by sea: fairways, pilots, tugs, anchorages, barriers, fog; not work on the quay*).
 2. **Severity of something that has already ended by today is Low**, and PIN notices: "End Date" is when the notice ends, not when the measure changed.
 
-If you prefer to keep Haiku, these two fixes plus a short re-run (~$0.02) would show whether Haiku closes the gap.
 
 ## Side by side
 
