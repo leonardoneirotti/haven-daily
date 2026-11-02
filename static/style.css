@@ -2002,6 +2002,27 @@ td.ais-text {
   gap: 0.55rem;
 }
 
+/* Method page: the sources by verdict, generated from config/sources.toml (#24) */
+.source-group {
+  display: grid;
+  gap: 0.55rem;
+}
+
+/* "(feed)" / "(page)": the address the job reads, after the link to the source's public page */
+.source-feed {
+  font-size: 0.875em;
+  color: var(--ink-2);
+}
+
+.source-group h3 {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
 .swatch {
   display: inline-block;
   width: 1rem;

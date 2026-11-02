@@ -165,3 +165,84 @@ def test_broken_toml_names_the_file(tmp_path):
 def test_missing_file(tmp_path):
     with pytest.raises(ConfigError, match="not found"):
         load_sources(tmp_path / "nope.toml")
+
+
+# --- `why`: the public reason shown on the Method page (issue #24) ---------------------------
+
+
+def test_why_is_read_and_is_none_when_missing(tmp_path):
+    path = write(tmp_path, """
+        [[source]]
+        id = "loadstar"
+        name = "The Loadstar"
+        verdict = "headline-only"
+        urls = ["https://theloadstar.com/feed/"]
+        access = "rss"
+        language = "en"
+        why = "Its feed terms allow links only."
+
+        [[source]]
+        id = "ect-news"
+        name = "ECT news"
+        verdict = "use"
+        urls = ["https://www.ect.nl/en/news-feed"]
+        access = "html"
+        language = "en"
+    """)
+    loadstar, ect = load_sources(path)
+    assert loadstar.why == "Its feed terms allow links only."
+    assert ect.why is None
+
+
+@pytest.mark.parametrize("why", ['""', '"   "', "3", '"two\\nlines"'])
+def test_why_must_be_one_line_of_text(tmp_path, why):
+    path = write(tmp_path, f"""
+        [[source]]
+        id = "nos"
+        name = "NOS"
+        verdict = "drop"
+        why = {why}
+    """)
+    with pytest.raises(ConfigError, match="'why'"):
+        load_sources(path)
+
+
+
+# --- `home`: the source's normal public page, linked on the Method page (PR #76) ----------------
+
+
+def test_home_is_read_and_is_none_when_missing(tmp_path):
+    path = write(tmp_path, """
+        [[source]]
+        id = "loadstar"
+        name = "The Loadstar"
+        verdict = "headline-only"
+        home = "https://theloadstar.com/"
+        urls = ["https://theloadstar.com/feed/"]
+        access = "rss"
+        language = "en"
+
+        [[source]]
+        id = "nos"
+        name = "NOS"
+        verdict = "drop"
+    """)
+    loadstar, nos = load_sources(path)
+    assert loadstar.home == "https://theloadstar.com/"
+    assert nos.home is None
+
+
+@pytest.mark.parametrize("home", ['"theloadstar.com"', '""', '["https://theloadstar.com/"]'])
+def test_home_must_be_one_web_address(tmp_path, home):
+    path = write(tmp_path, f"""
+        [[source]]
+        id = "loadstar"
+        name = "The Loadstar"
+        verdict = "headline-only"
+        home = {home}
+        urls = ["https://theloadstar.com/feed/"]
+        access = "rss"
+        language = "en"
+    """)
+    with pytest.raises(ConfigError, match="'home'"):
+        load_sources(path)

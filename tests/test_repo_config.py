@@ -78,3 +78,19 @@ def test_no_off_topic_word_drops_a_port_headline():
     for language, headlines in port_headlines.items():
         for headline in headlines:
             assert off_topic_word(headline, lists[language]) is None, headline
+
+
+def test_every_headline_only_and_dropped_source_says_why_in_public_words():
+    # The Method page shows `why` (issue #24); `note` stays for people reading the config.
+    for source in load_sources():
+        if source.verdict in ("headline-only", "drop"):
+            assert source.why, f"{source.id}: add a one-line public `why`"
+
+
+def test_every_fetched_source_has_a_public_home_page_other_than_what_is_read():
+    # The Method page links a source's name to its normal public page and "(feed)" to what the
+    # job reads (owner, 2 Nov 2026, PR #76).
+    for source in load_sources():
+        if source.fetched:
+            assert source.home, f"{source.id}: add `home`, the source's normal public page"
+            assert source.home not in source.urls, f"{source.id}: `home` repeats a read URL"

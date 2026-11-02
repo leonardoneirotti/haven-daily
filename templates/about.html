@@ -1,30 +1,37 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m %}
 {% block title %}Method · {{ site.name }}{% endblock %}
+{#
+  The Method page (spec §2.3 item 4, issue #24). What lives in config or code comes from
+  `method` (render.method_page): the source list (config/sources.toml), the Kaub thresholds
+  (config/rhine.toml) and the AI models (haven/filter.py, haven/summarise.py), so the page
+  can't drift from what the pipeline does. Everything else is written here.
+#}
 {% block main %}
 <main id="main" class="wrap">
   <div class="page-head">
     <h1 class="page-title">Method</h1>
-    <p class="page-lede">A short brief every morning on what affects the Port of Rotterdam, written for the people who plan cargo through it.</p>
+    <p class="page-lede">How a brief is made, the rules it follows, and where every number comes from.</p>
   </div>
 
   <div class="prose">
     <section aria-labelledby="what">
       <h2 id="what">What this is</h2>
-      <p>Haven Daily collects port and logistics news each morning, keeps what matters for Rotterdam, and turns it into at most five items, most severe first. Each item says what happened, links to the original source and gives an interpretation of the impact for a planner. On quiet days the brief is shorter. It is never padded.</p>
-      <p><em>Haven</em> means port in Dutch and a safe place in English.</p>
+      <p>Haven Daily is a short brief, published every morning, on what affects the Port of Rotterdam and what it means for the people who plan cargo through it. It collects port and logistics news, keeps what matters for Rotterdam, and turns it into at most five items, most severe first. Each item says what happened, links to the original source and gives an interpretation of the impact for a planner. Quiet days get a shorter brief. It is never padded.</p>
+      <p>It is a personal project, not a company tool, and it is not affiliated with the Port of Rotterdam Authority or any company in the port. <em>Haven</em> means port in Dutch and a safe place in English.</p>
     </section>
 
     <section aria-labelledby="steps">
       <h2 id="steps">How a brief is made</h2>
       <ol class="steps">
-        <li><strong>Collect, around 06:45 Amsterdam time.</strong> A scheduled job collects new items from the sources and records about 12 minutes of ship positions.</li>
-        <li><strong>Filter.</strong> Items about the Port of Rotterdam and the routes, carriers and hinterland links that serve it are kept. The rest are dropped.</li>
-        <li><strong>Summarise.</strong> An AI model writes a two-line summary, a planner impact and a severity for each kept item, following the rules below. It may only use facts from the source.</li>
-        <li><strong>Status.</strong> The job reads the port status values: weather warnings, the Rhine water level and the strike flag.</li>
-        <li><strong>Publish.</strong> The brief goes online straight away. A day is never skipped.</li>
+        <li><strong>Collect, around 06:45 Amsterdam time.</strong> A scheduled job reads the sources listed below and keeps only items it hasn't seen in the last 14 days.</li>
+        <li><strong>Filter.</strong> Fixed rules go first: items older than 48 hours, port notices that ended more than 12 hours ago and clearly off-topic headlines (football, for example) are dropped. Items from Rotterdam-specific sources are kept. An AI model checks the rest: is this relevant to a planner working with the Port of Rotterdam? When unsure, it keeps the item.</li>
+        <li><strong>Summarise.</strong> A second AI model writes a two-line summary, a planner impact and a severity for each kept item, following the rules below, and picks its place on the chart and its "affects" tags from fixed lists.</li>
+        <li><strong>Status.</strong> The job reads the port status: weather warnings, the Rhine water level at Kaub and the strike flag.</li>
+        <li><strong>Publish.</strong> The brief is saved and the site goes online straight away. A day is never skipped.</li>
       </ol>
-      <p>Every step is automatic and nobody checks the brief before it goes online. When a mistake is found afterwards, {{ site.author.split(" ")[0] }} fixes it and the page is published again with a correction: the time at the top of the brief ("Corrected 09:14") and a note saying what changed, under "How this brief was made". A brief is never changed silently.</p>
+      <p>Every step is automatic. Nobody checks a brief before it goes online. When a mistake is found afterwards, {{ site.author.split(" ")[0] }} fixes it and the page is published again with a correction: the time at the top of the brief ("Corrected 09:14") and a note saying what changed, under "How this brief was made". A brief is never changed silently.</p>
+      <p>Each brief ends with "How this brief was made": the sources checked, how many items were collected, kept and shown, and every source or step that failed. If one source fails, the rest of the brief is still published and the failure is shown.</p>
     </section>
 
     <section aria-labelledby="severity">
@@ -32,58 +39,139 @@
       <dl class="rules">
         <div><dt><span class="swatch num-high"></span><span class="sev sev-high">High</span></dt><dd>Directly affects Rotterdam operations and has a timeframe. Example: a strike at a terminal this week.</dd></div>
         <div><dt><span class="swatch num-medium"></span><span class="sev sev-medium">Medium</span></dt><dd>Affects a European route, carrier or hinterland connection that serves Rotterdam.</dd></div>
-        <div><dt><span class="swatch num-low"></span><span class="sev sev-low">Low</span></dt><dd>Background trend or long-term news.</dd></div>
+        <div><dt><span class="swatch num-low"></span><span class="sev sev-low">Low</span></dt><dd>Background trend or long-term news, or something already over when the brief is made (a closure lifted, a delay cleared). A port notice to shipping whose end date has passed is always Low, whatever the AI answered.</dd></div>
         <div><dt><span class="swatch num-unrated"></span><span class="sev sev-unrated">Unrated</span></dt><dd>The AI step failed for this item, so it has no severity, summary or impact: only the headline and a link. Unrated items come after all rated ones.</dd></div>
       </dl>
       <p>The impact for planners is always an interpretation, which is why it is set in a different typeface. When the source does not support one, the item says <em>Not enough information</em> instead of guessing.</p>
-      <p>If the AI is unavailable all morning, the job retries an hour later. If it is still down at the last try, a reduced brief is published so no day is skipped: the port status, and only items from the Rotterdam-specific sources, all unrated, under the note <em>"The AI step was unavailable this morning: headlines only, no summaries."</em> The strike flag then shows No data, because it can't be judged without the AI.</p>
+      <p>Items from headline-only sources (see Sources) have no summary. The AI rates them from the headline alone, and the page marks them <em>rated from headline only</em>.</p>
+      <p>If the AI is unavailable all morning, the job tries again an hour later. If it is still down at the last try, a reduced brief is published so no day is skipped: the port status, and only items from the Rotterdam-specific sources, all unrated, under the note <em>"The AI step was unavailable this morning: headlines only, no summaries."</em> The strike flag then shows No data, because it can't be judged without the AI.</p>
     </section>
 
     <section aria-labelledby="thresholds">
       <h2 id="thresholds">Port status thresholds</h2>
-      <p class="draft">{{ m.icon("triangle-alert") }}<span><strong>Draft.</strong> These rules are not final. They will be set from public sources when the status line is built.</span></p>
+      <p>Each indicator shows a value, a level (Normal, Watch, Alert), the change since yesterday, when it was read and its source. The level is always shown by a shape as well as a colour.</p>
       <div class="table-scroll" role="region" aria-labelledby="thresholds" tabindex="0">
         <table>
           <thead>
             <tr><th scope="col">Indicator</th><th scope="col">Normal</th><th scope="col">Watch</th><th scope="col">Alert</th><th scope="col">Source</th></tr>
           </thead>
           <tbody>
-            <tr><th scope="row">Weather warnings</th><td>No warning for the Rotterdam region</td><td>Code yellow</td><td>Code orange or red</td><td>KNMI</td></tr>
-            <tr><th scope="row">Rhine water level</th><td>Above the watch level</td><td>Below the watch level (to be set)</td><td>Below the alert level (to be set)</td><td>Public water-level data, Kaub and Lobith</td></tr>
-            <tr><th scope="row">Strike flag</th><td>No strike in today's items</td><td>Strike announced for Rotterdam</td><td>Strike affecting Rotterdam today</td><td>Today's items</td></tr>
+            <tr id="threshold-weather">
+              <th scope="row">Weather warnings, Zuid-Holland</th>
+              <td>No warning (green) for the rest of today</td>
+              <td>Code yellow at any time in the rest of today</td>
+              <td>Code orange or red at any time in the rest of today</td>
+              <td>KNMI's warnings for the province of Zuid-Holland, via <a href="https://www.meteoalarm.org">MeteoAlarm</a></td>
+            </tr>
+            <tr id="threshold-rhine">
+              <th scope="row">Rhine water level, Kaub</th>
+              <td>{{ method.rhine.normal }}</td>
+              <td>{{ method.rhine.watch_low }}: barge low-water surcharges start. Or {{ method.rhine.watch_high }}: high-water shipping restrictions (Marke I).</td>
+              <td>{{ method.rhine.alert_low }}: barge operators no longer guarantee transport. Or {{ method.rhine.alert_high }}: shipping stops (Marke II).</td>
+              <td>Low water: {% for src in method.rhine.low_sources %}<a href="{{ src.url }}">{{ src.name }}</a>{{ ", " if not loop.last }}{% endfor %} (read {{ method.rhine.low_read }}). High water: the gauge marks of the German waterways administration (WSV), from <a href="{{ method.rhine.pegelonline_url }}">PEGELONLINE</a>.</td>
+            </tr>
+            <tr id="threshold-strike">
+              <th scope="row">Strike flag</th>
+              <td>No active Rotterdam strike: none found, all over, or called off</td>
+              <td>Rotterdam strike announced for a later date, or with no date given</td>
+              <td>Rotterdam strike today, or ongoing</td>
+              <td>Kept items of the last 14 days (<a href="#strike">how it works</a>)</td>
+            </tr>
           </tbody>
         </table>
       </div>
       <p><strong>No data</strong> means the source did not answer or returned nothing usable. A missing value is never estimated.</p>
-      <p>Weather warnings are issued by <strong>KNMI</strong> and read once a day, at 06:45 Amsterdam time, from <a href="https://www.meteoalarm.org">www.meteoalarm.org</a>. They are not live. Each reading shows KNMI's original level and hazard next to the Watch or Alert it maps to, and the time KNMI issued it.</p>
-      <p class="disclaimer">Time delays between this website and the www.meteoalarm.org website are possible. For the most up-to-date awareness information as published by the participating National Meteorological and Hydrological Services, please refer to <a href="https://www.meteoalarm.org">www.meteoalarm.org</a>.</p>
+      <p>The Kaub gauge is the reference barge operators use for the Rhine: the low-water surcharges above are set by its level. The reading is rounded to a whole centimetre before the level is set. A reading below the lowest level on record is still a valid Alert. The level at Lobith, where the Rhine enters the Netherlands, is stored every day for later trend charts but not shown.</p>
+    </section>
+
+    <section aria-labelledby="weather">
+      <h2 id="weather">Weather warnings</h2>
+      <p>Weather warnings are issued by <strong>KNMI</strong>, the Dutch national weather service, and read once a day, at around 06:45 Amsterdam time, from <a href="https://www.meteoalarm.org">www.meteoalarm.org</a>. They are not live: the weather dial says "Warnings at 06:45 · not live" and links to www.meteoalarm.org for the current warnings. Each reading shows KNMI's own level and hazard next to the level it maps to (for example "KNMI: Code yellow · Wind → Watch") and the time of issue of the warning. Only the level and the hazard are shown, never the warning text.</p>
+      <p class="disclaimer">{{ meteoalarm_disclaimer }}</p>
+    </section>
+
+    <section aria-labelledby="strike">
+      <h2 id="strike">How the strike flag works</h2>
+      <p>Strikes are announced days ahead, so the flag doesn't look at today's news alone. When the AI summarises an item about a strike, it notes where the strike is and whether it is announced, ongoing or called off. It copies the words that give its dates, and the code works out the dates from them. A date the source doesn't state is never guessed. Each morning the flag reads these details from the kept items of the last 14 days, plus any strike dated today or later from up to 60 days back.</p>
+      <ul>
+        <li>Several items about the same strike: the newest one decides. A cancellation brings the flag back to Normal.</li>
+        <li>A false alarm is better than a missed strike. Only an item the AI confidently matches to a strike can lower its level. When the match is unsure, the strike stays up and both items are shown, so the reader can judge.</li>
+        <li>A strike reported as ongoing with no newer report after two days drops to Watch ("no newer report"), never to Normal by itself.</li>
+        <li>The flag links the item that decided it, with its source and date.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="models">
+      <h2 id="models">The AI models</h2>
+      <ul>
+        <li><strong>Relevance check:</strong> {{ method.models.filter }}, one short yes-or-no question per item that the rules couldn't decide.</li>
+        <li><strong>Summaries:</strong> {{ method.models.summary }}, chosen after a side-by-side test with {{ method.models.fallback }} on the same items. All kept items go to Anthropic's Batch API, which costs half as much. Items with no answer after {{ method.models.batch_wait_minutes }} minutes are summarised by {{ method.models.fallback }} instead, so the brief isn't held up. Each item records which model wrote it.</li>
+        <li>The AI picks places and "affects" tags only from fixed lists. Anything else it answers is dropped.</li>
+        <li>Every answer is checked in code. A summary that copies ten or more words in a row from the article, or runs too long, gets one more try. If the answer still fails, or the AI refuses, the item is shown unrated. No second model is asked to try instead.</li>
+        <li>All AI calls together are kept under €5 a month.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="sources">
+      <h2 id="sources">Sources</h2>
+      <p>Every source was tested before use: does it have a feed or a readable page, what do its terms and robots.txt allow, and does it opt out of AI use? Each source's terms and robots.txt are respected. A source that opts out of AI use is headline-only: its article text never goes to an AI, only its headline and link are used.</p>
+      {% for group in method.source_groups %}
+      <div class="source-group" id="sources-{{ group.verdict }}">
+        <h3>{{ group.label }}</h3>
+        <ul>
+          {% for src in group.sources %}
+          <li>
+            <strong>{% if src.home %}<a href="{{ src.home }}">{{ src.name }}</a>{% else %}{{ src.name }}{% endif %}</strong>{% if src.read_url %} <span class="source-feed">(<a href="{{ src.read_url }}">{{ src.read_label }}</a>)</span>{% endif %}{% if src.access %} · {{ src.access }}{% endif %}{% if src.language_name %} · {{ src.language_name }}{% endif %}.
+            {% if group.verdict != "drop" %}{{ src.how }}{% endif %}{% if src.why %} {{ src.why }}{% endif %}
+
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </section>
+
+    <section aria-labelledby="copyright">
+      <h2 id="copyright">Copyright and article text</h2>
+      <ul>
+        <li>Every item links to its original source. Summaries are short and written in the AI's own words, with no long quotes and no invented facts, numbers or quotes.</li>
+        <li>No article text is stored. An article is read in memory to write its summary, then discarded. What is stored, in public, is the headline, the link, the date and our own summary, so the original can always be reopened.</li>
+        <li>Paywalled sources, and sources whose terms allow links only, appear as a headline and link only.</li>
+        <li>Dutch articles get an English summary and a <em>Read in English</em> link that opens the original through Google Translate. Translated articles are never stored or republished here.</li>
+      </ul>
     </section>
 
     <section aria-labelledby="chart">
       <h2 id="chart">The chart</h2>
       <ul>
-        <li>The land and water are drawn from OpenStreetMap data. They are prepared once by a script, so the daily build does not depend on a map service. Roads, railways and storage tanks are drawn as texture, not as a road map.</li>
+        <li>The land and water are drawn from OpenStreetMap data. They are prepared once by a script, so the page does not depend on a map service. Roads, railways and storage tanks are drawn as texture, not as a road map.</li>
         <li>The fine lines in the water are decoration: each one is a fixed distance from the shore. They are not depth contours and say nothing about where ships can sail.</li>
-        <li>Ship positions come from a short daily AIS snapshot of the port area. Only seagoing cargo ships are shown (container ships, tankers and bulk carriers), not barges, tugs or pilot boats.</li>
+        <li>Numbered squares on the chart are the day's items, placed at a location picked from a fixed list of port places.</li>
+        {% if ais_snapshot_built %}
+        <li>Ship positions come from a short AIS snapshot of the port area, recorded each morning: where ships were at that moment, not live. Only seagoing cargo ships are shown (container ships, tankers and bulk carriers), not barges, tugs or pilot boats. Ships at a terminal named in an item are drawn in that item's colour.</li>
         <li>Destinations are typed in by ship crews and are often messy, for example <span class="ais-text">ANTWERP&gt;HAMBURG</span> or blank. The page shows a cleaned destination next to the original text, and <em>Unknown</em> when it is unclear.</li>
-        <li>Numbered squares on the chart are today's items. Ships at a terminal named in an item are drawn in that item's colour.</li>
+        {% else %}
+        <li>Ship positions are not collected yet. They will come from a short AIS snapshot of the port area each morning: seagoing cargo ships only, where they were at that moment, not live.</li>
+        {% endif %}
       </ul>
     </section>
 
-    <section aria-labelledby="sources">
-      <h2 id="sources">Sources and copyright</h2>
+    <section aria-labelledby="credits">
+      <h2 id="credits">Credits</h2>
       <ul>
-        <li>Every item links to its original source. Summaries are short and written in our own words, with no long quotes.</li>
-        <li>Dutch articles get an English summary and a <em>Read in English</em> link that opens the original through Google Translate. Translated articles are never stored or republished here.</li>
-        <li>Paywalled sources appear as a headline and link only.</li>
-        <li>Each source's terms and robots.txt are respected. Sources that do not allow automated access are not used.</li>
+        <li>Weather warnings by KNMI via <a href="https://www.meteoalarm.org">MeteoAlarm</a>.</li>
+        <li>Rhine level at Kaub by WSV via PEGELONLINE (licence DL-DE→Zero-2.0). Rhine level at Lobith by Rijkswaterstaat (CC0).</li>
+        <li>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (ODbL).</li>
+        <li>Built with <a href="https://leafletjs.com">Leaflet</a> 1.9.4 (BSD-2), Jinja2 (BSD), Beautiful Soup and soupsieve (MIT), the Anthropic Python SDK (MIT), and Shapely (BSD) for the map script.</li>
+        <li>Icons: <a href="https://lucide.dev">Lucide</a> (ISC). Fonts: IBM Plex Sans, Sans Condensed, Mono and Serif (SIL Open Font License).</li>
       </ul>
     </section>
 
     <section aria-labelledby="maker">
       <h2 id="maker">Who makes this</h2>
-      <p>Haven Daily is a personal portfolio project by {{ site.author }}, a second-year BBA International Business (Supply Chain Management) student at Rotterdam University of Applied Sciences. It is built with Python, Jinja2, Leaflet and GitHub Actions.</p>
+      <p>Haven Daily is a personal portfolio project by {{ site.author }}, a second-year BBA International Business (Supply Chain Management) student at Rotterdam University of Applied Sciences. It is built with Python and GitHub Actions, with Claude models for the AI steps.</p>
       {% if site.linkedin_url %}<p><a href="{{ site.linkedin_url }}">{{ site.author }} on LinkedIn</a></p>{% endif %}
+      {% if site.repo_url %}<p><a href="{{ site.repo_url }}">Source code on GitHub</a></p>{% endif %}
       <p>It is not affiliated with the Port of Rotterdam Authority or any company in the port.</p>
     </section>
   </div>

@@ -20,7 +20,10 @@ from urllib.parse import urlencode
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
+from haven import filter as haven_filter
+from haven import summarise
 from haven.clock import AMSTERDAM
+from haven.config import RhineThresholds, Source, load_rhine, load_sources
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = PROJECT_DIR / "templates"
@@ -43,6 +46,29 @@ METEOALARM_DISCLAIMER = (
     "up-to-date awareness information as published by the participating National Meteorological and "
     "Hydrological Services, please refer to www.meteoalarm.org."
 )
+# Method page (issue #24): where the Rhine thresholds in config/rhine.toml come from (spec §2.2).
+PEGELONLINE_KAUB_URL = (
+    "https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/KAUB/W.json?includeCharacteristicValues=true"
+)
+RHINE_LOW_SOURCES = (
+    {"name": "Contargo low-water surcharge", "url": "https://www.contargo.net/en/goodtoknow/lws"},
+    {"name": "Maersk Rhine low water surcharge",
+     "url": "https://www.maersk.com/news/articles/2026/07/09/rhine-river-low-water-surcharge"},
+)
+RHINE_SOURCES_READ = "2 Nov 2026"  # low side; the high side was read 31 Oct 2026 (config/rhine.toml)
+# How the Method page names the models the pipeline calls. A model id missing here stops the
+# build (KeyError), so a model change in filter.py or summarise.py can't leave the page out of date.
+MODEL_NAMES = {
+    "claude-haiku-5-5": "Claude Haiku 5.5",
+    "claude-sonnet-5-5": "Claude Sonnet 5.5",
+    "claude-opus-5-5": "Claude Opus 5.5",
+}
+SOURCE_GROUPS = (
+    ("use", "Summarised"),
+    ("headline-only", "Headline and link only"),
+    ("drop", "Not used"),
+)
+
 SEVERITIES = ("high", "medium", "low")
 # severity null = unrated: the AI failed for that item (spec §2.1, §5.6). It sorts after
 # every rated item and still counts toward MAX_ITEMS. "unrated" is its CSS key.
@@ -487,6 +513,59 @@ def group_by_month(briefs: list[dict]) -> list[tuple[str, list[dict]]]:
     return [(f"{month:%B %Y}", list(days)) for month, days in grouped]
 
 
+def source_use(source: Source) -> str:
+    """One line on how the pipeline uses a source, from its config (Method page, #24)."""
+    if source.verdict == "use" and source.auto_keep:
+        return ("Rotterdam-specific, so its new items skip the AI relevance check. Each is summarised "
+                "from the article.")
+    if source.verdict == "use":
+        return "New items go through the AI relevance check. Kept ones are summarised from the article."
+    if source.verdict == "headline-only":
+        return "Headline and link only. The AI sees the headline alone, to judge relevance and to rate it."
+    return "Not collected."
+
+
+def method_page(sources: tuple[Source, ...], rhine: RhineThresholds) -> dict:
+    """What the Method page shows that lives in config or code, so the page can't drift from it:
+    the sources by verdict, the Kaub thresholds and the AI models (issue #24)."""
+    groups = []
+    for verdict, label in SOURCE_GROUPS:
+        listed = [
+            {
+                "name": src.name,
+                "home": src.home,  # the name links the source's normal public page
+                "read_url": src.urls[0] if src.urls else None,  # what the job reads
+                "read_label": "page" if src.access == "html" else "feed",  # "(page)" / "(feed)", owner PR #76
+                "language_name": LANGUAGE_NAMES.get(src.language, src.language) if src.language else None,
+                "access": {"rss": "RSS feed", "html": "Web page"}.get(src.access),
+                "how": source_use(src),
+                "why": src.why,
+            }
+            for src in sources if src.verdict == verdict
+        ]
+        if listed:
+            groups.append({"verdict": verdict, "label": label, "sources": listed})
+    return {
+        "source_groups": groups,
+        "rhine": {
+            "normal": f"{rhine.watch_at_or_below + 1}–{rhine.watch_above} cm",
+            "watch_low": f"{rhine.watch_at_or_below} cm or below",
+            "watch_high": f"above {rhine.watch_above} cm",
+            "alert_low": f"{rhine.alert_at_or_below} cm or below",
+            "alert_high": f"above {rhine.alert_above} cm",
+            "low_sources": RHINE_LOW_SOURCES,
+            "low_read": RHINE_SOURCES_READ,
+            "pegelonline_url": PEGELONLINE_KAUB_URL,
+        },
+        "models": {
+            "filter": MODEL_NAMES[haven_filter.AI_MODEL],
+            "summary": MODEL_NAMES[summarise.SUMMARY_MODEL],
+            "fallback": MODEL_NAMES[summarise.FALLBACK_MODEL],
+            "batch_wait_minutes": summarise.BATCH_WAIT // 60,
+        },
+    }
+
+
 def make_environment() -> Environment:
     env = Environment(
         loader=FileSystemLoader(TEMPLATES_DIR),
@@ -548,7 +627,8 @@ def render_site(briefs_dir: Path, out_dir: Path) -> int:
         env, "archive.html", out_dir / "archive.html",
         root="", active="archive", sample=sample, months=group_by_month(briefs),
     )
-    write_page(env, "about.html", out_dir / "about.html", root="", active="method", sample=sample)
+    write_page(env, "about.html", out_dir / "about.html", root="", active="method", sample=sample,
+               method=method_page(load_sources(), load_rhine()))
     return len(briefs)
 
 

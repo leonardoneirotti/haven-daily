@@ -18,7 +18,7 @@ CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 VERDICTS = ("use", "headline-only", "drop")
 ACCESS_TYPES = ("rss", "html")
 
-_SOURCE_FIELDS = {"id", "name", "verdict", "urls", "access", "language", "auto_keep", "note"}
+_SOURCE_FIELDS = {"id", "name", "verdict", "urls", "access", "language", "auto_keep", "note", "why", "home"}
 _LANGUAGE = re.compile(r"^[a-z]{2}$")
 
 # Place list (spec §5.10). "barrier" and "bridge" are Claude's additions to the
@@ -47,7 +47,9 @@ class Source:
     access: str | None = None  # "rss" / "html"; None for dropped sources
     language: str | None = None  # two-letter code, e.g. "en", "nl"
     auto_keep: bool = False  # skips the AI relevance check (spec §5.4)
-    note: str | None = None
+    note: str | None = None  # for people reading the config only, never shown
+    why: str | None = None  # one public line on the Method page: why it is headline-only or dropped (#24)
+    home: str | None = None  # the source's normal public page, linked from its name on the Method page (PR #76)
 
     @property
     def fetched(self) -> bool:
@@ -341,6 +343,14 @@ def _check_source(file: str, number: int, entry: dict) -> Source:
     if note is not None and not isinstance(note, str):
         fail("'note' must be text")
 
+    why = entry.get("why")
+    if why is not None and (not isinstance(why, str) or not why.strip() or "\n" in why):
+        fail("'why' must be one line of text (it is shown on the Method page)")
+
+    home = entry.get("home")
+    if home is not None and (not isinstance(home, str) or not home.startswith(("https://", "http://"))):
+        fail("'home' must be one web address starting with https:// or http://")
+
     if verdict != "drop":
         if not urls:
             fail(f"has no URL (a {verdict!r} source is fetched, so it needs at least one)")
@@ -357,4 +367,6 @@ def _check_source(file: str, number: int, entry: dict) -> Source:
         language=language,
         auto_keep=auto_keep,
         note=note,
+        why=why,
+        home=home,
     )
