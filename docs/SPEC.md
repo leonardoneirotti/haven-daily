@@ -254,7 +254,10 @@ haven/                 Python package
 config/
   sources.toml         every source in SOURCES.md: verdict, URLs, access, language, auto-keep
   filter.toml          off-topic word lists per language (§5.4), small starter lists (football)
-tests/                 pytest; run with `python -m pytest` (settings in pytest.ini)
+tests/                 pytest; run with `python -m pytest` (settings in pytest.ini). conftest.py: no API keys, no internet in any test
+.github/workflows/
+  pages.yml            render + deploy the site on every push to main
+  tests.yml            run all tests on every pull request and push to main; no secrets
 templates/             base.html, day.html, archive.html, about.html, _macros.html
 static/
   style.css            the whole design (tokens at the top)
