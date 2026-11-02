@@ -1072,7 +1072,7 @@ Principle: **fact vs interpretation in two typefaces** — the impact is the onl
 - `map.js` is unchanged: the strip opens on the same home views; with the panel not floating, `panelCover()` is 0, so no room is kept for it.
 - Tests: `tests/test_first_screen.py`. Screenshots before/after (sample briefs only): `design/screenshots/issue-81/`.
 
-*Claude's defaults (#81), not yet confirmed by the owner:*
+*Claude's defaults (#81), all 7 confirmed by the owner (2 Nov 2026, PR #87):*
 1. **An item cut from the 5 shown doesn't count** as a pin, and **a day with ships but no pins keeps the full chart** (the ships are something to show).
 2. **Strip sizes**: phone `30vh`, min 15rem (240 px: room for the whole-port and zoom buttons, the scale and the credit), max 20rem; wide screens as tall as the panel beside it, min 18rem.
 3. **Wide screens, empty day: panel beside the strip, without its item list.** With the list the panel is ~800 px tall and the chart beside it would be full height again; without it the strip is ~360 px and the first full card is on a 1440 × 900 laptop's first screen.
