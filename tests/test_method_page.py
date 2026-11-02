@@ -169,6 +169,11 @@ def test_headline_only_and_dropped_sources_show_why():
     assert "No public feed." in text
 
 
+def test_sentences_in_the_source_list_are_separated_by_a_space(about):
+    # Jinja's trim_blocks once glued "how" and "why" together: "...to an AI.Its robots.txt..."
+    assert not re.search(r"[a-z)]\.[A-Z]", text_of(section(about, "sources")))
+
+
 def test_how_each_source_is_used_follows_its_config():
     sources = (source("auto", "use", auto_keep=True), source("checked", "use"),
                source("head", "headline-only", why="Paywalled."))
@@ -215,7 +220,7 @@ def test_nothing_suggests_the_page_is_official_or_reviewed(about):
     for word in ("official", "officially", "reviewed", "approved", "verified", "endorsed", "partner"):
         assert not re.search(rf"\b{word}\b", text, re.I), word
     assert "Nobody checks a brief before it goes online" in text
-    assert "not affiliated with the Port of Rotterdam Authority" in text.lower()
+    assert "not affiliated with the port of rotterdam authority" in text.lower()
     assert "portofrotterdam.com/" not in re.sub(r'href="[^"]*"', "", about)  # no images or logos from them
 
 

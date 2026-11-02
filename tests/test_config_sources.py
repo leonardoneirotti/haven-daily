@@ -194,7 +194,7 @@ def test_why_is_read_and_is_none_when_missing(tmp_path):
     assert ect.why is None
 
 
-@pytest.mark.parametrize("why", ['""', '"   "', "3", '"two\nlines"'])
+@pytest.mark.parametrize("why", ['""', '"   "', "3", '"two\\nlines"'])
 def test_why_must_be_one_line_of_text(tmp_path, why):
     path = write(tmp_path, f"""
         [[source]]
