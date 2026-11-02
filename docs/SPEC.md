@@ -696,22 +696,23 @@ Examples: terminals (ECT Delta, Euromax, RWG, APMT Maasvlakte II…), areas (Maa
 - **A warning that already expired when the feed is read doesn't count** ("valid at any time during the rest of today", §2.2), so a night fog warning that ended at 05:00 doesn't show Watch at 06:45; a warning starting later today does.
 - **Zuid-Holland only, for now.** The feed also has KNMI **coastal** warnings for sea areas, among them **Hook of Holland** (`NL802`, the port's sea entrance), which had a yellow wind warning on 2 Nov while Zuid-Holland was green. Not counted; adding it later is one constant (`AREA_CODE`) plus the display naming the area. *Open item (§11).*
 
-**The reading** (`key` `weather`, `label` "Weather warnings", `icon` `wind`, `place` "Zuid-Holland"): `value` (`"Code yellow · Wind"` or `"No warnings"`), `level` (`green`/`amber`/`red`), `knmi_level` (KNMI's own colour) and `hazards` (at the deciding level), `issued_at` (time of issue), `warnings` (every yellow/orange/red warning that counts: level, hazard, onset, expires, issued_at, highest first), `observed_at` (when the feed was read), `source_name` "KNMI via MeteoAlarm", `source_url` www.meteoalarm.org, `note` "Warnings at 06:45 · not live". All times Amsterdam, ISO 8601. **Never the warning text** (headline, description, event name), tested.
+**The reading** (`key` `weather`, `label` "Weather warnings", `icon` `wind`, `place` "Zuid-Holland"): `value` (`"Code yellow · Wind"` or `"No warnings"`), `level` (`green`/`amber`/`red`), `knmi_level` (KNMI's own colour) and `hazards` (at the deciding level), `issued_at` (time of issue; `null` when there are no warnings, see 6), `warnings` (every yellow/orange/red warning that counts: level, hazard, onset, expires, issued_at, highest first), `observed_at` (when the feed was read), `source_name` "KNMI via MeteoAlarm", `source_url` www.meteoalarm.org, `note` "Warnings at 06:45 · not live". All times Amsterdam, ISO 8601. **Never the warning text** (headline, description, event name), tested.
 
 **No data** (`value`, `level`, `knmi_level`, `issued_at`, `note` `null`, empty lists) with **one failure line** under "Weather warnings (MeteoAlarm)" when: the fetch fails or robots.txt blocks it, the answer is not JSON or not the warnings feed, **there is no Zuid-Holland entry for today at all**, or a Zuid-Holland warning has an unreadable level, colour, hazard or time.
 
-*Proposed by Claude, not yet confirmed by the owner (issue #18):*
+*Proposed by Claude, confirmed by the owner 2 Nov 2026, with the change marked (issue #18, PR #70):*
 1. **Only the newest version of each warning counts**: a version named in another message's `references` (an `Update` replaces it, a `Cancel` withdraws it) is ignored; a `Cancel` itself is never a warning. Only `status` "Actual" counts (not Test, Exercise, …).
 2. **Zuid-Holland is matched by its code `NL009` or its name**, so a renamed area is still found.
 3. **No Zuid-Holland entry for today = No data, not Normal.** KNMI always publishes green day entries, so an empty answer means the feed or the area changed; Normal would hide that forever (the same reason as the K+N 14-day check, §5.8).
 4. **Any unreadable level, hazard or time in a Zuid-Holland entry = No data for the whole reading**, not "skip that entry": a skipped orange warning would show Normal.
 5. **Valid during the rest of today** = onset before midnight tonight (Amsterdam) **and** expiry after the moment the feed was read; **expiring exactly at that moment = over**; no expiry = still valid; no onset = from when it became `effective` (else `sent`). A time without a timezone is unreadable.
-6. **Several hazards at the deciding level are all named** in the value, in onset order, once each ("Code yellow · Fog, Wind"); the time of issue is that of the **earliest-starting** one. **With no warnings**, the time of issue is the **newest `sent` among today's green entries** (on 2 Nov 2026 that was 28 Oct: KNMI issues them days ahead).
+   - A time without a timezone is unreadable here **on purpose** (MeteoAlarm always gives one), unlike the news filter, which reads such times as Amsterdam time (§5.4).
+6. **Several hazards at the deciding level are all named** in the value, in onset order, once each ("Code yellow · Fog, Wind"); the time of issue is that of the **earliest-starting** one. *(Changed by the owner, 2 Nov 2026: **with no warnings there is no time of issue** (`issued_at` `null`); the reading shows only "No warnings" plus the read time. Claude had proposed the newest `sent` among today's green entries, but KNMI issues those days ahead, so it read as stale: "28 Oct" on 2 Nov. Tested.)*
 7. **Hazard names as KNMI writes them, first letter capitalised** ("Wind", "Fog", "Snow-ice"), no translation table of our own.
 8. **The note uses the real read time**, "Warnings at HH:MM · not live", not a fixed "06:45", so a late retry run says so.
 9. **The module is `weather.py`**, one per indicator (Rhine #20 and strike flag #21 get their own); the runner (#22) puts the readings into `data/status/` and the brief.
 
-Live run (2 Nov 2026, 12:47, from a desktop, nothing written): read with no failures; Zuid-Holland green → "No warnings", issued 28 Oct 03:08.
+Live run (2 Nov 2026, 12:47, from a desktop, nothing written): read with no failures; Zuid-Holland green → "No warnings" (before the owner's change to 6, the reading still gave the green entries' issue time, 28 Oct 03:08).
 
 ---
 
