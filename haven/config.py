@@ -409,3 +409,58 @@ def _check_source(file: str, number: int, entry: dict) -> Source:
         why=why,
         home=home,
     )
+
+
+# ---------- config/site.toml: the site's own addresses (spec §2.3, issue #28) ----------
+
+_SITE_FIELDS = ("base_url", "linkedin_url", "repo_url", "social_image", "social_image_alt")
+# One https web address: a host with a dot, no spaces.
+_HTTPS_URL = re.compile(r"^https://[^\s/]+\.[^\s/]+(/\S*)?$")
+# A PNG file name in static/: no folders, no spaces.
+_IMAGE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.png$")
+
+
+@dataclass(frozen=True)
+class SiteConfig:
+    base_url: str  # where the site is published, ending with "/"
+    linkedin_url: str
+    repo_url: str
+    social_image: str  # file name of the 1200 x 630 PNG preview card in static/
+    social_image_alt: str
+
+
+def load_site(path: Path = CONFIG_DIR / "site.toml") -> SiteConfig:
+    """The site's own addresses and its preview image, checked. Raises ConfigError on the first problem."""
+    path = Path(path)
+    data = _read_toml(path)
+    unknown = sorted(set(data) - set(_SITE_FIELDS))
+    if unknown:
+        raise ConfigError(f"{path.name}: unknown field {unknown[0]!r} (allowed: {', '.join(_SITE_FIELDS)})")
+    for name in _SITE_FIELDS:
+        if name not in data:
+            raise ConfigError(f"{path.name}: missing {name!r}")
+    for name in ("base_url", "linkedin_url", "repo_url"):
+        if not isinstance(data[name], str) or not _HTTPS_URL.match(data[name]):
+            raise ConfigError(f"{path.name}: {name} must be one https:// web address, got {data[name]!r}")
+    if not data["base_url"].endswith("/"):
+        raise ConfigError(f"{path.name}: base_url must end with / (page addresses are added to it)")
+    if not isinstance(data["social_image"], str) or not _IMAGE_NAME.match(data["social_image"]):
+        raise ConfigError(f"{path.name}: social_image must be the file name of a .png in static/, "
+                          f"e.g. \"social-preview.png\", got {data['social_image']!r}")
+    alt = data["social_image_alt"]
+    if not isinstance(alt, str) or not alt.strip() or "\n" in alt:
+        raise ConfigError(f"{path.name}: social_image_alt must be one line of text")
+    return SiteConfig(**{name: data[name].strip() if name == "social_image_alt" else data[name]
+                         for name in _SITE_FIELDS})
+
+
+def preview_image_size(path: Path) -> tuple[int, int] | None:
+    """Width and height of a PNG, read from its header (no Pillow); None if it isn't a PNG."""
+    try:
+        with Path(path).open("rb") as f:
+            head = f.read(24)
+    except OSError:
+        return None
+    if len(head) < 24 or head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
+        return None
+    return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")

@@ -43,10 +43,11 @@ from dataclasses import dataclass, field
 from typing import Callable
 from urllib.parse import urljoin, urlsplit
 
-from haven.config import Source
+from haven.config import Source, load_site
 
 PRODUCT_TOKEN = "HavenDaily"
-METHOD_PAGE_URL = "https://leonardoneirotti.github.io/haven-daily/about.html"
+# "How it works" (about.html) at the site's address in config/site.toml (#28).
+METHOD_PAGE_URL = load_site().base_url + "about.html"
 USER_AGENT = f"{PRODUCT_TOKEN}/1.0 (+{METHOD_PAGE_URL})"
 
 MIN_DELAY = 3.0  # seconds between two requests to the same host
