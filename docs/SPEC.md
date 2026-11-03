@@ -308,9 +308,11 @@ static/
   basemap.js           generated: land, detail, labels (window.HAVEN_BASEMAP)
   site.js              adds the "js" class to <html>
   favicon.svg
+  social-preview.png   generated: the 1200 × 630 social preview card (§7.7)
   fonts/               IBM Plex woff2 files + OFL.txt, self-hosted (§7.3, #27)
   vendor/leaflet/      Leaflet 1.9.4, self-hosted
 tools/build_basemap.py builds basemap.js from OpenStreetMap (run once)
+tools/make_social_preview.py  draws static/social-preview.png, the og:image card (§7.7, #95)
 data/basemap/          land.geojson + raw Overpass caches (caches git-ignored)
 data/sample/briefs/    4 sample briefs (fake, marked as sample; 26 Oct is a reduced brief)
 data/briefs/           real briefs, one per day (what the renderer reads)
@@ -321,7 +323,7 @@ site/                  output, not committed (Actions builds it)
 CLAUDE.md, SOURCES.md, README.md
 BUILD_PLAN.md          pointer only: the plan is the GitHub issues + §10
 requirements.txt       jinja2>=3.1,<4, tzdata (time zone rules; Windows has none built in), beautifulsoup4>=4.12,<5 (HTML lists, §5.8), anthropic>=2.3,<3 (Claude API, §5.4)
-requirements-dev.txt   + pytest, + shapely>=2.0,<3 (only for the basemap tool)
+requirements-dev.txt   + pytest, + shapely>=2.0,<3 (only for the basemap tool), + pillow==12.3.0 (only for the preview card tool)
 .gitignore             .venv/, __pycache__/, *.pyc, osm caches, site/
 ```
 
@@ -1151,15 +1153,20 @@ Prompts:
 
 ### 7.7 Other images worth generating (Nano Banana Pro)
 
-- **Social preview card (og:image, 1200×630)** — highest impact, LinkedIn shows it: "Wide 1200×630 banner, dark warm charcoal background (#151311), top-down stylised relief map of a large seaport at dusk with fine concentric contour lines in the water following the coastline, a few small teal ship silhouettes seen from above, one glowing orange accent, minimal and editorial, lots of empty dark space on the left for a title, no text, no logos, no real company branding"
+- **Social preview card (og:image, 1200×630)** — highest impact, LinkedIn shows it. *Replaced by a drawn, text-only card (#95, below); this prompt is kept as an idea only:* "Wide 1200×630 banner, dark warm charcoal background (#151311), top-down stylised relief map of a large seaport at dusk with fine concentric contour lines in the water following the coastline, a few small teal ship silhouettes seen from above, one glowing orange accent, minimal and editorial, lots of empty dark space on the left for a title, no text, no logos, no real company branding"
 - **Built 3 Nov 2026 (#28): the site config and the preview tags.** `config/site.toml` holds the site's own addresses, `base_url` (GitHub Pages for now; change it here when the site moves to havendaily.nl), `linkedin_url` and `repo_url`, plus the preview image: `social_image` (a PNG file name in `static/`) and `social_image_alt`. `haven/config.py` (`load_site`) checks it: https addresses only, `base_url` ending with `/`, unknown or missing fields stop the build. The renderer adds the addresses to `site` for the templates (footer, "How it works", the Today page's About block); the fetcher's user agent uses `base_url` too. No template has the site's own addresses written in (`tests/test_social_tags.py`). Every page has `og:site_name`, `og:type` (`website`), `og:url` (its absolute address), `og:title`, `og:description` and `twitter:card`. `tests/test_privacy.py` allows this site's own address in an `og:`/`twitter:` `<meta>` (it loads nothing; only link-preview services read it) and nothing else. *Proposed by Claude, all seven confirmed by the owner (3 Nov 2026, PR #94):*
   1. **Today, Archive, "How it works":** title "Haven Daily" / "Archive · Haven Daily" / "How it works · Haven Daily", description = the owner's page description (§7.8). The Today page doesn't take the day's headline, so a link to the site (e.g. on the LinkedIn profile) previews the same way every day.
   2. **Day pages:** title "Thursday 29 October 2026 · Haven Daily", description the top headline, then "(and 4 more)" when there are more items; a quiet day: "Nothing significant on this day. The port status still applies."
   3. **Sample day pages** (hard rule 10): title "… · Haven Daily (sample data)", description the sample-data note, so a shared sample page can't preview invented news as real.
   4. **`og:image` only once the image exists and is 1200 × 630:** `static/social-preview.png`; until then no `og:image` and `twitter:card` = `summary`. With it: `og:image` (absolute URL), `og:image:width`/`height`, `og:image:alt` and `twitter:card` = `summary_large_image`. **PNG only**, because its size is read from the file header (no Pillow); a wrong size is left out of the pages (the page still builds) and fails `tests/test_config_site.py`.
-  5. **The alt text**, proposed by Claude: "A dark, stylised chart of a large seaport at dusk, with a few ships seen from above." (from the §7.7 prompt); change it in `config/site.toml` when the image is made.
+  5. **The alt text**, proposed by Claude: "A dark, stylised chart of a large seaport at dusk, with a few ships seen from above." (from the §7.7 prompt); change it in `config/site.toml` when the image is made. *(Replaced by #95: it now describes the drawn card.)*
   6. **"No hard-coded URLs in templates"** is read as the site's own addresses (base URL, LinkedIn, repository). Links to other sites (sources, OpenStreetMap, MeteoAlarm, the GitHub Privacy Statement, credits) stay in the templates as page content.
   7. **`og:type` is `website` on every page**, day pages included (not `article`).
+- **Built 3 Nov 2026 (#95): the image itself.** `static/social-preview.png` is drawn by `tools/make_social_preview.py` (Pillow), not generated, so it can be remade and contains nothing from anyone else (hard rule 13): no map data, no photos. It shows the page background (`--bg`), a short orange bar (`--accent`), **"Haven Daily"** large in ivory (`--ink`), the owner's one-liner (§7.8) below it in `--ink-2`, a thin rule (`--rule`) and **"Independent portfolio project"** small at the bottom. The script reads the texts from `SITE` in `haven/render.py`, the colours from the tokens at the top of `style.css` and the letters from the self-hosted Plex files in `static/fonts/`, so a change to any of them needs only a re-run. Since the file exists, every page has `og:image` and `twitter:card` = `summary_large_image` (#28). `social_image_alt` in `config/site.toml` describes the card: *"Dark card with a short orange line above "Haven Daily" in large ivory letters, under it the line "What affects … Updated every morning." and, small at the bottom, "Independent portfolio project"."* `tests/test_social_preview.py` checks: 1200 × 630; the committed file is pixel-identical to what the script makes now; texts, colours and fonts are the site's own; every pixel is a blend of the named tokens over the background; no text/metadata chunks in the PNG; the script reads nothing from the network; the alt text quotes the three texts and mentions no chart, map or ships. **Same pixels on every computer:** Pillow is pinned (`pillow==12.3.0`, in `requirements-dev.txt` only; the daily build doesn't need it, and `haven/config.py` still reads the PNG size from its header), and the script uses Pillow's basic text layout, because Pillow on Linux also has Raqm, which places letters differently, and CI (Linux) failed the pixel check until then. *Proposed by Claude, all four confirmed by the owner (3 Nov 2026, PR #96):*
+  1. **Title in IBM Plex Sans Condensed 700, 148 px** (the headline role, §7.3), not Plex Mono like the brand row: it reads better as a big word at thumbnail size.
+  2. **One-liner in Plex Sans 400, 38 px, on two lines** of about equal length; **footer label in Plex Mono 500, 21 px, uppercase with letter-spacing**, like the site's labels (§7.3).
+  3. **Two small additions to what was asked:** the short orange bar above the title (the site's one accent) and a thin rule above the footer label. Both are in the alt text.
+  4. **Left-aligned with an 88 px margin**, everything inside LinkedIn's visible area.
 - **Ship-type illustrations for popups** (one each, labelled "illustration" in the UI): "Top-down 3/4 view illustration of a large [container ship / oil tanker / bulk carrier] at sea, muted warm palette on a dark charcoal background, subtle teal highlights, clean editorial style, no text, no logos, no company markings, 800×500"
 
 
@@ -1304,7 +1311,7 @@ python -m http.server 8765 --directory site     # in the background
 
 Use `--dump-dom` with a small injected script that writes errors/timings into a `data-` attribute. Headless windows have a minimum width (~500 px), so phone screenshots at 390 px are unreliable.
 
-**Phone screenshots anyway (used in #23 and #25):** open a small wrapper page that holds the real page in a 390 px wide `<iframe>`, in a 600 px window, then crop the image to 390 px (PowerShell `System.Drawing`; the venv has no Pillow). Add `--allow-file-access-from-files` and load pages as `file://` (screenshots over `http://` can hang). For a whole page, measure its height first (a script in the wrapper reads the footer's bottom through the iframe and `--dump-dom` prints it), make the iframe that tall and capture it in pieces of ≤ 4,000 px by shifting the iframe up (a capture is capped at ~8,200 device px). Note: in a tall iframe `vh` units read as the iframe height, so only the first-screen shots show the exact first screen.
+**Phone screenshots anyway (used in #23 and #25):** open a small wrapper page that holds the real page in a 390 px wide `<iframe>`, in a 600 px window, then crop the image to 390 px (PowerShell `System.Drawing`; Pillow is only in `requirements-dev.txt`, for the preview card tool, since #95). Add `--allow-file-access-from-files` and load pages as `file://` (screenshots over `http://` can hang). For a whole page, measure its height first (a script in the wrapper reads the footer's bottom through the iframe and `--dump-dom` prints it), make the iframe that tall and capture it in pieces of ≤ 4,000 px by shifting the iframe up (a capture is capped at ~8,200 device px). Note: in a tall iframe `vh` units read as the iframe height, so only the first-screen shots show the exact first screen.
 
 ---
 
@@ -1370,7 +1377,7 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 - ~~Self-host the IBM Plex font files (`static/fonts/`) instead of Google Fonts, to avoid sending EU visitors' IP addresses to Google.~~ **Done 2 Nov 2026 (#27), §7.3.**
 - ~~Privacy check (EU/GDPR): no cookies, storage, analytics or outside loads; privacy note in the footer.~~ **Done 2 Nov 2026 (#68), hard rule 14, §5.3.** Footer wording and all 7 defaults confirmed by the owner (2 Nov 2026, PR #79).
 - Check aisstream.io terms for public display.
-- New logo (§7.6) and a social preview image (§7.7). *The meta tags are built (#28, §7.7): `og:image` appears by itself once `static/social-preview.png` (1200 × 630) is added.*
+- New logo (§7.6). ~~A social preview image (§7.7).~~ **Done 3 Nov 2026 (#95):** `static/social-preview.png`, drawn by `tools/make_social_preview.py`; every page now has `og:image` (#28). Check the preview with a link preview inspector (e.g. LinkedIn Post Inspector) once deployed.
 - ~~Fill in LinkedIn URL and repository URL in the site config (footer + Method page).~~ **Done:** shown since #86, in `config/site.toml` since #28.
 - First LinkedIn post: one concrete flagged item, what the tool said, and what the owner would do as a planner.
 
