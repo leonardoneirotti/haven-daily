@@ -38,6 +38,9 @@ SITE = {
     # The owner's own words (spec §7.8, #86): used exactly, so they live here once.
     "tagline": ("What affects the Port of Rotterdam today, and what it means for logistics planners. "
                 "Updated every morning."),
+    # The page description search engines show, on every page (owner, 3 Nov 2026, PR #93).
+    "description": ("What affects the Port of Rotterdam today, and what it means for logistics planners. "
+                    "Independent, unofficial portfolio project."),
     "about": ("Haven Daily is an independent portfolio project by Leonardo Neirotti, an International Business "
               "student at Rotterdam University of Applied Sciences. Every morning an automated pipeline reads "
               "public sources, uses AI to filter and summarise what matters for logistics planners, and publishes "

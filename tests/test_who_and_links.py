@@ -23,6 +23,9 @@ ABOUT = ("Haven Daily is an independent portfolio project by Leonardo Neirotti, 
          "student at Rotterdam University of Applied Sciences. Every morning an automated pipeline reads public "
          "sources, uses AI to filter and summarise what matters for logistics planners, and publishes this brief. "
          "It is not affiliated with the Port of Rotterdam Authority or any company named here.")
+# The page description search engines show (owner, 3 Nov 2026, PR #93: item 6).
+DESCRIPTION = ("What affects the Port of Rotterdam today, and what it means for logistics planners. "
+               "Independent, unofficial portfolio project.")
 # Under the About text in "Who makes this" (owner, 3 Nov 2026, PR #93: default 3).
 BUILT_BY = ("Built by Leonardo Neirotti, second-year BBA student (Supply Chain Management), "
             "with Python and GitHub Actions.")
@@ -76,6 +79,13 @@ def test_the_one_liner_is_exact_under_the_brand_on_every_page(pages):
         assert ONE_LINER in text_of(header), name
         # under the brand: after the brand name in the header
         assert text_of(header).index("Haven Daily") < text_of(header).index(ONE_LINER), name
+
+
+def test_every_page_has_exactly_the_owners_description(pages):
+    for name, page in pages.items():
+        found = re.findall(r'<meta name="description" content="([^"]*)">', page)
+        assert [html_lib.unescape(text) for text in found] == [DESCRIPTION], name
+    assert render.SITE["description"] == DESCRIPTION
 
 
 # ---------- S2: LinkedIn and the repository ----------
