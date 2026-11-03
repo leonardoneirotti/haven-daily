@@ -45,7 +45,9 @@ def test_the_repo_file_has_the_sites_addresses():
         linkedin_url="https://www.linkedin.com/in/leonardo-neirotti",
         repo_url="https://github.com/leonardoneirotti/haven-daily",
         social_image="social-preview.png",
-        social_image_alt="A dark, stylised chart of a large seaport at dusk, with a few ships seen from above.",
+        social_image_alt=('Dark card with "Haven Daily" in large ivory letters, under it the line "What affects the Port of '
+                          'Rotterdam today, and what it means for logistics planners. Updated every morning." and, small '
+                          'at the bottom, "Independent portfolio project".'),
     )
 
 
@@ -97,13 +99,12 @@ def test_the_preview_image_size_is_read_from_the_png(tmp_path):
     assert preview_image_size(png(tmp_path / "a.png", 1200, 630)) == (1200, 630)
 
 
-def test_the_preview_image_in_the_repo_is_1200_by_630_once_it_exists():
-    # Not made yet (owner's checklist #43). When it is added to static/, it must be the size
-    # LinkedIn shows uncropped; the renderer would leave a wrong-sized one out (test_social_tags).
+def test_the_preview_image_in_the_repo_is_1200_by_630():
+    # Made by tools/make_social_preview.py (#95). It must be the size LinkedIn shows uncropped;
+    # the renderer would leave a wrong-sized one out (test_social_tags).
     from pathlib import Path
     image = Path(__file__).resolve().parent.parent / "static" / load_site().social_image
-    if image.exists():
-        assert preview_image_size(image) == (1200, 630)
+    assert preview_image_size(image) == (1200, 630)
 
 
 def test_a_file_that_is_not_a_png_has_no_size(tmp_path):

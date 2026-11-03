@@ -3,7 +3,7 @@
 Every page has og:title, og:description, og:url (absolute), og:type, og:site_name and
 twitter:card. Day pages get their own title and description (the date and the top headline);
 sample day pages say they are sample data (hard rule 10). og:image, an absolute URL to a
-1200 × 630 PNG, appears only once that image exists. The addresses come from config/site.toml:
+1200 × 630 PNG, appears only once that image exists (it does since #95). The addresses come from config/site.toml:
 no template has the site's own URLs written in.
 """
 
@@ -127,9 +127,23 @@ def test_sample_day_pages_say_they_are_sample_data(sample_site):
 
 # ---------- og:image only once the image exists ----------
 
-def test_no_og_image_while_the_preview_image_does_not_exist(sample_site):
-    assert not (PROJECT_DIR / "static" / load_site().social_image).exists()  # not made yet (#43)
+def test_the_real_site_shows_the_preview_image_on_every_page(sample_site):
+    # static/social-preview.png exists since #95, so the tags appear by themselves.
+    assert (PROJECT_DIR / "static" / load_site().social_image).exists()
     for url_path, page in all_pages(sample_site).items():
+        assert tag(page, "og:image") == BASE + "static/social-preview.png", url_path
+        assert tag(page, "og:image:alt") == load_site().social_image_alt, url_path
+        assert tag(page, "twitter:card") == "summary_large_image", url_path
+
+
+def test_no_og_image_while_the_preview_image_does_not_exist(tmp_path, monkeypatch):
+    static = tmp_path / "static"
+    shutil.copytree(PROJECT_DIR / "static", static)
+    (static / load_site().social_image).unlink()
+    monkeypatch.setattr(render, "STATIC_DIR", static)
+    site = tmp_path / "out"
+    render.render_site(SAMPLE_BRIEFS, site)
+    for url_path, page in all_pages(site).items():
         assert not [name for name in tags(page) if name.startswith("og:image")], url_path
         assert tag(page, "twitter:card") == "summary", url_path
 
