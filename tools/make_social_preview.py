@@ -83,12 +83,18 @@ def draw_tracked(draw: ImageDraw.ImageDraw, xy: tuple[int, int], text: str, font
         x += font.getlength(letter) + tracking
 
 
+def font(role: str, size: int) -> ImageFont.FreeTypeFont:
+    # Pillow's basic text layout on every computer: its Linux build also has Raqm, which places
+    # letters slightly differently, so the image remade in CI would not match the one made on Windows.
+    return ImageFont.truetype(str(FONTS[role]), size, layout_engine=ImageFont.Layout.BASIC)
+
+
 def make(out: Path = OUT) -> Path:
     """Draw the card and save it as a PNG at `out`. Returns `out`."""
-    title_font = ImageFont.truetype(str(FONTS["title"]), TITLE_SIZE)
-    tagline_font = ImageFont.truetype(str(FONTS["tagline"]), TAGLINE_SIZE)
+    title_font = font("title", TITLE_SIZE)
+    tagline_font = font("tagline", TAGLINE_SIZE)
     tagline_font.set_variation_by_axes([400])
-    footer_font = ImageFont.truetype(str(FONTS["footer"]), FOOTER_SIZE)
+    footer_font = font("footer", FOOTER_SIZE)
 
     image = Image.new("RGB", (WIDTH, HEIGHT), COLOURS["bg"])
     draw = ImageDraw.Draw(image)
