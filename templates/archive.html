@@ -7,6 +7,12 @@
     <h1 class="page-title">Archive</h1>
     <p class="page-lede">Every brief so far. Each day keeps its own page and chart, exactly as published.</p>
   </div>
+  {# What the marks in each row mean (design review S9, #84): one line above the list. #}
+  <p class="archive-legend">
+    <span>Squares: the day's items by severity</span>
+    <span>Icons: weather, Rhine, strike</span>
+    <span class="legend-levels">{% for key, label in (("ok", "Normal"), ("watch", "Watch"), ("alert", "Alert"), ("nodata", "No data")) %}<span class="mark mark-{{ key }}">{{ m.icon(level_icons[key]) }}{{ label }}</span>{% endfor %}</span>
+  </p>
   {% for month, briefs in months %}
   <section class="month" aria-labelledby="month-{{ loop.index }}">
     <h2 id="month-{{ loop.index }}">{{ month }}</h2>
@@ -21,7 +27,9 @@
           </span>
           {{ m.severity_strip(brief) }}
           <span class="day-top{% if not items %} is-quiet{% endif %}">{% if items %}{{ items[0].headline }}{% else %}Nothing significant{% endif %}</span>
-          <span class="day-status">{{ m.status_marks(brief) }}<span class="day-ships">{% if brief.ships %}{{ brief.ships.count }} ships{% else %}No AIS{% endif %}</span></span>
+          <span class="day-status">{{ m.status_marks(brief) }}
+          {#- Ships: nothing in v1 (not collected yet); from v2 the count, or "No ship data" (#84). #}
+          {%- if brief.ships %}<span class="day-ships">{{ brief.ships.count }} ships</span>{% elif ais_snapshot_built %}<span class="day-ships">No ship data</span>{% endif %}</span>
         </a>
       </li>
       {% endfor %}
