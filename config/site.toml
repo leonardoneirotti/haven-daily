@@ -11,8 +11,9 @@ base_url = "https://leonardoneirotti.github.io/haven-daily/"
 linkedin_url = "https://www.linkedin.com/in/leonardo-neirotti"
 repo_url = "https://github.com/leonardoneirotti/haven-daily"
 
-# The social preview card (og:image): a 1200 x 630 PNG in static/, made by the owner (§7.7,
-# checklist #43). Until the file exists, pages have no og:image; once it does, every page links
-# it. A file of another size is left out (LinkedIn would crop it).
+# The social preview card (og:image): a 1200 x 630 PNG in static/, made by
+# tools/make_social_preview.py (§7.7, #95). Every page links it; without the file, or at another
+# size (LinkedIn would crop it), pages have no og:image. The alt text says what the card shows:
+# change it when the script draws something else.
 social_image = "social-preview.png"
-social_image_alt = "A dark, stylised chart of a large seaport at dusk, with a few ships seen from above."
+social_image_alt = 'Dark card with a short orange line above "Haven Daily" in large ivory letters, under it the line "What affects the Port of Rotterdam today, and what it means for logistics planners. Updated every morning." and, small at the bottom, "Independent portfolio project".'
