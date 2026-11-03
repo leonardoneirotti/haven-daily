@@ -39,6 +39,7 @@ static/basemap.js         port land shapes + place names (generated, see below)
 static/fonts/             IBM Plex font files + their licence (OFL.txt), self-hosted: no request to Google Fonts
 static/vendor/leaflet/    Leaflet 1.9.4, self-hosted
 tools/build_basemap.py    builds the basemap from OpenStreetMap (run once)
+tools/make_social_preview.py  draws static/social-preview.png, the link preview card
 data/basemap/             basemap output as GeoJSON
 data/sample/briefs/       four SAMPLE briefs (fake content, clearly marked on every page)
 site/                     output, not committed (GitHub Actions will build it)
@@ -86,6 +87,12 @@ The basemap is already built. To rebuild it (for example after changing the map 
 ```
 
 It downloads coastlines and water areas, and separately roads, railways, breakwaters and storage tanks, once from the Overpass API (cached in `data/basemap/osm-cache.json` and `osm-detail-cache.json`). It cuts the map rectangle along the coastline, keeps the land, and stores the detail compactly (about 650 KB for the whole `basemap.js`, roughly 200 KB as GitHub Pages sends it compressed).
+
+The social preview card (`static/social-preview.png`, what LinkedIn shows for a link to the site) is drawn by a script from the site's own texts, colours and fonts. Remake it after changing any of them:
+
+```powershell
+.\.venv\Scripts\python.exe tools\make_social_preview.py
+```
 
 ## Brief format (one file per day)
 
