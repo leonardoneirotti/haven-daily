@@ -8,7 +8,7 @@
 
   var el = document.getElementById("port-map");
   var dataEl = document.getElementById("map-data");
-  if (!el || !dataEl || !window.L || !window.HAVEN_BASEMAP) return;
+  if (!el || !dataEl || !window.L || !window.HAVEN_BASEMAP || !window.HavenPins) return;
   document.documentElement.classList.add("has-map");
 
   var data = JSON.parse(dataEl.textContent);
@@ -461,7 +461,8 @@
   data.callouts.forEach(function (callout) { callouts[callout.rank] = { data: callout }; });
   var ranks = Object.keys(callouts).map(Number).sort(function (a, b) { return a - b; });
   var calloutLayer = L.layerGroup().addTo(map);
-  var MARKER_GAP = 4; // pixels kept free between two markers
+  var MARKER_GAP = 4; // pixels kept free between two markers, and between a marker and the chart's edge
+  var pinGeometry = window.HavenPins; // the geometry: static/pins.js
   var activeRank = null, hoverRank = null; // kept here, because markers are rebuilt when they merge or split
 
   // A group's items in marker order: by rank, but items at the same place side by side
@@ -544,39 +545,35 @@
     return sizes[key];
   }
 
-  // Where a marker's box is on the screen. The anchor's number is centred on the place; the
-  // rest runs to the right of it, or the labels to the left; rows run down. As in style.css.
-  function boxAt(point, size, side, rows) {
-    var left = side === "left" ? point.x - size.half - (size.w - size.lead) : point.x - size.half;
-    var top = rows ? point.y - size.half : point.y - size.h / 2;
-    return { left: left, right: left + size.w, top: top, bottom: top + size.h };
-  }
-  function overlaps(a, b) {
-    return a.left < b.right + MARKER_GAP && b.left < a.right + MARKER_GAP &&
-      a.top < b.bottom + MARKER_GAP && b.top < a.bottom + MARKER_GAP;
-  }
 
   // Each marker on the side its place prefers (`side` in config/places.toml), on one line.
   // If it would run off the chart or under the panel: the other side; then, for a shared
-  // marker, rows on either side; if nothing fits, the narrowest of these.
+  // marker, rows on either side; if nothing fits, the narrowest of these. Last, a marker at
+  // the chart's edge moves inward just enough that no number is cut (owner, PR #91).
   function placeMarker(marker) {
     var anchor = callouts[marker.ranks[0]].data;
     var point = map.latLngToContainerPoint([anchor.lat, anchor.lon]);
-    var left = panelCover() + MARKER_GAP, right = map.getSize().x - MARKER_GAP;
+    var size = map.getSize(), chart = { left: panelCover(), top: 0, right: size.x, bottom: size.y };
+    var left = chart.left + MARKER_GAP, right = chart.right - MARKER_GAP;
     var preferred = anchor.side === "left" ? "left" : "right", other = preferred === "left" ? "right" : "left";
     var layouts = [[preferred, false], [other, false]];
     if (marker.ranks.length > 1) layouts.push([preferred, true], [other, true]);
     var best = null;
     layouts.forEach(function (layout) {
-      var box = boxAt(point, sizeOf(marker.ranks, layout[1]), layout[0], layout[1]);
+      var box = pinGeometry.boxAt(point, sizeOf(marker.ranks, layout[1]), layout[0], layout[1]);
       var fits = box.left >= left && box.right <= right;
       if (!best || (fits && !best.fits) || (!best.fits && box.right - box.left < best.box.right - best.box.left)) {
         best = { side: layout[0], rows: layout[1], box: box, fits: fits };
       }
     });
+    var nudge = pinGeometry.nudgeInside(best.box, point, chart, MARKER_GAP);
     marker.side = best.side;
     marker.rows = best.rows;
-    marker.box = best.box;
+    marker.nudge = { x: Math.round(nudge.x), y: Math.round(nudge.y) };
+    marker.box = {
+      left: best.box.left + marker.nudge.x, right: best.box.right + marker.nudge.x,
+      top: best.box.top + marker.nudge.y, bottom: best.box.bottom + marker.nudge.y,
+    };
     return marker;
   }
 
@@ -587,7 +584,7 @@
       var pair = null;
       for (var i = 0; i < markers.length && !pair; i++) {
         for (var j = i + 1; j < markers.length && !pair; j++) {
-          if (overlaps(markers[i].box, markers[j].box)) pair = [markers[i], markers[j]];
+          if (pinGeometry.overlaps(markers[i].box, markers[j].box, MARKER_GAP)) pair = [markers[i], markers[j]];
         }
       }
       if (!pair) return markers;
@@ -601,7 +598,9 @@
     if (!ranks.length) return;
     if (remeasure) sizes = {};
     var plan = planMarkers().sort(function (a, b) { return a.ranks[0] - b.ranks[0]; }); // keyboard order: item 1 first
-    var key = plan.map(function (m) { return m.ranks.join(",") + m.side + (m.rows ? " rows" : ""); }).sort().join("|");
+    var key = plan.map(function (m) {
+      return m.ranks.join(",") + m.side + (m.rows ? " rows" : "") + " " + m.nudge.x + "," + m.nudge.y;
+    }).sort().join("|");
     if (key === shownPlan) return;
     shownPlan = key;
     // A rebuilt marker is a new element: keep the keyboard focus on the same item.
@@ -614,7 +613,12 @@
         interactive: false, // the buttons inside take the clicks (see the document click handler)
         keyboard: false,
         zIndexOffset: 1000,
-        icon: L.divIcon({ className: markerClass(planned), iconSize: [0, 0], html: markerHtml(planned.ranks, planned.rows) }),
+        icon: L.divIcon({
+          className: markerClass(planned),
+          iconSize: [0, 0],
+          iconAnchor: [-planned.nudge.x, -planned.nudge.y], // Leaflet shifts the icon by minus the anchor
+          html: markerHtml(planned.ranks, planned.rows),
+        }),
       }).addTo(calloutLayer);
       L.DomEvent.disableClickPropagation(marker.getElement()); // no map drag or zoom from a number
     });
