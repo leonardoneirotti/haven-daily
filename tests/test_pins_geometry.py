@@ -93,6 +93,57 @@ def test_a_pin_just_right_of_the_panel_is_moved_clear_of_it():
     assert result["box"]["left"] == LAPTOP["left"] + MARGIN
 
 
+# ---------- Which pins the home view counts as shown ----------
+# Owner, 3 Nov 2026 (PR #91): the home view keeps an item whose number the edge nudge makes
+# visible. Before, it asked for 18 px (half a number) between a pin and the chart's edge, so on
+# a phone it dropped 5 East Anchorage (12 px below the top edge) from 10 pairs that fit on screen.
+
+def shown(point, chart=PHONE):
+    return js(f"P.onChart({json.dumps(point)}, {json.dumps(chart)})")
+
+
+def test_a_pin_near_the_edge_that_the_nudge_makes_whole_counts_as_shown():
+    assert shown({"x": 200, "y": 12}) is True  # 5 East Anchorage on a phone
+    assert shown({"x": 3, "y": 300}) is True
+    assert shown({"x": 200, "y": 523}) is True  # on the bottom edge itself
+    assert shown({"x": 420, "y": 400}, chart=LAPTOP) is True  # just right of the panel
+
+
+def test_a_place_off_the_chart_or_under_the_panel_does_not_count_as_shown():
+    assert shown({"x": 200, "y": -1}) is False
+    assert shown({"x": 391, "y": 300}) is False
+    assert shown({"x": 415, "y": 400}, chart=LAPTOP) is False
+
+
+def test_the_home_view_counts_as_shown_exactly_the_pins_the_nudge_makes_whole():
+    # Across both charts, edges included: a point that counts as shown gets its whole marker
+    # inside the chart after the nudge; any other point is not moved (and so stays off the chart).
+    mismatches = js(
+        "(() => { const out = [];"
+        f" for (const chart of [{json.dumps(PHONE)}, {json.dumps(LAPTOP)}]) {{"
+        "  for (let x = chart.left - 30; x <= chart.right + 30; x += 7) {"
+        "   for (let y = chart.top - 30; y <= chart.bottom + 30; y += 7) {"
+        "    const point = {x: x, y: y};"
+        f"    const box = P.boxAt(point, {json.dumps(ONE_ITEM)}, x > chart.right - 200 ? 'left' : 'right', false);"
+        f"    const n = P.nudgeInside(box, point, chart, {MARGIN});"
+        "    const whole = box.left + n.x >= chart.left && box.right + n.x <= chart.right"
+        "      && box.top + n.y >= chart.top && box.bottom + n.y <= chart.bottom;"
+        "    const moved = n.x !== 0 || n.y !== 0;"
+        "    if (P.onChart(point, chart) ? !whole : moved) out.push([chart.right, x, y]);"
+        "   } } }"
+        " return out; })()"
+    )
+    assert mismatches == []
+
+
+def test_map_js_home_view_uses_the_shared_rule():
+    # map.js can't run in Node (Leaflet, the page); this ties its home view to the tested rule.
+    source = (ROOT / "static" / "map.js").read_text(encoding="utf-8")
+    shows_pins = source[source.index("function showsPins"):source.index("function goHome")]
+    assert "pinGeometry.onChart(" in shows_pins
+    assert "NUM_HALF" not in shows_pins
+
+
 # ---------- The marker box and overlaps (as map.js uses them) ----------
 
 def test_box_one_line_right_and_shared_line_left():

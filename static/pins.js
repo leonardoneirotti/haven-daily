@@ -18,14 +18,19 @@
     return a.left < b.right + gap && b.left < a.right + gap && a.top < b.bottom + gap && b.top < a.bottom + gap;
   }
 
+  // A place on the chart's free area (edges included; left = right edge of the panel). Its marker
+  // is shown with its whole number: nudgeInside moves it inward when it sticks out. The home view
+  // uses this to decide which of the day's pins are on screen (owner, PR #91).
+  function onChart(point, chart) {
+    return point.x >= chart.left && point.x <= chart.right && point.y >= chart.top && point.y <= chart.bottom;
+  }
+
   // A marker whose place is on the chart but whose box sticks out of it (a place at the chart's
   // edge, such as 5 East Anchorage on a phone) moves inward just enough to keep `margin` pixels
   // from the edge, so no number is cut. A place off the chart, or under the panel, is left alone:
   // its marker is not pulled into view. chart = the free area (left = right edge of the panel).
   function nudgeInside(box, point, chart, margin) {
-    if (point.x < chart.left || point.x > chart.right || point.y < chart.top || point.y > chart.bottom) {
-      return { x: 0, y: 0 };
-    }
+    if (!onChart(point, chart)) return { x: 0, y: 0 };
     var left = chart.left + margin, right = chart.right - margin, top = chart.top + margin, bottom = chart.bottom - margin;
     return {
       x: box.left < left ? left - box.left : box.right > right ? right - box.right : 0,
@@ -33,5 +38,5 @@
     };
   }
 
-  root.HavenPins = { boxAt: boxAt, overlaps: overlaps, nudgeInside: nudgeInside };
+  root.HavenPins = { boxAt: boxAt, overlaps: overlaps, onChart: onChart, nudgeInside: nudgeInside };
 })(typeof window !== "undefined" ? window : globalThis);

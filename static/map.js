@@ -13,6 +13,7 @@
 
   var data = JSON.parse(dataEl.textContent);
   var basemap = window.HAVEN_BASEMAP;
+  var pinGeometry = window.HavenPins; // marker geometry: static/pins.js (the home view uses it too)
   var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var chart = document.getElementById("chart");
   var focusBox = document.getElementById("chart-focus");
@@ -79,7 +80,7 @@
   // The normal view of the port, moved (and zoomed out if needed) just enough to show every pin
   // of the day, clear of the panel (#85). If the chart can't zoom out that far (on a phone, an
   // anchorage and the city on the same day), as many pins as fit, most severe item first.
-  var NUM_HALF = 18; // half a number square (2.25rem): closer to the edge, the number is cut
+  var NUM_HALF = 18; // half a number square (2.25rem): room kept around the pins when the view can move
 
   function homeView() {
     var port = boundsOf(el.clientWidth < 640 ? data.view_compact : data.view_home);
@@ -110,12 +111,13 @@
     );
     return { center: map._limitCenter(map.unproject(middle.add(shift), zoom), zoom, map.options.maxBounds), zoom: zoom };
   }
-  // Every pin's number fully on the chart, and right of the panel on wide screens.
+  // Every pin on the chart, right of the panel on wide screens. A pin close to the edge counts:
+  // its marker is nudged inward so the whole number shows (pins.js; owner, PR #91).
   function showsPins(view, pins) {
-    var size = map.getSize(), middle = map.project(view.center, view.zoom), left = panelCover() + NUM_HALF;
+    var size = map.getSize(), middle = map.project(view.center, view.zoom);
+    var chart = { left: panelCover(), top: 0, right: size.x, bottom: size.y };
     return pins.every(function (pin) {
-      var p = map.project(pin, view.zoom).subtract(middle).add(size.divideBy(2));
-      return p.x >= left && p.x <= size.x - NUM_HALF && p.y >= NUM_HALF && p.y <= size.y - NUM_HALF;
+      return pinGeometry.onChart(map.project(pin, view.zoom).subtract(middle).add(size.divideBy(2)), chart);
     });
   }
   function goHome(animate) {
@@ -462,7 +464,6 @@
   var ranks = Object.keys(callouts).map(Number).sort(function (a, b) { return a - b; });
   var calloutLayer = L.layerGroup().addTo(map);
   var MARKER_GAP = 4; // pixels kept free between two markers, and between a marker and the chart's edge
-  var pinGeometry = window.HavenPins; // the geometry: static/pins.js
   var activeRank = null, hoverRank = null; // kept here, because markers are rebuilt when they merge or split
 
   // A group's items in marker order: by rank, but items at the same place side by side
