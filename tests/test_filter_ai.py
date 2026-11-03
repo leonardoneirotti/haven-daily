@@ -205,7 +205,7 @@ def test_no_key_means_ai_unavailable_and_no_call():
     assert ai_client(environ={}) is None
     assert ai_client(environ={"ANTHROPIC_API_KEY": ""}) is None
     result = check_with_ai([item(1), item(2)], None)
-    assert result.unavailable == "ANTHROPIC_API_KEY is not set"
+    assert result.unavailable == "no API key is set"
     assert [i.filter for i in result.items] == [None, None]  # nothing decided; the runner (#22) chooses
     assert result.calls == 0
 

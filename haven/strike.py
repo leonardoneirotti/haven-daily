@@ -40,6 +40,10 @@ FRESH_DAYS = 2  # "ongoing, no end date": Alert while the newest item is at most
 STATES = ("announced", "ongoing", "cancelled")
 MATCHES = ("new", "same", "unsure")
 NO_AI_NOTE = "Can't be judged without the AI step."
+# The public words of the reading (issue #84, design review S8): where the flag comes from.
+PLACE = f"From the news of the last {WINDOW_DAYS} days"
+NOTHING_LINKED = "Haven Daily's news sources"  # the source when no item is linked
+UNREADABLE_DETAILS = "strike details unreadable (what kind of report, which strike, or whether it affects Rotterdam); item skipped"
 _RANK = {None: 0, "amber": 1, "red": 2}
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
@@ -234,8 +238,7 @@ def _report(record: dict, day: date, position: int, failures: list[dict]) -> _Re
     state, match = details.get("state"), details.get("match")
     if state not in STATES or match not in MATCHES or not isinstance(details.get("affects_rotterdam"), bool):
         failures.append({"source": FAILURE_SOURCE,
-                         "error": f"{where}: strike details unreadable (state, match or "
-                                  f"affects_rotterdam); item skipped"})
+                         "error": f"{where}: {UNREADABLE_DETAILS}"})
         return None
     start = _date(details.get("start"), "start", where, failures)
     end = _date(details.get("end"), "end", where, failures)
@@ -290,10 +293,10 @@ def reading(flag: StrikeFlag, observed_at: datetime) -> dict:
         "icon": "megaphone",
         "value": flag.value,
         "level": flag.level,
-        "place": "Derived from kept items",
+        "place": PLACE,
         "items": list(flag.items),
         "observed_at": observed_at.astimezone(AMSTERDAM).isoformat(timespec="seconds"),
-        "source_name": first["source"] if first else "Kept items of the last 14 days",
+        "source_name": first["source"] if first else NOTHING_LINKED,
         "source_url": first["url"] if first else None,
         "note": NO_AI_NOTE if flag.ai_unavailable else None,
     }

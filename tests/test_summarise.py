@@ -304,7 +304,7 @@ def test_same_and_unsure_keep_a_known_strike_id(match):
 def test_same_or_unsure_with_an_unknown_or_missing_id_makes_the_item_unrated(match, strike_id):
     result, _ = run([item()], full(strike=strike(match=match, strike_id=strike_id)), known=KNOWN)
     assert result.items[0].ai["severity"] is None
-    assert result.failures[0]["error"].endswith(f"strike match '{match}' does not name a known strike")
+    assert result.failures[0]["error"].endswith("strike matched to a strike that isn't known")
 
 
 # --- dates: the AI copies the phrase, the code works out the date ------------------------------
@@ -441,12 +441,12 @@ def test_phrase_in_ignores_case_and_spacing_but_needs_the_words():
     ({"severity": None}, "unknown severity"),
     ({"summary": ""}, "empty summary"),
     ({"impact": 42}, "impact is not text"),
-    ({"tags": "Containers"}, "tags are not a list"),
+    ({"tags": "Containers"}, "unreadable tags"),
     ({"strike": strike(state="postponed")}, "unknown strike state"),
     ({"strike": strike(match="maybe")}, "unknown strike match"),
-    ({"strike": strike(affects_rotterdam="yes")}, "strike affects_rotterdam is not true/false"),
+    ({"strike": strike(affects_rotterdam="yes")}, "strike: unclear whether it affects Rotterdam"),
     ({"strike": strike(location="")}, "strike location missing"),
-    ({"strike": "yes"}, "strike is not an object"),
+    ({"strike": "yes"}, "unreadable strike details"),
 ])
 def test_an_invalid_field_makes_the_item_unrated(change, problem):
     result, _ = run([item()], full(**change))
@@ -554,9 +554,9 @@ def test_failure_lines_never_repeat_what_the_ai_or_the_article_wrote():
 
 def test_no_client_means_ai_unavailable_and_items_untouched():
     result = summarise([item()], None, known=[], today=TODAY, read_at=READ_AT)
-    assert result.unavailable == "ANTHROPIC_API_KEY is not set"
+    assert result.unavailable == "no API key is set"
     assert result.items[0].ai is None and result.calls == 0
-    assert result.failures == [{"source": "AI summariser", "error": "AI unavailable: ANTHROPIC_API_KEY is not set"}]
+    assert result.failures == [{"source": "AI summariser", "error": "AI unavailable: no API key is set"}]
 
 
 def test_a_rejected_key_stops_at_once_as_unavailable():
