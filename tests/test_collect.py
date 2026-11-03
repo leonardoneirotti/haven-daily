@@ -337,6 +337,8 @@ def test_a_skipped_gap_check_is_recorded_as_a_note(tmp_path):
     result, _ = run(tmp_path, [src("a"), PIN], {})
     assert gap_skipped() in result.failures
     assert "\n" not in collect.GAP_CHECK_SKIPPED
+    assert collect.GAP_CHECK_SKIPPED == ("couldn't check whether any notices were missed since the last run: "
+                                         "there is no earlier run in the last 14 days")  # plain words, #84
 
 
 def test_no_gap_note_when_a_previous_read_time_is_known(tmp_path):

@@ -15,6 +15,10 @@ from haven.config import Source, load_sources
 from haven.feeds import Item, collect_feed, parse_feed, rollover_gap
 from haven.fetch import Fetcher, RawResponse, TransportError
 
+# The PIN gap line in plain words (issue #84): no "feed rolled over".
+GAP = ("some notices may have been missed: the feed keeps only the latest notices, "
+       "and all of them are newer than the last run")
+
 # --- fakes and helpers ------------------------------------------------------------------
 
 
@@ -410,7 +414,7 @@ PREVIOUS_RUN = datetime(2026, 10, 31, 5, 50, tzinfo=timezone.utc)  # 06:50 Amste
 
 def test_gap_fires_when_the_oldest_item_is_newer_than_the_previous_run():
     items = [item("2026-11-01T06:10:00+01:00"), item("2026-10-31T07:05:00+01:00")]
-    assert rollover_gap(items, PREVIOUS_RUN) == "some notices may have been missed (feed rolled over)"
+    assert rollover_gap(items, PREVIOUS_RUN) == GAP
 
 
 def test_no_gap_when_the_feed_still_reaches_back_past_the_previous_run():
@@ -451,7 +455,7 @@ def test_collecting_pin_records_the_gap_in_failures():
     result = collect_feed(PIN, fetcher, previous_run=PREVIOUS_RUN)
 
     assert len(result.items) == 2
-    assert result.failures == [{"source": PIN.name, "error": "some notices may have been missed (feed rolled over)"}]
+    assert result.failures == [{"source": PIN.name, "error": GAP}]
 
 
 def test_collecting_pin_without_rollover_records_nothing():

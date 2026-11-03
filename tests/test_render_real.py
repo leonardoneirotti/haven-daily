@@ -102,8 +102,8 @@ def link(n=1, role="decides", state="announced", match="new", day=DAY, published
 def strike(value, level, links=(), note=None):
     first = links[0] if links else None
     return {"key": "strike", "label": "Strike flag", "icon": "megaphone", "value": value, "level": level,
-            "place": "Derived from kept items", "items": list(links), "observed_at": "2026-11-20T06:46:05+01:00",
-            "source_name": first["source"] if first else "Kept items of the last 14 days",
+            "place": "From the news of the last 14 days", "items": list(links), "observed_at": "2026-11-20T06:46:05+01:00",
+            "source_name": first["source"] if first else "Haven Daily's news sources",
             "source_url": first["url"] if first else None, "note": note}
 
 
@@ -455,19 +455,19 @@ def test_build_notes_show_counts_summaries_and_grouped_failures(tmp_path):
              "failures": [{"source": "Strike flag", "error": "first problem"},
                           {"source": "NL Times", "error": "HTTP 503"},
                           {"source": "Strike flag", "error": "second problem"}]}
-    items = [news("low", f"Item {n}") for n in range(7)]
+    items = [news("low", f"Item {n}", written_by={"model": "claude-sonnet-5-5", "api": "batch"}) for n in range(7)]
     notes = section(render_day(tmp_path, make_brief(items=items, build=build)), "build-title")
     text = text_of(notes)
     assert "Sources checked 9" in text and "Items collected 41" in text
     assert "Kept as relevant 7" in text and "Shown (max 5) 5" in text
-    assert "Summaries in the batch 5" in text and "Summaries by the fallback 1" in text
+    assert "Summaries 7 by Claude Sonnet 5.5, 0 by the backup model" in text  # plain words, #84
     assert text.count("Strike flag") == 1
     assert "first problem" in text and "second problem" in text and "HTTP 503" in text
 
 
 def test_build_notes_without_summaries_field_still_render(tmp_path):
     notes = text_of(section(render_day(tmp_path, make_brief()), "build-title"))
-    assert "Summaries in the batch" not in notes
+    assert "Summaries" not in notes
 
 
 def test_build_notes_list_corrections(tmp_path):

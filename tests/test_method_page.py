@@ -124,7 +124,7 @@ def test_every_threshold_row_cites_its_source(about):
     assert 'href="https://www.meteoalarm.org"' in rows["weather"]
     for url in (CONTARGO_LWS, MAERSK_LWS, render.PEGELONLINE_KAUB_URL):
         assert f'href="{url}"' in rows["rhine"]
-    assert "kept items of the last 14 days" in text_of(rows["strike"]).lower()
+    assert "the news of the last 14 days" in text_of(rows["strike"]).lower()  # plain words, #84
     assert 'href="#strike"' in rows["strike"]  # how the strike flag works, further down the page
 
 
