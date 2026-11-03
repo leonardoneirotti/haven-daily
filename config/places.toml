@@ -349,14 +349,16 @@ lon = 4.0850
 side = "right"
 osm = "way/41947487"
 
+# A point on the canal's centre line (way/41923863), between Europoort and the Calandbrug,
+# read on 3 Nov 2026 (#85). The way's own centre was 0.12 km from the Europoort pin.
 [[place]]
 id = "calandkanaal"
 label = "Calandkanaal"
 kind = "fairway"
-lat = 51.9325
-lon = 4.1720
+lat = 51.9248
+lon = 4.2081
 side = "right"
-osm = "way/41923863"
+osm = "node/7306819468"
 
 [[place]]
 id = "nieuwe-waterweg"
