@@ -55,8 +55,11 @@ UTM_PREFIX = "utm_"  # tracking parameters ignored by the duplicate check (owner
 DUPLICATE_CHECK = "Duplicate check"  # the `source` of failures in reading stored days
 KN_QUIET = "no item collected in the last 14 days (weekly port update renamed, or the collector broken?)"
 NO_ARTICLE_TEXT = "article text not found on the page (layout changed?)"
-NO_READER = "no article reader for this source in haven/collect.py, so the article was not opened"
-GAP_CHECK_SKIPPED = "gap check skipped: no brief of the last 14 days records when the feeds were last read"
+NO_READER = "the article was not opened: there is no article reader for this source yet"
+# In plain words (issue #84): the line is public, so it names no internal step. The cause is unchanged:
+# no brief of the last 14 days records when the feeds were last read (e.g. the first run).
+GAP_CHECK_SKIPPED = ("couldn't check whether any notices were missed since the last run: "
+                     "there is no earlier run in the last 14 days")
 
 # Where the article text sits on each `use` source's article pages (checked 1 Nov 2026).
 # PIN (whole notice in its feed) and K+N (Rotterdam paragraph, haven/pages.py) set their text

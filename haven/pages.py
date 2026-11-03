@@ -50,7 +50,7 @@ KN_WEEKLY_PREFIX = "port operational updates"  # headline of K+N's weekly roundu
 
 NO_ITEMS = "no news items found on the page (layout changed?)"
 NO_PARAGRAPH = "no Rotterdam paragraph found in the weekly port update (layout changed?)"
-NO_PARSER = "no page parser for this source in haven/pages.py, so it was not fetched"
+NO_PARSER = "the page was not read: there is no page reader for this source yet"
 
 _HEADINGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
 _ROTTERDAM_LABEL = re.compile(r"(?:^|\s)Rotterdam\s*:?$", re.IGNORECASE)
