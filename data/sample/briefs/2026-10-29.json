@@ -44,7 +44,7 @@
       "icon": "megaphone",
       "value": "Strike today · Maasvlakte",
       "level": "red",
-      "place": "Derived from kept items",
+      "place": "From the news of the last 14 days",
       "items": [
         {
           "headline": "Dockworkers strike for 24 hours at a Maasvlakte container terminal",
