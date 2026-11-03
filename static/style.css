@@ -1387,9 +1387,12 @@ html:not(.has-map) .needs-map,
 
 /* Focus: one item or one group of ships stands out, the rest steps back */
 .chart-map.is-focused .ship:not(.is-hot) { opacity: 0.3; }
-.chart-map.is-focused .callout:not(.is-active) { opacity: 0.45; }
+.chart-map.is-focused .callout:not(.is-active),
+.chart-map.is-focused .callout.is-active .callout-item:not(.is-active) { opacity: 0.45; }
 
-/* Numbered item markers */
+/* Numbered item markers. Items whose markers would overlap share one marker (#85): their
+   numbers side by side, then their places ("2 4 Europoort · Calandkanaal"); in rows when that
+   is too wide for the chart. Each number is a button; map.js measures these boxes to merge them. */
 .callout {
   transition: opacity 0.3s;
 }
@@ -1400,16 +1403,71 @@ html:not(.has-map) .needs-map,
   top: 0;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
   transform: translate(-1.125rem, -50%);
   white-space: nowrap;
-  cursor: pointer;
 }
 
-/* Label on the left of the number, where the right side is crowded */
-.callout-left .callout-inner {
+.callout-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto; /* Leaflet turns clicks off on markers that aren't interactive themselves */
+  transition: opacity 0.3s;
+}
+
+.callout-item:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* The numbers of a shared marker, and of several items at one place in rows */
+.callout-nums,
+.callout-place {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.callout-place {
+  gap: 0.375rem;
+}
+
+/* Label on the left of the number, where the right side is crowded or would run off the chart */
+.callout-left .callout-inner,
+.callout-left .callout-item,
+.callout-left .callout-place {
   flex-direction: row-reverse;
+}
+
+.callout-left .callout-inner {
   transform: translate(calc(-100% + 1.125rem), -50%);
+}
+
+/* Shared marker, labels on the left: the first number (not the last) stays on its place */
+.callout-merged.callout-left .callout-inner {
+  transform: translate(calc(-100% + var(--nums) * 2.5rem - 0.25rem - 1.125rem), -50%);
+}
+
+/* A shared marker too wide for the chart: one row per place, running down from the first */
+.callout-rows .callout-inner,
+.callout-rows.callout-left .callout-inner {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  transform: translate(-1.125rem, -1.125rem);
+}
+
+.callout-rows.callout-left .callout-inner {
+  align-items: flex-end;
+  transform: translate(calc(-100% + 1.125rem), -1.125rem);
 }
 
 .callout .num {
@@ -1423,13 +1481,13 @@ html:not(.has-map) .needs-map,
   background: var(--bg);
 }
 
-.callout.is-hover .num,
-.callout.is-active .num {
+.callout-item.is-hover .num,
+.callout-item.is-active .num {
   transform: scale(1.2);
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink);
 }
 
-.callout.sev-high .num::after {
+.callout-item.sev-high .num::after {
   content: "";
   position: absolute;
   inset: -2px;

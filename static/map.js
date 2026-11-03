@@ -8,11 +8,12 @@
 
   var el = document.getElementById("port-map");
   var dataEl = document.getElementById("map-data");
-  if (!el || !dataEl || !window.L || !window.HAVEN_BASEMAP) return;
+  if (!el || !dataEl || !window.L || !window.HAVEN_BASEMAP || !window.HavenPins) return;
   document.documentElement.classList.add("has-map");
 
   var data = JSON.parse(dataEl.textContent);
   var basemap = window.HAVEN_BASEMAP;
+  var pinGeometry = window.HavenPins; // marker geometry: static/pins.js (the home view uses it too)
   var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var chart = document.getElementById("chart");
   var focusBox = document.getElementById("chart-focus");
@@ -30,10 +31,11 @@
   }
 
   // ---------- The sheet ----------
-  // The chart is a fixed "sheet": the area covered by the basemap. It can never pan
-  // or zoom past the sheet's edge. On wide screens the news panel floats over its
-  // western side (open sea), so the chart opens on the whole port in the space to
-  // the right of the panel. Phones open on the western port. On a day with nothing
+  // The chart is a fixed "sheet": the area covered by the basemap. It never zooms out
+  // past the sheet, and pans past its edge only on the open-sea side under the panel
+  // (below). On wide screens the news panel floats over its western side, so the chart
+  // opens on the whole port in the space to the right of the panel. Phones open on the
+  // western port. Both move to show the day's pins (#85). On a day with nothing
   // on the chart (#81) the panel sits beside or above a short strip instead of over
   // it; panelCover() is then 0, so the strip simply fits the same views.
   var bbox = basemap.bbox; // south, west, north, east
@@ -68,11 +70,59 @@
   });
   map.setMinZoom(map.getBoundsZoom(sheet, true)); // smallest zoom that stays inside the sheet
 
+  // West of the sheet there is only open sea. On wide screens the chart may move past the
+  // sheet's western edge by the width of the panel, so a pin at the outer anchorages can sit
+  // right of the panel instead of under it (#85). Past that edge the chart is plain water.
+  var seaRoom = panelCover() ? ((panelCover() + 48) * 360) / (256 * Math.pow(2, map.getMinZoom())) : 0;
+  map.setMaxBounds(L.latLngBounds([bbox[0], bbox[1] - seaRoom], [bbox[2], bbox[3]]));
+
+  // ---------- The home view ----------
+  // The normal view of the port, moved (and zoomed out if needed) just enough to show every pin
+  // of the day, clear of the panel (#85). If the chart can't zoom out that far (on a phone, an
+  // anchorage and the city on the same day), as many pins as fit, most severe item first.
+  var NUM_HALF = 18; // half a number square (2.25rem): room kept around the pins when the view can move
+
+  function homeView() {
+    var port = boundsOf(el.clientWidth < 640 ? data.view_compact : data.view_home);
+    var pins = data.callouts.slice().sort(function (a, b) { return a.rank - b.rank; })
+      .map(function (callout) { return L.latLng(callout.lat, callout.lon); });
+    // _getBoundsCenterZoom and _limitCenter are Leaflet's own steps of fitBounds (fit, then keep
+    // inside maxBounds), internal but stable in the self-hosted 1.9.4. Working out the view
+    // first, instead of trying views on the chart, avoids repainting the basemap each time.
+    var normal = map._getBoundsCenterZoom(port, panelCover() ? viewPadding() : {});
+    var roomy = panelCover() ? viewPadding() : { paddingTopLeft: [NUM_HALF + 6, NUM_HALF + 6], paddingBottomRight: [NUM_HALF + 6, NUM_HALF + 6] };
+    var topLeft = L.point(roomy.paddingTopLeft), bottomRight = L.point(roomy.paddingBottomRight);
+    for (var count = pins.length; count > 0; count--) {
+      var some = L.latLngBounds(pins.slice(0, count));
+      var zoom = Math.min(normal.zoom, map.getBoundsZoom(some, false, topLeft.add(bottomRight)));
+      var view = moveToShow(normal.center, zoom, some, topLeft, bottomRight);
+      if (count === 1 || showsPins(view, pins.slice(0, count))) return view;
+    }
+    return { center: map._limitCenter(normal.center, normal.zoom, map.options.maxBounds), zoom: normal.zoom };
+  }
+  // The smallest move of the view that brings the pins inside the padded area.
+  function moveToShow(center, zoom, pins, topLeft, bottomRight) {
+    var middle = map.project(center, zoom), half = map.getSize().divideBy(2);
+    var min = middle.subtract(half).add(topLeft), max = middle.add(half).subtract(bottomRight);
+    var sw = map.project(pins.getSouthWest(), zoom), ne = map.project(pins.getNorthEast(), zoom);
+    var shift = L.point(
+      sw.x < min.x ? sw.x - min.x : ne.x > max.x ? ne.x - max.x : 0,
+      ne.y < min.y ? ne.y - min.y : sw.y > max.y ? sw.y - max.y : 0
+    );
+    return { center: map._limitCenter(map.unproject(middle.add(shift), zoom), zoom, map.options.maxBounds), zoom: zoom };
+  }
+  // Every pin on the chart, right of the panel on wide screens. A pin close to the edge counts:
+  // its marker is nudged inward so the whole number shows (pins.js; owner, PR #91).
+  function showsPins(view, pins) {
+    var size = map.getSize(), middle = map.project(view.center, view.zoom);
+    var chart = { left: panelCover(), top: 0, right: size.x, bottom: size.y };
+    return pins.every(function (pin) {
+      return pinGeometry.onChart(map.project(pin, view.zoom).subtract(middle).add(size.divideBy(2)), chart);
+    });
+  }
   function goHome(animate) {
-    var compact = el.clientWidth < 640;
-    var options = panelCover() ? viewPadding() : {};
-    options.animate = animate;
-    map.fitBounds(boundsOf(compact ? data.view_compact : data.view_home), options);
+    var view = homeView();
+    map.setView(view.center, view.zoom, { animate: animate });
   }
   goHome(false);
 
@@ -403,22 +453,207 @@
   });
 
   // ---------- Numbered items ----------
+  // Each item with a place shows its number on the chart, with the place's name beside it.
+  // Items whose markers would overlap at the current zoom share one marker: their numbers side
+  // by side on the first item's place, then their places ("2 4 Europoort · Calandkanaal"). It
+  // splits again when zooming in makes room (#85). A shared marker too wide for the chart lists
+  // its items in rows instead. Every number is its own button, so each item in a shared marker
+  // can still be picked, also by keyboard.
   var callouts = {};
-  data.callouts.forEach(function (callout) {
-    var marker = L.marker([callout.lat, callout.lon], {
-      title: "Item " + callout.rank + ": " + callout.title,
-      zIndexOffset: 1000,
-      icon: L.divIcon({
-        className: "callout sev-" + callout.severity + (callout.side === "left" ? " callout-left" : ""),
-        iconSize: [0, 0],
-        html:
-          '<span class="callout-inner"><span class="num num-' + callout.severity + '">' + callout.rank +
-          '</span><span class="callout-label">' + escapeHtml(callout.label) + "</span></span>",
-      }),
-    }).addTo(map);
-    marker.on("click", function () { selectItem(callout.rank, { fromChart: true }); });
-    callouts[callout.rank] = { data: callout, marker: marker };
-  });
+  data.callouts.forEach(function (callout) { callouts[callout.rank] = { data: callout }; });
+  var ranks = Object.keys(callouts).map(Number).sort(function (a, b) { return a - b; });
+  var calloutLayer = L.layerGroup().addTo(map);
+  var MARKER_GAP = 4; // pixels kept free between two markers, and between a marker and the chart's edge
+  var activeRank = null, hoverRank = null; // kept here, because markers are rebuilt when they merge or split
+
+  // A group's items in marker order: by rank, but items at the same place side by side
+  // (they share one label). The first is the anchor: the marker sits on its place.
+  function inPlaceOrder(list) {
+    var sorted = list.slice().sort(function (a, b) { return a - b; }), order = [];
+    sorted.forEach(function (rank) {
+      if (order.indexOf(rank) >= 0) return;
+      sorted.forEach(function (other) {
+        if (callouts[other].data.label === callouts[rank].data.label) order.push(other);
+      });
+    });
+    return order;
+  }
+
+  function listWords(words) {
+    return words.length < 2 ? words.join("") : words.slice(0, -1).join(", ") + " and " + words[words.length - 1];
+  }
+
+  function itemButton(rank, withLabel) {
+    var item = callouts[rank].data, name = "Item " + rank + ", " + item.label + ": " + item.title;
+    return '<button type="button" class="callout-item sev-' + item.severity + '" data-action="show-item" data-rank="' +
+      rank + '" title="' + escapeHtml(name) + '" aria-label="' + escapeHtml(name) + '"><span class="num num-' +
+      item.severity + '">' + rank + "</span>" + (withLabel ? labelHtml([item.label]) : "") + "</button>";
+  }
+  function labelHtml(places) {
+    return '<span class="callout-label">' + escapeHtml(places.join(" · ")) + "</span>";
+  }
+  function placesOf(group) {
+    return group.map(function (rank) { return callouts[rank].data.label; })
+      .filter(function (label, i, all) { return all.indexOf(label) === i; });
+  }
+
+  // One item: its number and label, as one button. Shared, on one line: the numbers, then the
+  // places. Shared, in rows: one row per place, its number(s) then its label.
+  function markerHtml(group, rows) {
+    var html;
+    if (group.length === 1) {
+      html = itemButton(group[0], true);
+    } else if (!rows) {
+      html = '<span class="callout-nums">' + group.map(function (rank) { return itemButton(rank, false); }).join("") +
+        "</span>" + labelHtml(placesOf(group));
+    } else {
+      html = placesOf(group).map(function (place) {
+        var here = group.filter(function (rank) { return callouts[rank].data.label === place; });
+        if (here.length === 1) return itemButton(here[0], true);
+        return '<span class="callout-place">' + here.map(function (rank) { return itemButton(rank, false); }).join("") +
+          labelHtml([place]) + "</span>";
+      }).join("");
+    }
+    var shared = group.length > 1
+      ? ' role="group" aria-label="' + escapeHtml("Items " + listWords(group.map(String)) + " share this marker: " +
+        placesOf(group).join(", ")) + '" style="--nums:' + group.length + '"'
+      : "";
+    return '<span class="callout-inner"' + shared + ">" + html + "</span>";
+  }
+
+  function markerClass(marker) {
+    var shared = marker.ranks.length > 1 ? (marker.rows ? " callout-rows" : " callout-merged") : "";
+    return "callout" + (marker.side === "left" ? " callout-left" : "") + shared;
+  }
+
+  // Marker sizes, measured once in a hidden copy (they depend on the text and on one line or
+  // rows, not on the side). The fonts change them, so they are measured again once loaded.
+  // `lead` is the width of the numbers at the front; `half` is half a number square.
+  var ruler = L.DomUtil.create("div", "callout-ruler", map.getPane("markerPane"));
+  ruler.setAttribute("aria-hidden", "true");
+  ruler.style.cssText = "position:absolute;left:0;top:0;visibility:hidden";
+  var sizes = {};
+  function sizeOf(group, rows) {
+    var key = group.join(",") + (rows ? " rows" : "");
+    if (!sizes[key]) {
+      ruler.className = "callout-ruler" + (rows && group.length > 1 ? " callout-rows" : "");
+      ruler.innerHTML = markerHtml(group, rows);
+      var box = ruler.firstChild.getBoundingClientRect(), num = ruler.querySelector(".num").getBoundingClientRect();
+      var nums = ruler.querySelector(".callout-nums");
+      sizes[key] = { w: box.width, h: box.height, half: num.width / 2, lead: nums ? nums.getBoundingClientRect().width : num.width };
+      ruler.innerHTML = "";
+    }
+    return sizes[key];
+  }
+
+
+  // Each marker on the side its place prefers (`side` in config/places.toml), on one line.
+  // If it would run off the chart or under the panel: the other side; then, for a shared
+  // marker, rows on either side; if nothing fits, the narrowest of these. Last, a marker at
+  // the chart's edge moves inward just enough that no number is cut (owner, PR #91).
+  function placeMarker(marker) {
+    var anchor = callouts[marker.ranks[0]].data;
+    var point = map.latLngToContainerPoint([anchor.lat, anchor.lon]);
+    var size = map.getSize(), chart = { left: panelCover(), top: 0, right: size.x, bottom: size.y };
+    var left = chart.left + MARKER_GAP, right = chart.right - MARKER_GAP;
+    var preferred = anchor.side === "left" ? "left" : "right", other = preferred === "left" ? "right" : "left";
+    var layouts = [[preferred, false], [other, false]];
+    if (marker.ranks.length > 1) layouts.push([preferred, true], [other, true]);
+    var best = null;
+    layouts.forEach(function (layout) {
+      var box = pinGeometry.boxAt(point, sizeOf(marker.ranks, layout[1]), layout[0], layout[1]);
+      var fits = box.left >= left && box.right <= right;
+      if (!best || (fits && !best.fits) || (!best.fits && box.right - box.left < best.box.right - best.box.left)) {
+        best = { side: layout[0], rows: layout[1], box: box, fits: fits };
+      }
+    });
+    var nudge = pinGeometry.nudgeInside(best.box, point, chart, MARKER_GAP);
+    marker.side = best.side;
+    marker.rows = best.rows;
+    marker.nudge = { x: Math.round(nudge.x), y: Math.round(nudge.y) };
+    marker.box = {
+      left: best.box.left + marker.nudge.x, right: best.box.right + marker.nudge.x,
+      top: best.box.top + marker.nudge.y, bottom: best.box.bottom + marker.nudge.y,
+    };
+    return marker;
+  }
+
+  // Start with one marker per item; while two overlap, merge them, and check again.
+  function planMarkers() {
+    var markers = ranks.map(function (rank) { return placeMarker({ ranks: [rank] }); });
+    for (;;) {
+      var pair = null;
+      for (var i = 0; i < markers.length && !pair; i++) {
+        for (var j = i + 1; j < markers.length && !pair; j++) {
+          if (pinGeometry.overlaps(markers[i].box, markers[j].box, MARKER_GAP)) pair = [markers[i], markers[j]];
+        }
+      }
+      if (!pair) return markers;
+      markers = markers.filter(function (m) { return m !== pair[0] && m !== pair[1]; });
+      markers.push(placeMarker({ ranks: inPlaceOrder(pair[0].ranks.concat(pair[1].ranks)) }));
+    }
+  }
+
+  var shownPlan = null;
+  function showCallouts(remeasure) {
+    if (!ranks.length) return;
+    if (remeasure) sizes = {};
+    var plan = planMarkers().sort(function (a, b) { return a.ranks[0] - b.ranks[0]; }); // keyboard order: item 1 first
+    var key = plan.map(function (m) {
+      return m.ranks.join(",") + m.side + (m.rows ? " rows" : "") + " " + m.nudge.x + "," + m.nudge.y;
+    }).sort().join("|");
+    if (key === shownPlan) return;
+    shownPlan = key;
+    // A rebuilt marker is a new element: keep the keyboard focus on the same item.
+    var focused = document.activeElement && document.activeElement.closest && document.activeElement.closest(".callout-item");
+    var focusedRank = focused && el.contains(focused) ? focused.getAttribute("data-rank") : null;
+    calloutLayer.clearLayers();
+    plan.forEach(function (planned) {
+      var anchor = callouts[planned.ranks[0]].data;
+      var marker = L.marker([anchor.lat, anchor.lon], {
+        interactive: false, // the buttons inside take the clicks (see the document click handler)
+        keyboard: false,
+        zIndexOffset: 1000,
+        icon: L.divIcon({
+          className: markerClass(planned),
+          iconSize: [0, 0],
+          iconAnchor: [-planned.nudge.x, -planned.nudge.y], // Leaflet shifts the icon by minus the anchor
+          html: markerHtml(planned.ranks, planned.rows),
+        }),
+      }).addTo(calloutLayer);
+      L.DomEvent.disableClickPropagation(marker.getElement()); // no map drag or zoom from a number
+    });
+    markCallouts();
+    if (focusedRank) {
+      var again = calloutButton(focusedRank);
+      if (again) again.focus({ preventScroll: true });
+    }
+  }
+
+  function calloutButton(rank) {
+    return el.querySelector('.callout-item[data-rank="' + rank + '"]');
+  }
+
+  // The selected and the hovered item stand out; in a shared marker, only that item.
+  function markCallouts() {
+    var buttons = el.querySelectorAll(".callout-item");
+    for (var i = 0; i < buttons.length; i++) {
+      var rank = Number(buttons[i].getAttribute("data-rank"));
+      buttons[i].classList.toggle("is-active", rank === activeRank);
+      buttons[i].classList.toggle("is-hover", rank === hoverRank);
+    }
+    var markers = el.querySelectorAll(".leaflet-marker-pane .callout");
+    for (var j = 0; j < markers.length; j++) {
+      markers[j].classList.toggle("is-active", !!markers[j].querySelector(".callout-item.is-active"));
+    }
+  }
+
+  showCallouts(false);
+  map.on("moveend", function () { showCallouts(false); });
+  if (document.fonts) {
+    document.fonts.addEventListener("loadingdone", function () { showCallouts(true); });
+    document.fonts.ready.then(function () { showCallouts(true); });
+  }
 
   // ---------- Focus: items, groups of ships, one ship ----------
   function markerEl(marker) {
@@ -428,7 +663,8 @@
   function clearFocus() {
     el.classList.remove("is-focused");
     ships.forEach(function (s) { markerEl(s.marker).classList.remove("is-hot"); });
-    Object.keys(callouts).forEach(function (rank) { markerEl(callouts[rank].marker).classList.remove("is-active"); });
+    activeRank = null;
+    markCallouts();
     var active = document.querySelectorAll(".item.is-active, .panel-item.is-active");
     for (var i = 0; i < active.length; i++) active[i].classList.remove("is-active");
     var pressed = document.querySelectorAll('[data-action="show-item"][aria-pressed="true"]');
@@ -492,7 +728,8 @@
     }
 
     el.classList.add("is-focused");
-    markerEl(callout.marker).classList.add("is-active");
+    activeRank = rank;
+    markCallouts();
     var points = [[callout.data.lat, callout.data.lon]];
     var linked = ships.filter(function (s) { return s.ship.news_item === rank; });
     linked.forEach(function (s) {
@@ -589,13 +826,18 @@
   for (var l = 0; l < lists.length; l++) {
     lists[l].addEventListener("mouseover", function (event) {
       var card = event.target.closest(CARD);
-      var callout = card && callouts[card.getAttribute("data-rank")];
-      if (callout) markerEl(callout.marker).classList.add("is-hover");
+      var rank = card && Number(card.getAttribute("data-rank"));
+      if (rank && callouts[rank]) {
+        hoverRank = rank;
+        markCallouts();
+      }
     });
     lists[l].addEventListener("mouseout", function (event) {
       var card = event.target.closest(CARD);
-      var callout = card && callouts[card.getAttribute("data-rank")];
-      if (callout && !card.contains(event.relatedTarget)) markerEl(callout.marker).classList.remove("is-hover");
+      if (card && hoverRank !== null && !card.contains(event.relatedTarget)) {
+        hoverRank = null;
+        markCallouts();
+      }
     });
   }
 
