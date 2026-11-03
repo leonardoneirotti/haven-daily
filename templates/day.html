@@ -161,6 +161,22 @@
     </section>
   </div>
 
+  {# Who makes this, for a recruiter (L2, #86): the owner's About text, on the Today page only,
+     right below the brief. Claude's default, for the owner to confirm (spec §7.8). #}
+  {% if is_index %}
+  <section class="wrap about" aria-labelledby="about-title">
+    <h2 id="about-title">About this project</h2>
+    <div class="about-body">
+      <p>{{ site.about }}</p>
+      <ul class="about-links">
+        <li><a href="{{ site.linkedin_url }}">{{ site.author }} on LinkedIn</a></li>
+        <li><a href="{{ site.repo_url }}">Source code on GitHub</a></li>
+        <li><a href="{{ root }}about.html">How it works</a></li>
+      </ul>
+    </div>
+  </section>
+  {% endif %}
+
   {% if ships %}
   <section class="wrap ship-list" aria-labelledby="ships-title">
     <details>

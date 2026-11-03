@@ -25,11 +25,13 @@
         <ul>
           <li><a href="{{ root }}index.html"{% if active == "today" %} aria-current="page"{% endif %}>Today</a></li>
           <li><a href="{{ root }}archive.html"{% if active == "archive" %} aria-current="page"{% endif %}>Archive</a></li>
-          <li><a href="{{ root }}about.html"{% if active == "method" %} aria-current="page"{% endif %}>Method</a></li>
+          <li><a href="{{ root }}about.html"{% if active == "method" %} aria-current="page"{% endif %}>How it works</a></li>
         </ul>
       </nav>
     </div>
   </div>
+  {# What this is, under the brand on every page (S1, #86): the owner's words, spec §7.8. #}
+  <p class="tagline">{{ site.tagline }}</p>
   {% if sample %}
   <p class="sample-note"><strong>Sample data.</strong> The ships, news and readings on this page are invented to preview the design.</p>
   {% endif %}
@@ -40,10 +42,10 @@
     <p class="disclaimer">Personal, unofficial project by {{ site.author }}. Not affiliated with the Port of Rotterdam Authority. AI-generated summaries — always check the original source.</p>
     <p class="privacy">Privacy: no cookies, no tracking, nothing loaded from other sites. The site is hosted on GitHub Pages, which logs visitors' IP addresses for security (<a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy Statement</a>).</p>
     <ul class="footer-links">
-      <li><a href="{{ root }}about.html">Method and sources</a></li>
+      <li><a href="{{ root }}about.html">How it works</a></li>
       <li><a href="{{ root }}archive.html">Archive</a></li>
       {% if site.linkedin_url %}<li><a href="{{ site.linkedin_url }}">{{ site.author }} on LinkedIn</a></li>{% endif %}
-      {% if site.repo_url %}<li><a href="{{ site.repo_url }}">Source code</a></li>{% endif %}
+      {% if site.repo_url %}<li><a href="{{ site.repo_url }}">Source code on GitHub</a></li>{% endif %}
     </ul>
     <p class="credits">Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.</p>
   </div>
