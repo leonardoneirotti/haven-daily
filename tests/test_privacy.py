@@ -251,16 +251,37 @@ def test_no_template_or_static_file_loads_anything_from_another_server():
     assert problems == {}
 
 
+def social_tag_with_own_address(tag, attribute, value) -> bool:
+    """A social preview tag (#28) holding this site's own address (og:url, og:image). A <meta>
+    makes the browser fetch nothing: only link-preview services (LinkedIn) read it."""
+    from haven.config import load_site
+    kind = str(tag.get("property") or tag.get("name") or "")
+    return (tag.name == "meta" and attribute == "content" and kind.startswith(("og:", "twitter:"))
+            and value.startswith(load_site().base_url))
+
+
 def test_outside_addresses_on_the_pages_are_only_ordinary_links(site):
     # Positive side of the same rule: the outside addresses that are on the pages
-    # (sources, OpenStreetMap, MeteoAlarm, Google Translate, GitHub) are all <a href>.
+    # (sources, OpenStreetMap, MeteoAlarm, Google Translate, GitHub) are all <a href>,
+    # apart from the social preview tags' own addresses.
     for path in pages(site):
         soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
         for tag in soup.find_all(True):
             for attribute, value in tag.attrs.items():
                 for v in (value if isinstance(value, list) else [value]):
                     if OUTSIDE.match(v) and not v.startswith(NAMESPACE):
+                        if social_tag_with_own_address(tag, attribute, v):
+                            continue
                         assert (tag.name, attribute) in {("a", "href")}, (path.name, tag.name, attribute, v)
+
+
+def test_only_this_sites_own_address_may_sit_in_a_social_tag():
+    soup = BeautifulSoup('<meta property="og:image" content="https://tracker.example/x.png">'
+                         '<meta name="description" content="https://leonardoneirotti.github.io/haven-daily/">',
+                         "html.parser")
+    og, description = soup.find_all("meta")
+    assert not social_tag_with_own_address(og, "content", og["content"])
+    assert not social_tag_with_own_address(description, "content", description["content"])
 
 
 # --- the privacy note ------------------------------------------------------------------------

@@ -90,9 +90,11 @@ def test_every_page_has_exactly_the_owners_description(pages):
 
 # ---------- S2: LinkedIn and the repository ----------
 
-def test_the_links_are_set_in_the_site_settings():
-    assert render.SITE["linkedin_url"] == LINKEDIN
-    assert render.SITE["repo_url"] == REPO
+def test_the_links_are_set_in_the_site_config():
+    # Set by #86 in render.SITE; moved to config/site.toml by #28.
+    from haven.config import load_site
+    assert load_site().linkedin_url == LINKEDIN
+    assert load_site().repo_url == REPO
 
 
 def test_the_footer_of_every_page_links_linkedin_and_the_repository(pages):
