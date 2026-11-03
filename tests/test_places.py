@@ -1,5 +1,6 @@
 """Fixed place list and "affects" tags (spec §5.10): loading the lists and checking the AI's choice."""
 
+import math
 import re
 
 import pytest
@@ -229,6 +230,32 @@ def test_every_real_place_lies_inside_the_chart_sheet():
     assert SHEET_BBOX == (51.74, 3.40, 52.16, 4.62)  # spec §8.1
     for place in load_places():
         assert south <= place.lat <= north and west <= place.lon <= east, place.id
+
+
+def km_apart(a, b):
+    """Distance between two places in km (flat-earth approximation, fine at port scale)."""
+    north = (a.lat - b.lat) * 111.2
+    east = (a.lon - b.lon) * 111.2 * math.cos(math.radians((a.lat + b.lat) / 2))
+    return math.hypot(north, east)
+
+
+def test_calandkanaal_pin_is_a_point_on_the_canal_away_from_every_other_place():
+    # Owner's decision M4 (b), 2 Nov 2026 (#85): the old pin was the centre of the canal's
+    # bounding box, 0.12 km from Europoort, so the two stacked. The new pin is a point on the
+    # canal's own centre line (OSM way/41923863), between Europoort and the Calandbrug.
+    places = {p.id: p for p in load_places()}
+    canal = places.pop("calandkanaal")
+    assert canal.osm == "node/7306819468"
+    assert (canal.lat, canal.lon) == (51.9248, 4.2081)
+    south, west, north, east = SHEET_BBOX
+    assert south <= canal.lat <= north and west <= canal.lon <= east
+    for other in places.values():
+        assert km_apart(canal, other) >= 1.5, other.id
+
+
+def test_europoort_pin_is_unchanged():
+    europoort = {p.id: p for p in load_places()}["europoort"]
+    assert (europoort.lat, europoort.lon, europoort.osm) == (51.9329, 4.1736, "node/3286698078")
 
 
 def test_real_lists_cover_every_kind_and_about_fifteen_tags():
