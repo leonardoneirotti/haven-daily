@@ -261,7 +261,7 @@ AI_TIMEOUT = 30.0  # seconds per request; the SDK retries timeouts, 429 and 5xx 
 BREAKER = 3  # failed calls in a row that count as an outage
 REASON_MAX = 200  # characters of the AI's reason kept on the item
 AI_CHECK = "AI relevance check"  # the `source` of its failure lines
-NO_KEY = "ANTHROPIC_API_KEY is not set"
+NO_KEY = "no API key is set"  # public failure line: no variable name (#84); the key is ANTHROPIC_API_KEY
 
 # Haiku 5.5 list prices in USD per million tokens, prompts up to 100K tokens (spec §5.4, Oct 2026).
 PRICE_INPUT_PER_M = 0.10

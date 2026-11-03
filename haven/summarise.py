@@ -87,6 +87,12 @@ POLL_EVERY = 30  # seconds between status checks while waiting; checking costs n
 SUMMARY_EFFORT = "medium"
 SUMMARY_MAX_TOKENS = 8192  # thinking counts toward it; only what is used is paid for
 SUMMARISER = "AI summariser"  # the `source` of its failure lines
+# Batch failure lines, in plain words (issue #84): the page says "the backup model", not
+# "fallback" or "standard API". Every item then goes to FALLBACK_MODEL through the standard API.
+BATCH_NOT_CREATED = "the half-price batch could not be started ({problem}), so every item was summarised by the backup model"
+BATCH_NOT_ENDED = "the half-price batch did not finish after it was cancelled, so every item was summarised by the backup model"
+BATCH_UNREADABLE = ("the half-price batch's answers could not be read ({problem}), "
+                    "so every item was summarised by the backup model")
 
 SEVERITIES = ("high", "medium", "low")
 STRIKE_STATES = ("announced", "ongoing", "cancelled")
@@ -479,8 +485,7 @@ def start_batch(items: list[Item], client, known: list[dict], today: date, model
         except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as error:
             return BatchRun(items, model, clock(), clock, unavailable=f"API key rejected (HTTP {error.status_code})")
         except Exception as error:
-            run.failures.append({"source": SUMMARISER, "error":
-                                 f"batch not created ({_problem(error)}); all items sent to the standard API"})
+            run.failures.append({"source": SUMMARISER, "error": BATCH_NOT_CREATED.format(problem=_problem(error))})
     return BatchRun(items, model, clock(), clock, run=run, batch_id=batch_id)
 
 
@@ -534,8 +539,7 @@ def _collect(pending: BatchRun, sleep: Callable[[float], None]) -> dict[int, obj
         except Exception:
             pass  # it may have ended just now; the check below decides
         if not _wait_until_ended(batches, batch_id, pending.clock() + CANCEL_WAIT, pending.clock, sleep):
-            run.failures.append({"source": SUMMARISER, "error":
-                                 "batch did not end after cancelling; all items sent to the standard API"})
+            run.failures.append({"source": SUMMARISER, "error": BATCH_NOT_ENDED})
             return {}
     ids = {_custom_id(i): i for i in range(len(pending.items))}
     answers = {}
@@ -545,9 +549,7 @@ def _collect(pending: BatchRun, sleep: Callable[[float], None]) -> dict[int, obj
             if index is not None and entry.result.type == "succeeded":
                 answers[index] = entry.result.message
     except Exception as error:
-        run.failures.append({"source": SUMMARISER, "error":
-                             f"batch results could not be read ({_problem(error)}); "
-                             "all items sent to the standard API"})
+        run.failures.append({"source": SUMMARISER, "error": BATCH_UNREADABLE.format(problem=_problem(error))})
         return {}
     return answers
 
@@ -616,7 +618,7 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
         impact = _own_words(data["impact"], "impact", IMPACT_MAX, item.article_text)
 
     if not isinstance(data["tags"], list):
-        raise _ItemFailed("tags are not a list")
+        raise _ItemFailed("unreadable tags")
     source_text = item.headline if headline_only else f"{item.headline}\n{item.article_text}"
     strike = _strike(data["strike"], source_text, known_ids, today, published_day(item.published), notes)
 
@@ -655,7 +657,7 @@ def _strike(value, source_text: str, known_ids: set[str], today: date, published
     if value is None:
         return None
     if not isinstance(value, dict):
-        raise _ItemFailed("strike is not an object")
+        raise _ItemFailed("unreadable strike details")
     if value.get("state") not in STRIKE_STATES:
         raise _ItemFailed("unknown strike state")
     location = value.get("location")
@@ -665,7 +667,7 @@ def _strike(value, source_text: str, known_ids: set[str], today: date, published
     if len(location) > LOCATION_MAX:
         raise _ItemFailed("strike location too long")
     if type(value.get("affects_rotterdam")) is not bool:
-        raise _ItemFailed("strike affects_rotterdam is not true/false")
+        raise _ItemFailed("strike: unclear whether it affects Rotterdam")
     match = value.get("match")
     if match not in MATCHES:
         raise _ItemFailed("unknown strike match")
@@ -673,7 +675,7 @@ def _strike(value, source_text: str, known_ids: set[str], today: date, published
     if match in ("same", "unsure"):
         strike_id = value.get("strike_id")
         if strike_id not in known_ids:
-            raise _ItemFailed(f"strike match '{match}' does not name a known strike")
+            raise _ItemFailed("strike matched to a strike that isn't known")
 
     # Dates: a bad one is left out, never guessed; the strike and the item stay (owner, 2 Nov 2026).
     start = _phrase_date(value.get("start_phrase"), "start", source_text, published, today, notes)
