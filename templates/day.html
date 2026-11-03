@@ -203,10 +203,8 @@
         {% if brief.build.items_collected is not none %}<div><dt>Items collected</dt><dd>{{ brief.build.items_collected }}</dd></div>{% endif %}
         {% if brief.build.items_kept is not none %}<div><dt>Kept as relevant</dt><dd>{{ brief.build.items_kept }}</dd></div>{% endif %}
         <div><dt>Shown (max {{ max_items }})</dt><dd>{{ items | length }}</dd></div>
-        {% if brief.build.summaries %}
-        <div><dt>Summaries in the batch</dt><dd>{{ brief.build.summaries.batch }}</dd></div>
-        <div><dt>Summaries by the fallback</dt><dd>{{ brief.build.summaries.fallback }}</dd></div>
-        {% endif %}
+        {# Who wrote the summaries, by model name (design review S8, #84; render.summaries_line). #}
+        {% if brief.summaries_line %}<div class="stat-text"><dt>Summaries</dt><dd>{{ brief.summaries_line }}</dd></div>{% endif %}
       </dl>
       {% if brief.failure_groups %}
       <ul class="failures">

@@ -125,6 +125,11 @@ STATUS_MEANINGS = {
     },
 }
 
+# The archive's status icons, as short text labels on phones (design review S9, issue #84): a
+# mouse-over `title` alone shows nothing on a touch screen. An indicator not listed here shows
+# its own label.
+STATUS_SHORT_LABELS = {"weather": "Weather", "rhine": "Rhine", "strike": "Strike"}
+
 # Shape carries the meaning as well as colour: octagon = act now, triangle = keep an eye on it.
 LEVEL_ICONS = {
     "ok": "circle-check",
@@ -432,6 +437,7 @@ def prepare_indicator(indicator: dict, previous: dict | None, is_first: bool, br
     indicator.setdefault("gauge_max", None)
     indicator.setdefault("source_url", None)  # null when nothing is linked (strike flag, §5.7)
     indicator["level_key"], indicator["level_label"] = LEVELS[indicator.get("level")]
+    indicator["short_label"] = STATUS_SHORT_LABELS.get(indicator["key"], indicator["label"])
     value = indicator["value"]
     indicator["is_number"] = isinstance(value, (int, float))
     indicator["display_value"] = f"{value:g}" if indicator["is_number"] else value
@@ -492,6 +498,39 @@ def prepare_item(item: dict, brief_date: str) -> None:
         item["translate_url"] = translate_url(item["url"], item["language"])
 
 
+def model_name(model: str) -> str:
+    """How the page names a model. A stored brief naming a model missing from MODEL_NAMES shows the
+    id: an old day must never stop the build (hard rule 9). The Method page, which names the
+    models the code calls now, stops instead (`method_page`)."""
+    return MODEL_NAMES.get(model, model)
+
+
+def summaries_line(items: list[dict], summaries: dict | None) -> str | None:
+    """Who wrote the day's summaries, in plain words (design review S8, issue #84):
+    "10 by Claude Sonnet 5.5, 0 by the backup model".
+
+    Counted from each rated item's `written_by.model` over **all** the brief's items (every kept
+    item, not only the five shown), so a rephrase retry by the main model, which `build.summaries`
+    counts under "fallback" (§5.5 point 4), is credited to the model that wrote it. The backup
+    model is `summarise.FALLBACK_MODEL`, always named last, with its count even at 0. None when the
+    brief has no `build.summaries` (a reduced brief, or older shapes): then the line is left out."""
+    if not summaries:
+        return None
+    counts: dict[str, int] = {}
+    for item in items:
+        model = (item.get("written_by") or {}).get("model")
+        if item.get("severity") is not None and model:
+            counts[model] = counts.get(model, 0) + 1
+    if not counts:
+        return "None"
+    backup = summarise.FALLBACK_MODEL
+    main = sorted((m for m in counts if m != backup), key=lambda m: -counts[m])  # stable: ties keep their order
+    parts = [f"{counts[m]} by {model_name(m)}" for m in main]
+    used = counts.get(backup, 0)
+    parts.append(f"{used} by the backup model" + (f" ({model_name(backup)})" if used else ""))
+    return ", ".join(parts)
+
+
 def prepare_ships(brief: dict) -> None:
     """Add labels and counts to the AIS snapshot. None means the snapshot failed."""
     ships = brief.setdefault("ships", None)
@@ -550,6 +589,8 @@ def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.to
     # Items shown on each day's page, {date: {url: rank}}: the strike line links an earlier
     # item's card only if its day page really shows it (spec §5.7 point 10).
     for brief in briefs:
+        # Who wrote the summaries is counted over every kept item, before the cut to five (#84).
+        brief["summaries_line"] = summaries_line(brief.get("items", []), (brief.get("build") or {}).get("summaries"))
         brief["items"] = rank_items(brief.get("items", []))
     shown_ranks = {
         brief["date"]: {item["url"]: rank for rank, item in enumerate(brief["items"], start=1)} for brief in briefs
