@@ -6,6 +6,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{% block title %}{{ site.name }}{% endblock %}</title>
 <meta name="description" content="{{ site.description }}">
+{# Social preview tags (#28): what LinkedIn and others show for a shared link. `preview` comes from
+   render_site (a day page: its date and top headline); the addresses from config/site.toml. #}
+{% set preview = preview if preview is defined else {"title": site.name, "description": site.description, "path": ""} %}
+<meta property="og:site_name" content="{{ site.name }}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ site.base_url }}{{ preview.path }}">
+<meta property="og:title" content="{{ preview.title }}">
+<meta property="og:description" content="{{ preview.description }}">
+{% if social_image %}
+<meta property="og:image" content="{{ social_image.url }}">
+<meta property="og:image:width" content="{{ social_image.width }}">
+<meta property="og:image:height" content="{{ social_image.height }}">
+<meta property="og:image:alt" content="{{ social_image.alt }}">
+{% endif %}
+<meta name="twitter:card" content="{{ 'summary_large_image' if social_image else 'summary' }}">
 <link rel="icon" href="{{ root }}static/favicon.svg" type="image/svg+xml">
 <script src="{{ root }}static/site.js"></script>
 {% block head %}{% endblock %}

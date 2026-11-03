@@ -30,6 +30,7 @@ config/filter.toml        off-topic word lists for the relevance filter (small s
 config/places.toml        the 41 places an item can be pinned to, coordinates taken once from OpenStreetMap (each with its OSM id)
 config/tags.toml          the 16 "affects" tags, each with a one-line meaning sent to the AI (place labels count as tags too)
 config/rhine.toml         the Kaub thresholds in cm (Alert ≤ 80 or > 640, Watch ≤ 150 or > 460), each with its public source
+config/site.toml          the site's own addresses (base URL, LinkedIn, repository) and its social preview image (og:image)
 tests/                    pytest tests; tests/test_repo_config.py keeps sources.toml and SOURCES.md in step
 templates/                Jinja2 page templates (base, day, archive, method page, shared macros)
 static/style.css          the whole design: colour and type tokens, light + dark mode

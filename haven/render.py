@@ -25,8 +25,8 @@ from haven import filter as haven_filter
 from haven import strike as haven_strike
 from haven import summarise
 from haven.clock import AMSTERDAM
-from haven.config import (CONFIG_DIR, RhineMeanings, RhineThresholds, Source, load_rhine, load_rhine_meanings,
-                          load_sources)
+from haven.config import (CONFIG_DIR, RhineMeanings, RhineThresholds, SiteConfig, Source, load_rhine,
+                          load_rhine_meanings, load_site, load_sources, preview_image_size)
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = PROJECT_DIR / "templates"
@@ -48,11 +48,15 @@ SITE = {
     # Under the About text in "Who makes this" (owner, 3 Nov 2026, PR #93).
     "built_by": ("Built by Leonardo Neirotti, second-year BBA student (Supply Chain Management), "
                  "with Python and GitHub Actions."),
-    # Footer of every page, "How it works" and the Today page's About block (#86). #28 later moves
-    # them into its site config with the base URL.
-    "linkedin_url": "https://www.linkedin.com/in/leonardo-neirotti",
-    "repo_url": "https://github.com/leonardoneirotti/haven-daily",
+    # The site's addresses (base URL, LinkedIn, repository) are in config/site.toml (#28);
+    # make_environment adds them to `site` for the templates.
 }
+
+# The sample-data note's words (base.html shows them on sample pages; hard rule 10). A sample day
+# page's preview description says the same, so a shared link can't pass invented news as real.
+SAMPLE_NOTE = "Sample data. The ships, news and readings on this page are invented to preview the design."
+QUIET_DAY = "Nothing significant on this day. The port status still applies."
+PREVIEW_SIZE = (1200, 630)  # og:image, the size LinkedIn shows uncropped (§7.7)
 
 MAX_ITEMS = 5
 # Ship positions (the AIS snapshot) come in v2 (#31). Until then a brief without ships says
@@ -680,6 +684,35 @@ def method_page(sources: tuple[Source, ...], rhine: RhineThresholds) -> dict:
     }
 
 
+def social_image(site: SiteConfig) -> dict | None:
+    """The og:image tags' values, or None while static/ has no preview image of the right size
+    (issue #28: "only output og:image once the image exists"; a wrong size is left out too)."""
+    path = STATIC_DIR / site.social_image
+    if not path.exists() or preview_image_size(path) != PREVIEW_SIZE:
+        return None
+    return {"url": f"{site.base_url}static/{site.social_image}", "width": PREVIEW_SIZE[0],
+            "height": PREVIEW_SIZE[1], "alt": site.social_image_alt}
+
+
+def day_preview(brief: dict) -> dict:
+    """A day page's preview title and description: the date, and the top headline (issue #28).
+    Sample days say they are sample data instead (hard rule 10)."""
+    title = f"{long_date(brief['day'])} · {SITE['name']}"
+    if brief["sample"]:
+        return {"title": f"{title} (sample data)", "description": SAMPLE_NOTE}
+    items = brief["items"]  # ranked: most severe first
+    if not items:
+        return {"title": title, "description": QUIET_DAY}
+    more = f" (and {len(items) - 1} more)" if len(items) > 1 else ""
+    return {"title": title, "description": items[0]["headline"] + more}
+
+
+def site_preview(path: str, page: str | None) -> dict:
+    """Today, Archive and "How it works": the page's title and the site description (issue #28)."""
+    return {"title": f"{page} · {SITE['name']}" if page else SITE["name"], "description": SITE["description"],
+            "path": path}
+
+
 def make_environment() -> Environment:
     env = Environment(
         loader=FileSystemLoader(TEMPLATES_DIR),
@@ -689,8 +722,11 @@ def make_environment() -> Environment:
         lstrip_blocks=True,
     )
     env.filters.update(long_date=long_date, date_only=date_only, short_date=short_date, clock=clock)
+    site = load_site()
     env.globals.update(
-        site=SITE,
+        # The owner's texts (SITE) and the addresses from config/site.toml, as one `site`.
+        site={**SITE, "base_url": site.base_url, "linkedin_url": site.linkedin_url, "repo_url": site.repo_url},
+        social_image=social_image(site),
         icons=ICONS,
         severity_keys=SEVERITY_KEYS,
         level_icons=LEVEL_ICONS,
@@ -730,6 +766,7 @@ def render_site(briefs_dir: Path, out_dir: Path, rhine_path: Path | None = None)
             env, "day.html", out_dir / "days" / f"{brief['date']}.html",
             root="../", active=None, sample=brief["sample"], is_index=False,
             brief=brief, older=older, newer=newer, is_latest=newer is None,
+            preview=dict(day_preview(brief), path=f"days/{brief['date']}.html"),
         )
 
     latest = briefs[-1]
@@ -737,13 +774,16 @@ def render_site(briefs_dir: Path, out_dir: Path, rhine_path: Path | None = None)
         env, "day.html", out_dir / "index.html",
         root="", active="today", sample=latest["sample"], is_index=True,
         brief=latest, older=briefs[-2] if len(briefs) > 1 else None, newer=None, is_latest=True,
+        preview=site_preview("", None),
     )
     write_page(
         env, "archive.html", out_dir / "archive.html",
         root="", active="archive", sample=sample, months=group_by_month(briefs),
+        preview=site_preview("archive.html", "Archive"),
     )
     write_page(env, "about.html", out_dir / "about.html", root="", active="method", sample=sample,
-               method=method_page(load_sources(), load_rhine(rhine_path)))
+               method=method_page(load_sources(), load_rhine(rhine_path)),
+               preview=site_preview("about.html", "How it works"))
     return len(briefs)
 
 

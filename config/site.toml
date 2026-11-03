@@ -1,0 +1,18 @@
+# The site's own addresses and its social preview image (spec §2.3, §7.7; issue #28).
+# Read by haven/config.py (load_site). Used by the renderer (footer, "How it works", the Today
+# page's About block, the og:/twitter: preview tags) and by the fetcher (its user agent links
+# "How it works"). Templates never have these written in.
+
+# Where the site is published, ending with "/": page addresses are this + "days/2026-10-29.html".
+# GitHub Pages for now; change it here if the site moves to its own domain (havendaily.nl, §11).
+base_url = "https://leonardoneirotti.github.io/haven-daily/"
+
+# The owner's links (given 2 Nov 2026, PR #80; shown since #86).
+linkedin_url = "https://www.linkedin.com/in/leonardo-neirotti"
+repo_url = "https://github.com/leonardoneirotti/haven-daily"
+
+# The social preview card (og:image): a 1200 x 630 PNG in static/, made by the owner (§7.7,
+# checklist #43). Until the file exists, pages have no og:image; once it does, every page links
+# it. A file of another size is left out (LinkedIn would crop it).
+social_image = "social-preview.png"
+social_image_alt = "A dark, stylised chart of a large seaport at dusk, with a few ships seen from above."
