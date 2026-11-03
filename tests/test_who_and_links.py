@@ -23,6 +23,9 @@ ABOUT = ("Haven Daily is an independent portfolio project by Leonardo Neirotti, 
          "student at Rotterdam University of Applied Sciences. Every morning an automated pipeline reads public "
          "sources, uses AI to filter and summarise what matters for logistics planners, and publishes this brief. "
          "It is not affiliated with the Port of Rotterdam Authority or any company named here.")
+# Under the About text in "Who makes this" (owner, 3 Nov 2026, PR #93: default 3).
+BUILT_BY = ("Built by Leonardo Neirotti, second-year BBA student (Supply Chain Management), "
+            "with Python and GitHub Actions.")
 LINKEDIN = "https://www.linkedin.com/in/leonardo-neirotti"
 REPO = "https://github.com/leonardoneirotti/haven-daily"
 
@@ -135,6 +138,11 @@ def test_who_makes_this_is_the_about_text_with_both_links(how):
     maker = part(how, r'<section aria-labelledby="maker">.*?</section>')
     assert ABOUT in text_of(maker)
     assert {LINKEDIN, REPO} <= links(maker)
+
+
+def test_who_makes_this_adds_the_built_by_line_right_under_the_about_text(how):
+    maker = text_of(part(how, r'<section aria-labelledby="maker">.*?</section>'))
+    assert ABOUT + " " + BUILT_BY in maker
 
 
 def about_block(page: str) -> str | None:
