@@ -11,11 +11,17 @@ as in spec §8.7), and measures the numbered markers on the chart:
   hidden     an item's number is not fully on the chart, or is under the news panel
   lost       an item is on no marker (or on more than one)
   label-cut  a marker's label runs past the chart's edge or under the panel
+and, about the run itself:
+  timeout    the check didn't finish within CHECK_LIMIT_S; logged, the run goes on
+  unfinished Edge stopped (or hit BLOCK_LIMIT_S) during this check; logged, the run goes on
+
+Edge runs with reduced motion, so no animation keeps it busy, and a fresh Edge runs each
+block of BLOCK checks. Progress is printed after every check.
 
 Not run in CI (it needs Edge). Writes nothing to the repo: the page is built in a temporary
 folder (or in --site, kept for screenshots). Items are invented ("Invented item 1").
 
-    python tools/check_map_pins.py                  # everything, both sizes (~10-20 min)
+    python tools/check_map_pins.py --only laptop --checks pairs   # 820 checks, ~1-2 s each
     python tools/check_map_pins.py --only laptop --checks all,singles
 """
 
@@ -41,6 +47,9 @@ from haven.config import load_places  # noqa: E402
 
 EDGE = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
 SIZES = {"laptop": (1440, 900), "phone": (390, 844)}
+BLOCK = 20  # checks per Edge process
+BLOCK_LIMIT_S = 180  # an Edge still running after this is stopped; the run goes on with the next check
+CHECK_LIMIT_S = 30  # one check that takes longer is logged as "timeout"
 BASE_BRIEF = ROOT / "data" / "sample" / "briefs" / "2026-10-29.json"  # a sample day with pins
 
 # The harness page: loads the day page into an iframe once per check, with that check's items
@@ -56,9 +65,10 @@ HARNESS = """<!doctype html>
 "use strict";
 const params = new URLSearchParams(location.search);
 const W = Number(params.get("w")), H = Number(params.get("h"));
+const FROM = Number(params.get("from")), TO = Number(params.get("to"));
 const CHECKS = __CHECKS__;
 const PLACES = __PLACES__;
-const results = [];
+const CHECK_LIMIT_MS = __CHECK_LIMIT_MS__;
 
 function pageFor(base, check) {
   const callouts = check.places.map((id, i) => Object.assign(
@@ -113,34 +123,45 @@ function measure(check, frame) {
     const numsShown = m.nums.every((n) => inside(n.box, free));
     if (numsShown && !inside(m.box, free)) problems.push({ kind: "label-cut", marker: m.text });
   });
-  return { name: check.name, problems: problems };
+  return { name: check.name, problems: problems, reduced: win.matchMedia("(prefers-reduced-motion: reduce)").matches };
 }
 
+// One check; after CHECK_LIMIT_MS it gives up and reports "timeout", so one stuck page
+// doesn't stop the run.
 function run(base, check) {
   return new Promise((resolve) => {
+    let done = false;
     const frame = document.createElement("iframe");
+    const finish = (result) => {
+      if (done) return;
+      done = true;
+      clearTimeout(limit);
+      frame.remove();
+      resolve(result);
+    };
+    const limit = setTimeout(() => finish({ name: check.name, problems: [{ kind: "timeout" }] }), CHECK_LIMIT_MS);
     frame.style.cssText = "position:absolute;left:0;top:0;border:0;width:" + W + "px;height:" + H + "px";
     frame.onload = async () => {
       const win = frame.contentWindow;
       await frame.contentDocument.fonts.ready;
       await new Promise((r) => win.requestAnimationFrame(() => win.requestAnimationFrame(r)));
       await new Promise((r) => setTimeout(r, 50));
-      const result = measure(check, frame);
-      frame.remove();
-      resolve(result);
+      if (!done) finish(measure(check, frame));
     };
     frame.srcdoc = pageFor(base, check);
     document.body.appendChild(frame);
   });
 }
 
+// Each result goes to the tool as soon as it's ready, so a block stopped part-way keeps
+// everything it finished.
 (async () => {
   const base = await (await fetch("days/__DAY__.html")).text();
-  for (let i = 0; i < CHECKS.length; i++) {
-    results.push(await run(base, CHECKS[i]));
-    if (results.length % 50 === 0) fetch("/progress?run=__RUN__&done=" + results.length, { method: "POST" });
+  for (let i = FROM; i < Math.min(TO, CHECKS.length); i++) {
+    const result = await run(base, CHECKS[i]);
+    await fetch("/check?run=__RUN__&n=" + (i + 1) + "&total=" + CHECKS.length, { method: "POST", body: JSON.stringify(result) });
   }
-  await fetch("/result?run=__RUN__", { method: "POST", body: JSON.stringify(results) });
+  await fetch("/done?run=__RUN__", { method: "POST" });
 })();
 </script>
 """
@@ -203,35 +224,72 @@ class Handler(SimpleHTTPRequestHandler):
         path, _, query = self.path.partition("?")
         args = dict(part.split("=", 1) for part in query.split("&"))
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
-        if path == "/progress":
-            print(f"  {args['run']}: {args['done']} checks", flush=True)
-        elif path == "/result":
-            self.server.results[args["run"]] = json.loads(body)
+        if path == "/check":
+            result = json.loads(body)
+            self.server.results.setdefault(args["run"], []).append(result)
+            kinds = sorted({problem["kind"] for problem in result["problems"]})
+            size = args["run"].rsplit("-", 1)[0]
+            print(f"  {size}: {args['n']}/{args['total']} {result['name']}" + (f"  [{', '.join(kinds)}]" if kinds else ""),
+                  flush=True)
+        elif path == "/done":
             self.server.event(args["run"]).set()
         self.send_response(204)
         self.end_headers()
 
 
-def run_size(name: str, site: Path, harness: str, server: Server, profile: Path) -> list[dict]:
-    width, height = SIZES[name]
-    (site / f"check-{name}.html").write_text(harness.replace("__RUN__", name), encoding="utf-8")
-    url = f"http://127.0.0.1:{server.server_address[1]}/check-{name}.html?w={width}&h={height}"
-    subprocess.run(
+def run_edge(url: str, profile: Path) -> bool:
+    """Edge with the check page, reduced motion on. False if it hit BLOCK_LIMIT_S: then Edge
+    and all its child processes are ended (a leftover Edge holding the same profile would
+    take over the next launch)."""
+    edge = subprocess.Popen(
         [str(EDGE), "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--user-data-dir={profile}",
          "--window-size=1600,1000", "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
-         "--disable-backgrounding-occluded-windows", "--dump-dom", url],
-        capture_output=True, timeout=3600,
+         "--disable-backgrounding-occluded-windows", "--force-prefers-reduced-motion", "--dump-dom", url],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
-    if name not in server.results:
-        raise SystemExit(f"{name}: Edge finished without sending results")
-    return server.results[name]
+    try:
+        edge.wait(timeout=BLOCK_LIMIT_S)
+        return True
+    except subprocess.TimeoutExpired:
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(edge.pid)], capture_output=True)
+        edge.wait()
+        return False
+
+
+def run_size(name: str, site: Path, harness: str, server: Server, profile: Path, todo: list[dict]) -> list[dict]:
+    """The checks in blocks of BLOCK, each in a fresh Edge (one Edge running hundreds of checks
+    stopped part-way, #85; a new one per block also frees its memory). A block stopped part-way
+    keeps the results it sent; the check it was on is logged as "unfinished" and the next block
+    starts after it."""
+    width, height = SIZES[name]
+    total, results, start = len(todo), [], 0
+    while start < total:
+        end = min(start + BLOCK, total)
+        run = f"{name}-{start}"
+        (site / f"check-{run}.html").write_text(harness.replace("__RUN__", run), encoding="utf-8")
+        url = (f"http://127.0.0.1:{server.server_address[1]}/check-{run}.html"
+               f"?w={width}&h={height}&from={start}&to={end}")
+        finished = run_edge(url, profile / run)
+        server.event(run).set()  # lets the page's /hold request end, whatever happened
+        got = server.results.pop(run, [])
+        results += got
+        start += len(got)
+        if start < end:
+            why = "Edge hit the block limit" if not finished else "Edge stopped"
+            print(f"  {name}: {start + 1}/{total} {todo[start]['name']}  [unfinished: {why}; skipped]", flush=True)
+            results.append({"name": todo[start]["name"], "problems": [{"kind": "unfinished", "why": why}]})
+            start += 1
+    return results
 
 
 def report(name: str, results: list[dict]) -> int:
     width, height = SIZES[name]
     print(f"\n{name} ({width} x {height}): {len(results)} checks")
     failed = 0
-    for kind in ("no-map", "lost", "overlap", "hidden", "label-cut"):
+    moving = sum(1 for r in results if r.get("reduced") is False)
+    if moving:
+        print(f"  warning: {moving} checks ran without reduced motion")
+    for kind in ("no-map", "lost", "overlap", "hidden", "label-cut", "timeout", "unfinished"):
         hits = [(r["name"], p) for r in results for p in r["problems"] if p["kind"] == kind]
         names = sorted({n for n, _ in hits})
         print(f"  {kind:10} {len(names):4} checks")
@@ -255,7 +313,7 @@ def main() -> None:
     if not EDGE.exists():
         raise SystemExit(f"Edge not found at {EDGE}")
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         site = args.site or Path(tmp) / "site"
         day = build_site(site)
         todo = checks(set(args.checks.split(",")) if args.checks else set(),
@@ -263,14 +321,15 @@ def main() -> None:
         harness = (HARNESS.replace("__CHECKS__", json.dumps(todo))
                    .replace("__PLACES__", json.dumps({p.id: {"lat": p.lat, "lon": p.lon, "label": p.label,
                                                              "side": p.side} for p in load_places()}))
-                   .replace("__DAY__", day))
+                   .replace("__DAY__", day)
+                   .replace("__CHECK_LIMIT_MS__", str(CHECK_LIMIT_S * 1000)))
         server = Server(site)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         try:
             all_results = {}
             for name in [args.only] if args.only else list(SIZES):
                 print(f"{name}: {len(todo)} checks", flush=True)
-                all_results[name] = run_size(name, site, harness, server, Path(tmp) / f"edge-{name}")
+                all_results[name] = run_size(name, site, harness, server, Path(tmp) / f"edge-{name}", todo)
         finally:
             server.shutdown()
 
