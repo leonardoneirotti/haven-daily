@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m %}
-{% block title %}Method · {{ site.name }}{% endblock %}
+{% block title %}How it works · {{ site.name }}{% endblock %}
 {#
-  The Method page (spec §2.3 item 4, issue #24). What lives in config or code comes from
+  "How it works", formerly the Method page (spec §2.3 item 4, issues #24 and #86; the file
+  stays about.html so links keep working). What lives in config or code comes from
   `method` (render.method_page): the source list (config/sources.toml), the Kaub thresholds
   (config/rhine.toml) and the AI models (haven/filter.py, haven/summarise.py), so the page
   can't drift from what the pipeline does. Everything else is written here.
@@ -10,15 +11,46 @@
 {% block main %}
 <main id="main" class="wrap">
   <div class="page-head">
-    <h1 class="page-title">Method</h1>
-    <p class="page-lede">How a brief is made, the rules it follows, and where every number comes from.</p>
+    <h1 class="page-title">How it works</h1>
+    <p class="page-lede">What this is, who makes it, how a brief is made, the rules it follows, and where every number comes from.</p>
   </div>
+
+  {# Contents (S3, #86): one entry per section below, in page order, worded like its heading
+     (tests/test_who_and_links.py checks both). #}
+  <nav class="contents" aria-label="Contents">
+    <ol>
+      <li><a href="#what">What this is</a></li>
+      <li><a href="#maker">Who makes this</a></li>
+      <li><a href="#steps">How a brief is made</a></li>
+      <li><a href="#severity">Severity rules</a></li>
+      <li><a href="#thresholds">Port status thresholds</a></li>
+      <li><a href="#weather">Weather warnings</a></li>
+      <li><a href="#strike">How the strike flag works</a></li>
+      <li><a href="#models">The AI models</a></li>
+      <li><a href="#sources">Sources</a></li>
+      <li><a href="#copyright">Copyright and article text</a></li>
+      <li><a href="#privacy">Privacy</a></li>
+      <li><a href="#chart">The chart</a></li>
+      <li><a href="#credits">Credits</a></li>
+    </ol>
+  </nav>
 
   <div class="prose">
     <section aria-labelledby="what">
       <h2 id="what">What this is</h2>
       <p>Haven Daily is a short brief, published every morning, on what affects the Port of Rotterdam and what it means for the people who plan cargo through it. It collects port and logistics news, keeps what matters for Rotterdam, and turns it into at most five items, most severe first. Each item says what happened, links to the original source and gives an interpretation of the impact for a planner. Quiet days get a shorter brief. It is never padded.</p>
       <p>It is a personal project, not a company tool, and it is not affiliated with the Port of Rotterdam Authority or any company in the port. <em>Haven</em> means port in Dutch and a safe place in English.</p>
+    </section>
+
+    {# Second, right after "What this is" (S3, #86): the owner's About text (L2, spec §7.8). #}
+    <section aria-labelledby="maker">
+      <h2 id="maker">Who makes this</h2>
+      <p>{{ site.about }}</p>
+      <p>{{ site.built_by }}</p>
+      <ul class="about-links">
+        <li><a href="{{ site.linkedin_url }}">{{ site.author }} on LinkedIn</a></li>
+        <li><a href="{{ site.repo_url }}">Source code on GitHub</a></li>
+      </ul>
     </section>
 
     <section aria-labelledby="steps">
@@ -176,14 +208,6 @@
         <li>Built with <a href="https://leafletjs.com">Leaflet</a> 1.9.4 (BSD-2), Jinja2 (BSD), Beautiful Soup and soupsieve (MIT), the Anthropic Python SDK (MIT), and Shapely (BSD) for the map script.</li>
         <li>Icons: <a href="https://lucide.dev">Lucide</a> (ISC). Fonts: IBM Plex Sans, Sans Condensed, Mono and Serif (<a href="{{ root }}static/fonts/OFL.txt">SIL Open Font License</a>), served from this site.</li>
       </ul>
-    </section>
-
-    <section aria-labelledby="maker">
-      <h2 id="maker">Who makes this</h2>
-      <p>Haven Daily is a personal portfolio project by {{ site.author }}, a second-year BBA International Business (Supply Chain Management) student at Rotterdam University of Applied Sciences. It is built with Python and GitHub Actions, with Claude models for the AI steps.</p>
-      {% if site.linkedin_url %}<p><a href="{{ site.linkedin_url }}">{{ site.author }} on LinkedIn</a></p>{% endif %}
-      {% if site.repo_url %}<p><a href="{{ site.repo_url }}">Source code on GitHub</a></p>{% endif %}
-      <p>It is not affiliated with the Port of Rotterdam Authority or any company in the port.</p>
     </section>
   </div>
 </main>

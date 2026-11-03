@@ -35,8 +35,23 @@ STATIC_DIR = PROJECT_DIR / "static"
 SITE = {
     "name": "Haven Daily",
     "author": "Leonardo Neirotti",
-    "linkedin_url": None,  # fill in to show the link in the footer and on the Method page
-    "repo_url": None,  # fill in once the GitHub repository is public
+    # The owner's own words (spec §7.8, #86): used exactly, so they live here once.
+    "tagline": ("What affects the Port of Rotterdam today, and what it means for logistics planners. "
+                "Updated every morning."),
+    # The page description search engines show, on every page (owner, 3 Nov 2026, PR #93).
+    "description": ("What affects the Port of Rotterdam today, and what it means for logistics planners. "
+                    "Independent, unofficial portfolio project."),
+    "about": ("Haven Daily is an independent portfolio project by Leonardo Neirotti, an International Business "
+              "student at Rotterdam University of Applied Sciences. Every morning an automated pipeline reads "
+              "public sources, uses AI to filter and summarise what matters for logistics planners, and publishes "
+              "this brief. It is not affiliated with the Port of Rotterdam Authority or any company named here."),
+    # Under the About text in "Who makes this" (owner, 3 Nov 2026, PR #93).
+    "built_by": ("Built by Leonardo Neirotti, second-year BBA student (Supply Chain Management), "
+                 "with Python and GitHub Actions."),
+    # Footer of every page, "How it works" and the Today page's About block (#86). #28 later moves
+    # them into its site config with the base URL.
+    "linkedin_url": "https://www.linkedin.com/in/leonardo-neirotti",
+    "repo_url": "https://github.com/leonardoneirotti/haven-daily",
 }
 
 MAX_ITEMS = 5
