@@ -365,13 +365,19 @@ def test_a_card_without_a_readable_date_is_still_collected():
 # --- Kuehne+Nagel: only the Rotterdam paragraph -----------------------------------------
 
 
+def kn_use():
+    """K+N as a `use` source. Its real verdict is headline-only (terms, #98); the Rotterdam-paragraph
+    code stays tested so that written permission later is a one-line config change."""
+    return with_verdict(real("kn-seanews"), "use")
+
+
 def kn_routes(article=None):
     return {KN_URL: html(KN_LIST), KN_WEEKLY: html(kn_article() if article is None else article)}
 
 
 def test_kn_yields_only_the_weekly_update_with_only_its_rotterdam_paragraph():
     fetcher, net = fetcher_for(kn_routes())
-    result = collect_page(real("kn-seanews"), fetcher)
+    result = collect_page(kn_use(), fetcher)
     assert result.failures == []
     [item] = result.items
     assert item.record() == {
@@ -412,7 +418,7 @@ def test_kn_paragraph_is_capped_at_the_article_text_limit():
     long_text = "Invented word. " * 1000
     text = rotterdam_paragraph(kn_article(body=f"<p><strong>Rotterdam:</strong> {long_text}</p>"))
     assert len(text) <= pages.ARTICLE_TEXT_MAX
-    item = collect_page(real("kn-seanews"), fetcher_for(kn_routes(
+    item = collect_page(kn_use(), fetcher_for(kn_routes(
         kn_article(body=f"<p><strong>Rotterdam:</strong> {long_text}</p>")))[0]).items[0]
     assert len(item.snippet) <= pages.SNIPPET_MAX
     assert len(item.article_text) <= pages.ARTICLE_TEXT_MAX
@@ -421,7 +427,7 @@ def test_kn_paragraph_is_capped_at_the_article_text_limit():
 def test_kn_article_without_a_rotterdam_paragraph_is_a_failure_and_no_item():
     article = kn_article(body=f"<p>{INTRO}</p><p><strong>Antwerp:</strong> Invented Antwerp text.</p>")
     fetcher, _ = fetcher_for(kn_routes(article))
-    result = collect_page(real("kn-seanews"), fetcher)
+    result = collect_page(kn_use(), fetcher)
     assert result.items == []
     [failure] = result.failures
     assert failure == {"source": "Kuehne+Nagel SeaNews", "error": f"{KN_WEEKLY}: {pages.NO_PARAGRAPH}"}
@@ -429,7 +435,7 @@ def test_kn_article_without_a_rotterdam_paragraph_is_a_failure_and_no_item():
 
 def test_kn_article_that_cannot_be_fetched_is_a_failure_and_no_item():
     fetcher, _ = fetcher_for({KN_URL: html(KN_LIST), KN_WEEKLY: html("gone", status=404)})
-    result = collect_page(real("kn-seanews"), fetcher)
+    result = collect_page(kn_use(), fetcher)
     assert result.items == []
     [failure] = result.failures
     assert failure["error"].startswith(f"{KN_WEEKLY}: ") and "404" in failure["error"]
@@ -439,15 +445,15 @@ def test_kn_without_a_weekly_update_on_the_list_is_quiet():
     """The weekly update is only on the first page for a few days: no item, but no failure either."""
     page = kn_list(kn_list_card("Invented crane delivery in Jakarta", "invented-crane-delivery"))
     fetcher, net = fetcher_for({KN_URL: html(page)})
-    result = collect_page(real("kn-seanews"), fetcher)
+    result = collect_page(kn_use(), fetcher)
     assert result.items == [] and result.failures == []
     assert [c for c in net.calls if not c.endswith("/robots.txt")] == [KN_URL]
 
 
 def test_kn_headline_only_by_config_needs_no_code_change_and_opens_no_article():
-    """If the K+N terms check (#43) says no, only the verdict in config changes."""
+    """K+N's real verdict since #98 (its terms): the weekly roundup's headline and link, nothing else."""
     fetcher, net = fetcher_for(kn_routes())
-    result = collect_page(with_verdict(real("kn-seanews"), "headline-only"), fetcher)
+    result = collect_page(real("kn-seanews"), fetcher)
     assert result.failures == []
     [item] = result.items
     assert (item.headline, item.url, item.access, item.published) == (WEEKLY_TITLE, KN_WEEKLY, "headline-only", None)
@@ -460,7 +466,7 @@ def test_kn_ai_opt_out_also_opens_no_article():
     routes = kn_routes()
     routes["https://mykn.kuehne-nagel.com/robots.txt"] = html(robots, headers={"content-type": "text/plain"})
     fetcher, net = fetcher_for(routes)
-    result = collect_page(real("kn-seanews"), fetcher)
+    result = collect_page(kn_use(), fetcher)
     [item] = result.items
     assert item.access == "headline-only" and item.article_text is None
     assert KN_WEEKLY not in net.calls
@@ -483,7 +489,7 @@ def test_a_page_whose_layout_changed_is_a_failure_and_other_sources_still_work()
 
 def test_kn_list_whose_layout_changed_is_a_failure():
     fetcher, _ = fetcher_for({KN_URL: html(doc("<div>Invented redesign</div>"))})
-    result = collect_page(real("kn-seanews"), fetcher)
+    result = collect_page(kn_use(), fetcher)
     assert result.items == []
     assert result.failures == [{"source": "Kuehne+Nagel SeaNews", "error": f"{KN_URL}: {pages.NO_ITEMS}"}]
 
@@ -559,7 +565,7 @@ def test_an_html_source_without_a_parser_is_a_failure_not_a_crash():
 def test_teasers_and_article_text_never_reach_the_stored_record_or_repr(tmp_path):
     fetcher, _ = fetcher_for({ECT_URL: html(ect_page(ect_card()))})
     [ect] = collect_page(real("ect-news"), fetcher).items
-    [kn] = collect_page(real("kn-seanews"), fetcher_for(kn_routes())[0]).items
+    [kn] = collect_page(kn_use(), fetcher_for(kn_routes())[0]).items
     for item in (ect, kn):
         assert SECRET not in repr(item) and ROTTERDAM not in repr(item)
         assert set(item.record()) == {"source", "headline", "url", "published", "language", "access"}

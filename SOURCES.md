@@ -18,7 +18,6 @@ Tested from a desktop, not from GitHub Actions IPs. Some sites may still block t
 | PIN notices to shipping | https://pin.portofrotterdam.com/rss.xml | RSS, full notice text. 40–60/week, noisy: AI check. Feed keeps only ~10 items. |
 | Contargo business news | https://www.contargo.net/en/business/business-news | HTML. AI check. |
 | ECT news | https://www.ect.nl/en/news-feed | HTML. Auto-keep. `/en/rss.xml` is stale. |
-| Kuehne+Nagel SeaNews | https://mykn.kuehne-nagel.com/news | HTML. Rotterdam paragraph of the weekly port update only. **Terms not found yet: check before launch.** |
 
 ## Headline-only
 
@@ -28,7 +27,8 @@ Tested from a desktop, not from GitHub Actions IPs. Some sites may still block t
 | Nieuwsblad Transport | https://www.nt.nl/havens/feed/ · https://www.nt.nl/tag/rotterdam/feed/ | Paywalled, blocks AI crawlers, `ai-train=no`. Ignore the body text in the feed. |
 | PortsEurope | https://www.portseurope.com/category/rotterdam/feed/ | Subscription site, blocks AI crawlers. |
 | The Loadstar | https://theloadstar.com/feed/ | Main feed only (robots disallows tag/category pages). Terms allow RSS for links back. |
-| RTV Rijnmond | https://www.rijnmond.nl/rss/nieuws | Blocks ClaudeBot and ~130 other bots. **Terms not found yet: check before launch.** |
+| RTV Rijnmond | https://www.rijnmond.nl/rss/nieuws | Blocks ClaudeBot and ~130 other bots. Terms (https://www.rijnmond.nl/aansprakelijkheid, read by the owner 15 Nov 2026): all rights reserved, any use needs prior permission. Headline-only until written permission (#98). |
+| Kuehne+Nagel SeaNews | https://mykn.kuehne-nagel.com/news | HTML. The weekly port update only. Terms (https://www.seaexplorer.com/legal-notice, read by the owner 15 Nov 2026): a limited, non-transferable right to use the content as-is only. Headline-only until written permission (#98). |
 
 ## Status line
 

@@ -1,7 +1,7 @@
 """Page collectors: read the HTML news lists into the common item shape (spec §4, §5.8; issue #10).
 
-The HTML sources in config/sources.toml: Port Authority news, Contargo business news, ECT news,
-Kuehne+Nagel SeaNews (all `use`) and the NL Times port tag page (headline-only).
+The HTML sources in config/sources.toml: Port Authority news, Contargo business news, ECT news
+(all `use`), and Kuehne+Nagel SeaNews and the NL Times port tag page (headline-only).
 
 Each source has one small parser below that finds the news cards on its page and reads a
 headline, link and date from each. The items are the same `Item` the feed collectors return
@@ -15,9 +15,10 @@ headline, link and date from each. The items are the same `Item` the feed collec
 **Kuehne+Nagel SeaNews: the Rotterdam paragraph only.** Of all K+N articles only the weekly
 "Port operational updates" roundup is collected. Its article page is opened, and only the
 section under the bold "Rotterdam:" label is kept (in memory, as `article_text` and
-`snippet`). Nothing else from the page is passed on: not the intro, not the other ports. If
-K+N becomes headline-only (terms check, owner checklist #43), only the verdict in config
-changes: the weekly roundup's headline and link are kept and no article page is opened.
+`snippet`). Nothing else from the page is passed on: not the intro, not the other ports. **Since
+15 Nov 2026 K+N is headline-only because of its terms (#98)**: the weekly roundup's headline and
+link are kept and no article page is opened. The paragraph code stays for written permission
+later, when only the verdict in config changes back to `use`.
 
 **A layout change is a failure, never an exception** (hard rule 9): a page on which no news
 cards are found, a K+N roundup without a Rotterdam paragraph, a fetch error or even a bug in

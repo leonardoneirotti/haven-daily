@@ -33,8 +33,9 @@ def sources_md() -> dict[str, tuple[str, tuple[str, ...]]]:
 
 def test_sources_md_was_parsed():
     listed = sources_md()
-    assert sum(v == "use" for v, _ in listed.values()) == 5
-    assert sum(v == "headline-only" for v, _ in listed.values()) == 5
+    # K+N moved from use to headline-only because of its terms (#98, 15 Nov 2026).
+    assert sum(v == "use" for v, _ in listed.values()) == 4
+    assert sum(v == "headline-only" for v, _ in listed.values()) == 6
 
 
 def test_config_and_sources_md_list_the_same_sources_with_the_same_verdicts():

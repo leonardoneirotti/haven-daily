@@ -584,7 +584,9 @@ def test_an_unexpected_error_while_reading_an_article_is_a_failure(monkeypatch):
 
 def test_every_use_source_has_a_way_to_get_its_text():
     use = {s.id for s in load_sources() if s.verdict == "use"}
-    assert use == set(collect.ARTICLE_BODY) | {PIN_SOURCE_ID, KN_SOURCE_ID}
+    readers = set(collect.ARTICLE_BODY) | {PIN_SOURCE_ID, KN_SOURCE_ID}
+    # K+N is headline-only by its terms (#98); its Rotterdam-paragraph reader stays for written permission later.
+    assert use == readers - {KN_SOURCE_ID}
 
 
 def test_article_text_lives_in_memory_only_and_never_reaches_a_file(tmp_path):
