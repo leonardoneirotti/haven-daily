@@ -22,6 +22,7 @@
 - **AI never invents:** places and "affects" tags are picked from fixed lists (§5.10); severity can be `null` = unrated; strike dates only if stated.
 - **Storage (§6.1):** plain JSON files per day in `data/`, written once; no article text ever.
 - **Sources (§4, `SOURCES.md`):** final verdicts use / headline-only / drop.
+- **Roadmap (§10):** the GitHub issues plus the build order are the roadmap. No separate `ROADMAP.md`, and no ADR files that duplicate the spec: decisions go in `docs/SPEC.md`. *(Owner, methodology review Q1, 15 Nov 2026.)*
 
 ## Hard rules (full text: spec §3)
 
@@ -73,4 +74,4 @@ Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, 
 
 ### Domain docs
 
-Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`. Never write an ADR that repeats what `docs/SPEC.md` already says; record the decision in the spec instead (spec §10).
