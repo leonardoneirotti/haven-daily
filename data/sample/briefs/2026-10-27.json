@@ -49,10 +49,10 @@
       "icon": "megaphone",
       "value": "No active strike",
       "level": "green",
-      "place": "Derived from kept items",
+      "place": "From the news of the last 14 days",
       "items": [],
       "observed_at": "2026-10-27T06:12:00+01:00",
-      "source_name": "Kept items of the last 14 days",
+      "source_name": "Haven Daily's news sources",
       "source_url": null,
       "note": null
     }
@@ -108,7 +108,7 @@
       },
       {
         "source": "Summariser",
-        "error": "No valid answer for one item, also after the Haiku fallback. It is shown unrated: headline and link only."
+        "error": "No valid answer for one item, so it is shown unrated: headline and link only."
       }
     ]
   },

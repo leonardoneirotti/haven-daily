@@ -156,7 +156,8 @@
 {% macro status_marks(brief) -%}
 <span class="status-marks">
   {% for ind in brief.status %}
-  <span class="mark mark-{{ ind.level_key }}" title="{{ ind.label }}: {{ ind.level_label }}">{{ icon(level_icons[ind.level_key]) }}<span class="visually-hidden">{{ ind.label }}: {{ ind.level_label }}.</span></span>
+  {# The short label shows as text on phones only (S9, #84); screen readers hear the full label once. #}
+  <span class="mark mark-{{ ind.level_key }}" title="{{ ind.label }}: {{ ind.level_label }}">{{ icon(level_icons[ind.level_key]) }}<span class="mark-label" aria-hidden="true">{{ ind.short_label }}</span><span class="visually-hidden">{{ ind.label }}: {{ ind.level_label }}.</span></span>
   {% endfor %}
 </span>
 {%- endmacro %}

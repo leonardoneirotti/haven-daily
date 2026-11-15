@@ -271,7 +271,7 @@ def test_a_cancel_that_does_not_end_the_batch_sends_every_item_to_the_fallback()
     assert written_by(result) == [HAIKU_STANDARD, HAIKU_STANDARD]
     assert clock.now <= BATCH_WAIT + CANCEL_WAIT
     assert result.failures == [{"source": "AI summariser", "error":
-                                "batch did not end after cancelling; all items sent to the standard API"}]
+                                "the half-price batch did not finish after it was cancelled, so every item was summarised by the backup model"}]
 
 
 # --- the batch failing ---------------------------------------------------------------------
@@ -290,7 +290,7 @@ def test_if_the_batch_cannot_be_created_every_item_goes_to_haiku_standard(error,
     assert result.summaries == {"batch": 0, "fallback": 2}
     assert clock.sleeps == []  # nothing to wait for
     assert result.failures == [{"source": "AI summariser", "error":
-                                f"batch not created ({problem}); all items sent to the standard API"}]
+                                f"the half-price batch could not be started ({problem}), so every item was summarised by the backup model"}]
 
 
 @pytest.mark.parametrize("cls, code", [(anthropic.AuthenticationError, 401), (anthropic.PermissionDeniedError, 403)])
@@ -302,7 +302,7 @@ def test_a_rejected_key_at_batch_creation_means_ai_unavailable(cls, code):
 
 def test_no_client_means_ai_unavailable_and_no_batch():
     result = summarise_batch([item()], None, known=[], today=TODAY, read_at=READ_AT)
-    assert result.unavailable == "ANTHROPIC_API_KEY is not set" and result.items[0].ai is None
+    assert result.unavailable == "no API key is set" and result.items[0].ai is None
 
 
 def test_no_items_means_no_batch_and_no_wait():
@@ -323,8 +323,8 @@ def test_results_that_cannot_be_read_send_the_items_to_the_fallback():
                                 results_error=anthropic.APIConnectionError(request=REQUEST))
     assert written_by(result) == [HAIKU_STANDARD]
     assert result.failures == [{"source": "AI summariser", "error":
-                                "batch results could not be read (connection error); "
-                                "all items sent to the standard API"}]
+                                "the half-price batch's answers could not be read (connection error), "
+                                "so every item was summarised by the backup model"}]
 
 
 def test_without_any_batch_answer_three_failed_fallback_calls_mean_ai_unavailable():

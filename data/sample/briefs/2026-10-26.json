@@ -39,10 +39,10 @@
       "icon": "megaphone",
       "value": null,
       "level": null,
-      "place": "Derived from kept items",
+      "place": "From the news of the last 14 days",
       "items": [],
       "observed_at": "2026-10-26T07:40:00+01:00",
-      "source_name": "Kept items of the last 14 days",
+      "source_name": "Haven Daily's news sources",
       "source_url": null,
       "note": "Can't be judged without the AI step."
     }

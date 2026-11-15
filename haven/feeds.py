@@ -47,7 +47,8 @@ from haven.config import Source
 from haven.fetch import Fetcher, FetchError
 
 PIN_SOURCE_ID = "pin-notices"
-GAP_MESSAGE = "some notices may have been missed (feed rolled over)"
+GAP_MESSAGE = ("some notices may have been missed: the feed keeps only the latest notices, "
+               "and all of them are newer than the last run")
 SNIPPET_MAX = 1000  # characters of feed text kept in memory for the relevance filter
 ARTICLE_TEXT_MAX = 6000  # characters of article text kept in memory for the summariser (spec §5.8)
 # Feeds whose description is the whole text, not a teaser (checked 1 Nov 2026): the article text

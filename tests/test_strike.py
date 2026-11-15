@@ -441,7 +441,7 @@ def test_reading_in_the_status_shape():
         "icon": "megaphone",
         "value": "Strike today · Maasvlakte",
         "level": "red",
-        "place": "Derived from kept items",
+        "place": "From the news of the last 14 days",
         "items": reading["items"],
         "observed_at": "2026-11-02T06:45:00+01:00",
         "source_name": "RTV Rijnmond",
@@ -455,7 +455,7 @@ def test_reading_with_nothing_linked():
     reading = strike.reading(flag(), READ_AT)
     assert reading["level"] == "green"
     assert reading["value"] == "No active strike"
-    assert reading["source_name"] == "Kept items of the last 14 days"
+    assert reading["source_name"] == "Haven Daily's news sources"
     assert reading["source_url"] is None
     assert reading["items"] == []
 
