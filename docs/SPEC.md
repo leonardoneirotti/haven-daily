@@ -1351,6 +1351,8 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 
 ## 10. Build plan (prompts for Claude Code, in order)
 
+**Where the roadmap lives** *(owner's answer to the methodology review, Q1, 15 Nov 2026)*: **the GitHub issues plus the build order are the roadmap.** That means the issues labelled `v1`, `v2` and `later`, with their "Blocked by" links and "Phase: v1 · N of 28" lines, and the numbered steps below. There is **no separate `ROADMAP.md`**; `BUILD_PLAN.md` stays a pointer only (§5.2). **No ADR files that duplicate this spec:** a decision is written here, with who decided it and when, not repeated in `docs/adr/`. ADR 0001 is kept because it records the reasoning and rejected options behind spec §2; new decisions go into the spec, not into new ADRs.
+
 **Version 1 — daily brief**
 1. Set up the Python project: folder structure, a config file listing sources, storage for items and status values, README. Explain the structure in a few lines.
 2. Test every source in SOURCES.md (feed or readable page? how much text? terms/robots.txt?) → mark use / headline-only / drop.
