@@ -64,17 +64,6 @@ language = "en"
 auto_keep = true
 note = "The /en/rss.xml feed is stale; read the HTML list."
 
-[[source]]
-id = "kn-seanews"
-name = "Kuehne+Nagel SeaNews"
-verdict = "use"
-why = "Only the Rotterdam paragraph of its weekly port update is used."
-home = "https://www.kuehne-nagel.com/"
-urls = ["https://mykn.kuehne-nagel.com/news"]
-access = "html"
-language = "en"
-note = "Rotterdam paragraph of the weekly port update only. Terms not found yet: check before launch (spec §11)."
-
 # --- headline-only --------------------------------------------------------------
 
 [[source]]
@@ -125,12 +114,23 @@ note = "Main feed only (robots.txt disallows tag/category pages)."
 id = "rtv-rijnmond"
 name = "RTV Rijnmond"
 verdict = "headline-only"
-why = "Its robots.txt blocks ClaudeBot and other AI crawlers."
+why = "Its terms reserve all rights, so there is no summary until RTV Rijnmond gives written permission. Its robots.txt also blocks ClaudeBot and other AI crawlers."
 home = "https://www.rijnmond.nl/"
 urls = ["https://www.rijnmond.nl/rss/nieuws"]
 access = "rss"
 language = "nl"
-note = "Blocks ClaudeBot and ~130 other bots. Terms not found yet: check before launch (spec §11)."
+note = "Blocks ClaudeBot and ~130 other bots. Terms (rijnmond.nl/aansprakelijkheid, read by the owner 15 Nov 2026): all rights reserved, any use needs prior permission via info@rijnmond.nl. Headline-only until written permission (#98)."
+
+[[source]]
+id = "kn-seanews"
+name = "Kuehne+Nagel SeaNews"
+verdict = "headline-only"
+why = "Its terms allow the content to be used only as it is, so there is no summary until Kuehne+Nagel gives written permission."
+home = "https://www.kuehne-nagel.com/"
+urls = ["https://mykn.kuehne-nagel.com/news"]
+access = "html"
+language = "en"
+note = "Terms (seaexplorer.com/legal-notice, read by the owner 15 Nov 2026): a limited, non-transferable right to use the content as-is only. Headline-only until written permission (#98): the weekly port update's headline and link only. With permission, set verdict = \"use\" and its Rotterdam paragraph is read again."
 
 # --- drop (never fetched) ----------------------------------------------------------
 
