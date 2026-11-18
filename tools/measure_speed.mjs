@@ -95,6 +95,7 @@ const base = `http://127.0.0.1:${server.address().port}/`;
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "speed-edge-"));
 const edge = spawn(BROWSER, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profileDir}`,
   "--no-first-run", "--no-default-browser-check", ...BROWSER_ARGS, "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+process.on("exit", () => edge.kill()); // also when the run ends with an error
 const wsUrl = await new Promise((ok, fail) => {
   let text = "";
   edge.stderr.on("data", (d) => {
@@ -122,7 +123,11 @@ ws.addEventListener("message", (event) => {
 function send(method, params = {}, sessionId) {
   const id = nextId++;
   ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
-  return new Promise((ok, fail) => pending.set(id, { ok, fail }));
+  // A browser that stops answering ends the run with an error instead of hanging it.
+  return new Promise((ok, fail) => {
+    const timer = setTimeout(() => { pending.delete(id); fail(new Error(`${method}: no answer in 120 s`)); }, 120000);
+    pending.set(id, { ok: (r) => { clearTimeout(timer); ok(r); }, fail: (e) => { clearTimeout(timer); fail(e); } });
+  });
 }
 const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
