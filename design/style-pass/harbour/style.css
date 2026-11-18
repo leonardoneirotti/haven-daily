@@ -1,0 +1,137 @@
+/* Style pass (#102), direction A: "Harbour Light", calm maritime.
+   A mockup only: loaded after static/style.css on a copy of the sample Today page
+   (tools/style_pass_shots.py). It changes tokens, fonts, spacing, borders and shadows,
+   never what the page contains.
+   Light and quiet: fog-white page, deep navy ink, white cards with soft corners,
+   a pale-blue sea with fine contour lines, sand-coloured land, deep teal ships.
+   Fonts: Manrope (headlines, UI, body), IBM Plex Mono (data, labels), IBM Plex Serif
+   (the planner impact only). Manrope is self-hosted from fonts/ (SIL OFL 1.1). */
+
+@font-face { font-family: "Manrope"; font-weight: 400; font-display: swap; src: url("fonts/manrope-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Manrope"; font-weight: 500; font-display: swap; src: url("fonts/manrope-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Manrope"; font-weight: 600; font-display: swap; src: url("fonts/manrope-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Manrope"; font-weight: 700; font-display: swap; src: url("fonts/manrope-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Manrope"; font-weight: 800; font-display: swap; src: url("fonts/manrope-latin-800-normal.woff2") format("woff2"); }
+
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --surface-2: #e4eef1;
+  --ink: #0f2231;
+  --ink-2: #4b5e6d;
+  --rule: #d6dee2;
+  --shadow: rgba(15, 34, 49, 0.14);
+  --overprint: #8a3a6c;
+  --gauge-water: rgba(46, 120, 170, 0.3);
+  --gauge-line: #2e78aa;
+
+  --water: #dbe7ed;
+  --water-line: #6f97ad;
+  --land: #efebe3;
+  --land-shadow: rgba(15, 34, 49, 0.16);
+  --coast: #8fa6b3;
+  --road: #d9d2c5;
+  --rail: #cbc2b2;
+  --tank: #c2b8a6;
+  --water-label: #35627d;
+  --land-label: #23384a;
+  --label-halo: rgba(255, 255, 255, 0.92);
+  --ship: #0f8a7c;
+
+  --button: #ffffff;
+  --on-button: #0f2231;
+  --accent: #0f6e8c;
+  --on-accent: #ffffff;
+  --cta: #e2f0f3;
+  --on-cta: #0f2231;
+
+  --high: #c8321e;   --on-high: #ffffff;   --high-ink: #ad2a17;
+  --medium: #eaa419; --on-medium: #231800; --medium-ink: #875800;
+  --low: #5d7186;    --on-low: #ffffff;    --low-ink: #475a6d;
+  --ok-ink: #1b7a4c; --nodata-ink: #5f6b77;
+  --flag-edge: #0f2231;
+
+  --font-sans: "Manrope", "Helvetica Neue", Arial, sans-serif;
+  --font-cond: "Manrope", "Helvetica Neue", Arial, sans-serif;
+  --radius: 14px;
+  color-scheme: light;
+}
+
+body { font-size: 1.03rem; }
+
+/* Top bar: white, the name in words, not spaced capitals */
+.topbar { background: var(--surface); }
+.brand-name { font-family: var(--font-sans); font-weight: 800; font-size: 1.2rem; letter-spacing: -0.01em; text-transform: none; }
+.sample-note { color: var(--medium-ink); }
+.site-nav a[aria-current="page"] { box-shadow: inset 0 -3px 0 var(--accent); }
+
+/* The chart: lit evenly, no dark vignette */
+.chart-frame::after { box-shadow: inset 0 0 80px 0 rgba(15, 34, 49, 0.1); }
+.stage-empty .chart-frame::after { box-shadow: inset 0 0 40px 0 rgba(15, 34, 49, 0.08); }
+
+@media (min-width: 64rem) {
+  .panel {
+    background: rgba(255, 255, 255, 0.97);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    box-shadow: 0 18px 50px rgba(15, 34, 49, 0.18);
+    overflow: hidden;
+  }
+  .chart-legend { background: rgba(255, 255, 255, 0.92); border-radius: 10px; }
+}
+
+.panel-head h1 span { font-weight: 800; letter-spacing: -0.035em; }
+.panel-head h1 { font-family: var(--font-sans); font-weight: 600; }
+.panel-item.is-active { border-left-color: var(--accent); }
+.panel-title { font-weight: 700; }
+
+.num { border-radius: 8px; font-family: var(--font-sans); font-weight: 800; }
+.callout .num { box-shadow: 0 0 0 2px #ffffff, 0 4px 10px rgba(15, 34, 49, 0.25); }
+.callout-item.is-hover .num,
+.callout-item.is-active .num { box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--accent); }
+.callout-label { text-shadow: 0 0 2px #fff, 0 0 6px #fff, 0 0 10px #fff; }
+
+.kicker, .sev, .impact-label { letter-spacing: 0.1em; }
+
+.chart-filter, .chart-focus { border-radius: 999px; overflow: hidden; }
+.chart-filter button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.chart-home { border-radius: 8px; }
+.leaflet-container .leaflet-bar a { border-radius: 8px; box-shadow: 0 3px 10px rgba(15, 34, 49, 0.18); }
+.leaflet-container .leaflet-control-attribution { background: rgba(255, 255, 255, 0.8); }
+
+/* Ships: a light outline on a light sea */
+.ship:not(.ship-anchored) .hull { stroke: rgba(255, 255, 255, 0.9); }
+.ship:not(.ship-anchored) .deck { fill: rgba(255, 255, 255, 0.35); }
+
+/* The brief: white cards with soft corners instead of rules */
+.section-title, .status-head h2 { font-weight: 800; letter-spacing: -0.03em; }
+.section-title, .status-head { border-bottom: 1px solid var(--rule); }
+.items { display: grid; gap: 1rem; margin-top: 1.25rem; }
+.item {
+  margin-inline: 0;
+  padding: 1.4rem 1.5rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(15, 34, 49, 0.05);
+}
+.has-map .item[data-place]:hover, .item.is-active { background: #fbfdfd; }
+.item.is-active { box-shadow: inset 4px 0 0 var(--accent), 0 6px 20px rgba(15, 34, 49, 0.1); }
+.item-title { font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.item-impact { background: #f6f2f5; border-top: 0; border-radius: 10px; padding: 0.8rem 1rem; }
+.chart-button { border-radius: 999px; border-color: var(--accent); color: var(--accent); }
+.chart-button:hover, .chart-button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+
+.dials { gap: 0.75rem; margin-top: 1rem; }
+.dial, .dial:nth-child(even) {
+  padding: 0.9rem 1rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.dial-value { font-weight: 800; letter-spacing: -0.03em; }
+.gauge-board { border-radius: 4px; background: linear-gradient(to right, transparent 50%, #fff 50%), repeating-linear-gradient(to top, var(--ink) 0 2.5%, #fff 2.5% 5%); }
+
+.about, .notes { border-radius: var(--radius); }
+.site-footer { background: var(--surface); }
+.page-title { font-weight: 800; letter-spacing: -0.04em; }

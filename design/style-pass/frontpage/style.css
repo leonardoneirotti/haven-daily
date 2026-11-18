@@ -1,0 +1,133 @@
+/* Style pass (#102), direction B: "Front Page", bold editorial.
+   A mockup only: loaded after static/style.css on a copy of the sample Today page
+   (tools/style_pass_shots.py). It changes tokens, fonts, spacing, borders and shadows,
+   never what the page contains.
+   A printed page: warm newsprint, black ink, heavy and hairline rules, big serif
+   headlines, the chart drawn like an engraving (paper sea with fine ink contour lines).
+   Colour is kept for meaning only: the severity squares and status levels; there is no
+   brand colour, so red always means High.
+   Fonts: Newsreader (masthead, headlines, readings, and the planner impact in italic),
+   IBM Plex Sans (body and UI), IBM Plex Sans Condensed (labels). Newsreader is
+   self-hosted from fonts/ (SIL OFL 1.1). Carries straight over to the newspaper view (#101). */
+
+@font-face { font-family: "Newsreader"; font-weight: 400; font-display: swap; src: url("fonts/newsreader-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Newsreader"; font-weight: 400; font-style: italic; font-display: swap; src: url("fonts/newsreader-latin-400-italic.woff2") format("woff2"); }
+@font-face { font-family: "Newsreader"; font-weight: 600; font-display: swap; src: url("fonts/newsreader-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Newsreader"; font-weight: 700; font-display: swap; src: url("fonts/newsreader-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Newsreader"; font-weight: 800; font-display: swap; src: url("fonts/newsreader-latin-800-normal.woff2") format("woff2"); }
+
+:root {
+  --bg: #f3eee3;
+  --surface: #faf6ee;
+  --surface-2: #e9e1cf;
+  --ink: #17140f;
+  --ink-2: #5a5247;
+  --rule: #cdc3b0;
+  --shadow: rgba(23, 20, 15, 0.14);
+  --overprint: #8b1e4f;
+  --gauge-water: rgba(31, 95, 139, 0.28);
+  --gauge-line: #1f5f8b;
+
+  --water: #f3eee3;
+  --water-line: #5f574b;
+  --land: #e3dac8;
+  --land-shadow: rgba(23, 20, 15, 0.22);
+  --coast: #6a6052;
+  --road: #cfc3ab;
+  --rail: #b9ab93;
+  --tank: #a69880;
+  --water-label: #3f382f;
+  --land-label: #17140f;
+  --label-halo: rgba(243, 238, 227, 0.95);
+  --ship: #1f5f8b;
+
+  --button: #17140f;
+  --on-button: #f3eee3;
+  --accent: #17140f;
+  --on-accent: #f3eee3;
+  --cta: #17140f;
+  --on-cta: #f3eee3;
+
+  --high: #b8241a;   --on-high: #ffffff;   --high-ink: #a01f16;
+  --medium: #e2a11b; --on-medium: #1f1600; --medium-ink: #825300;
+  --low: #55667a;    --on-low: #ffffff;    --low-ink: #44566a;
+  --ok-ink: #1b6c44; --nodata-ink: #6c675f;
+  --flag-edge: #17140f;
+
+  --font-cond: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-serif: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-label: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif;
+  color-scheme: light;
+}
+
+/* Masthead: the name set large in the serif, a double rule under the whole bar */
+.topbar { border-bottom: 4px double var(--ink); }
+.brand-name { font-family: var(--font-cond); font-size: 1.85rem; font-weight: 800; letter-spacing: -0.02em; text-transform: none; }
+.topbar-note { font-family: var(--font-label); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.tagline { font-family: var(--font-serif); font-style: italic; font-size: 1rem; color: var(--ink-2); }
+.site-nav a { font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.875rem; }
+.site-nav a[aria-current="page"] { box-shadow: inset 0 -3px 0 var(--ink); }
+
+/* Labels: condensed capitals, like section labels in print */
+.kicker, .sev, .impact-label, .panel-head h1 { font-family: var(--font-label); letter-spacing: 0.1em; }
+.panel-head h1 { font-weight: 600; text-transform: uppercase; font-size: 0.8125rem; }
+.panel-head h1 span { font-family: var(--font-cond); font-weight: 800; font-size: clamp(2.6rem, 2.1rem + 1.4vw, 3.3rem); letter-spacing: -0.02em; text-transform: none; }
+
+/* The chart: an engraving on paper. No vignette, no glow. */
+.chart-frame::after { box-shadow: none; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+
+@media (min-width: 64rem) {
+  .panel {
+    background: rgba(250, 246, 238, 0.98);
+    border: 1px solid var(--ink);
+    box-shadow: 6px 6px 0 rgba(23, 20, 15, 0.9);
+  }
+  .chart-legend { background: rgba(250, 246, 238, 0.95); border: 1px solid var(--ink); }
+}
+
+.panel-head { border-bottom: 1px solid var(--ink); }
+.panel-item.is-active { border-left-color: var(--ink); }
+.panel-title { font-family: var(--font-cond); font-size: 1.15rem; font-weight: 700; line-height: 1.2; }
+.panel-status { border-top: 3px double var(--ink); }
+.mini-value { font-family: var(--font-cond); font-size: 1.15rem; }
+
+.num { font-family: var(--font-cond); font-weight: 800; }
+.callout .num { box-shadow: 0 0 0 2px var(--bg); }
+.callout-label { font-family: var(--font-cond); font-weight: 700; font-style: italic; font-size: 1.05rem; }
+.chart-label-city span { font-family: var(--font-cond); letter-spacing: 0.3em; font-weight: 800; }
+.chart-label-land span { font-family: var(--font-label); letter-spacing: 0.2em; }
+
+.chart-filter, .chart-focus { border: 1px solid var(--ink); box-shadow: none; }
+.chart-filter button { font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.06em; }
+.leaflet-container .leaflet-bar a, .chart-home { box-shadow: none; }
+.leaflet-container .leaflet-bar a:hover { background: #000; }
+.leaflet-container .leaflet-control-attribution { background: rgba(243, 238, 227, 0.85); }
+
+.ship:not(.ship-anchored) .hull { stroke: rgba(243, 238, 227, 0.95); }
+.ship:not(.ship-anchored) .deck { fill: rgba(243, 238, 227, 0.4); }
+
+/* The brief: column rules, a thick-and-thin rule under each section title */
+.section-title, .status-head h2 { font-family: var(--font-cond); font-weight: 800; font-size: clamp(2rem, 1.6rem + 1.4vw, 2.9rem); letter-spacing: -0.02em; }
+.section-title, .status-head { border-bottom: 0; box-shadow: 0 4px 0 var(--ink), 0 7px 0 var(--bg), 0 8px 0 var(--ink); padding-bottom: 0.5rem; }
+.brief-intro { font-family: var(--font-serif); font-style: italic; margin-top: 1.1rem; }
+.item { border-bottom: 1px solid var(--ink); padding-block: 1.6rem 1.7rem; }
+.item-title { font-size: clamp(1.6rem, 1.3rem + 0.9vw, 2.15rem); font-weight: 700; line-height: 1.08; letter-spacing: -0.01em; }
+.item-meta { font-family: var(--font-label); letter-spacing: 0.04em; }
+.item-summary { font-size: 1.0625rem; }
+.item-impact { border-top: 1px dotted var(--ink-2); }
+.impact-label em { font-family: var(--font-serif); }
+.impact-text { font-style: italic; font-size: 1.2rem; line-height: 1.45; }
+.chart-button { border: 1px solid var(--ink); font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.8125rem; }
+
+@media (min-width: 64rem) {
+  .brief-layout .status { padding-left: 2rem; border-left: 1px solid var(--ink); }
+}
+.dial { border-bottom: 1px solid var(--ink-2); }
+.dial-value { font-family: var(--font-cond); font-weight: 700; letter-spacing: -0.02em; }
+.dial-value.is-text { font-size: 1.75rem; }
+.gauge-board { background: linear-gradient(to right, transparent 50%, var(--bg) 50%), repeating-linear-gradient(to top, var(--ink) 0 2.5%, var(--bg) 2.5% 5%); }
+
+.about h2, .notes h2, .ship-list summary h2 { font-family: var(--font-cond); font-weight: 800; }
+.stats dd { font-family: var(--font-cond); }
+.site-footer { border-top: 4px double var(--ink); }
+.page-title { font-family: var(--font-cond); font-weight: 800; letter-spacing: -0.03em; }

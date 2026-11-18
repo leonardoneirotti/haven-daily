@@ -1,0 +1,151 @@
+/* Style pass (#102), direction C: "Bridge Console", technical dashboard.
+   A mockup only: loaded after static/style.css on a copy of the sample Today page
+   (tools/style_pass_shots.py). It changes tokens, fonts, spacing, borders and shadows,
+   never what the page contains.
+   A ship's bridge at night: deep navy-black, panels as instrument tiles with thin
+   borders and a faint grid, cyan contour lines and ships, readings in a monospaced face.
+   Fonts: Space Grotesk (headlines, UI, body), JetBrains Mono (data, labels, readings),
+   IBM Plex Serif (the planner impact only). Space Grotesk and JetBrains Mono are
+   self-hosted from fonts/ (SIL OFL 1.1). */
+
+@font-face { font-family: "Space Grotesk"; font-weight: 400; font-display: swap; src: url("fonts/space-grotesk-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Space Grotesk"; font-weight: 500; font-display: swap; src: url("fonts/space-grotesk-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Space Grotesk"; font-weight: 600; font-display: swap; src: url("fonts/space-grotesk-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Space Grotesk"; font-weight: 700; font-display: swap; src: url("fonts/space-grotesk-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url("fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 700; font-display: swap; src: url("fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); }
+
+:root {
+  --bg: #070d14;
+  --surface: #0d1621;
+  --surface-2: #14202e;
+  --ink: #e4edf5;
+  --ink-2: #8b9cae;
+  --rule: #1d2b3a;
+  --shadow: rgba(0, 0, 0, 0.6);
+  --overprint: #c39af0;
+  --gauge-water: rgba(61, 214, 245, 0.3);
+  --gauge-line: #3dd6f5;
+
+  --water: #08111b;
+  --water-line: #2f7896;
+  --land: #13202e;
+  --land-shadow: rgba(0, 0, 0, 0.7);
+  --coast: #3f88a8;
+  --road: #1f3246;
+  --rail: #26394e;
+  --tank: #35506a;
+  --water-label: #6fa7c4;
+  --land-label: #b6cadb;
+  --label-halo: rgba(7, 13, 20, 0.92);
+  --ship: #3dd6f5;
+
+  --button: #e4edf5;
+  --on-button: #070d14;
+  --accent: #e4edf5;
+  --on-accent: #070d14;
+  --cta: #3dd6f5;
+  --on-cta: #04121a;
+
+  --high: #d93a24;   --on-high: #ffffff;   --high-ink: #ff7d70;
+  --medium: #f4b63b; --on-medium: #1a1200; --medium-ink: #f7c766;
+  --low: #4d6985;    --on-low: #ffffff;    --low-ink: #a0b6cc;
+  --ok-ink: #4fe0a2; --nodata-ink: #8090a1;
+  --flag-edge: #070d14;
+
+  --font-sans: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-cond: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --radius: 6px;
+  --line: rgba(61, 214, 245, 0.18);
+}
+
+/* A faint instrument grid behind everything below the chart */
+body {
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(120, 165, 205, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 165, 205, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: -1px -1px;
+}
+
+.topbar { background: rgba(7, 13, 20, 0.96); border-bottom: 1px solid var(--line); }
+.brand-name { font-family: var(--font-mono); font-weight: 700; letter-spacing: 0.14em; }
+.topbar-note { font-family: var(--font-mono); font-weight: 500; color: var(--ship); }
+.site-nav a { font-family: var(--font-mono); font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.site-nav a[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--ship); }
+
+.chart-frame::after { box-shadow: inset 0 0 120px 10px rgba(0, 0, 0, 0.6); }
+
+@media (min-width: 64rem) {
+  .panel {
+    background: rgba(9, 16, 25, 0.94);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 24px 60px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+  }
+  .chart-legend { background: rgba(9, 16, 25, 0.9); border: 1px solid var(--line); border-radius: var(--radius); font-family: var(--font-mono); font-size: 0.75rem; }
+}
+
+.panel { background: var(--bg); }
+.panel-head { border-bottom: 1px solid var(--line); }
+.panel-head h1 { color: var(--ship); }
+.panel-head h1 span { font-weight: 600; letter-spacing: -0.03em; }
+.panel-item.is-active { border-left-color: var(--ship); background: rgba(61, 214, 245, 0.07); }
+.panel-title { font-weight: 600; }
+.panel-status { border-top: 1px solid var(--line); }
+.panel-status li, .panel-status li:nth-child(even) { border-color: var(--line); }
+.mini-label { font-family: var(--font-mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.mini-value { font-family: var(--font-mono); font-weight: 700; font-size: 1rem; }
+
+.num { border-radius: 4px; font-family: var(--font-mono); font-weight: 700; }
+.callout .num { box-shadow: 0 0 0 2px var(--bg), 0 0 14px rgba(0, 0, 0, 0.8); }
+.callout-label { font-family: var(--font-mono); font-weight: 500; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.chart-label-city span { font-family: var(--font-mono); font-weight: 700; letter-spacing: 0.3em; font-size: 1rem; }
+.chart-label-land span { font-family: var(--font-mono); }
+
+.chart-filter, .chart-focus { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: rgba(9, 16, 25, 0.94); }
+.chart-filter button { font-family: var(--font-mono); font-size: 0.75rem; text-transform: uppercase; }
+.chart-filter button + button { border-left-color: var(--line); }
+.chart-filter button[aria-pressed="true"] { background: var(--ship); color: #04121a; }
+.leaflet-container .leaflet-bar a, .chart-home { border-radius: var(--radius); }
+.chart-home-label { font-family: var(--font-mono); text-transform: uppercase; font-size: 0.75rem; }
+.leaflet-container .leaflet-control-attribution { background: rgba(7, 13, 20, 0.8); }
+
+/* The brief and port status as instrument tiles */
+.section-title, .status-head h2 { font-family: var(--font-mono); font-size: 1rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ship); }
+.section-title, .status-head { border-bottom: 1px solid var(--line); }
+.items { display: grid; gap: 0.75rem; margin-top: 1rem; }
+.item {
+  margin-inline: 0;
+  padding: 1.25rem 1.35rem 1.35rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.item.is-active { box-shadow: inset 3px 0 0 var(--ship); border-color: var(--line); }
+.item-meta { font-family: var(--font-mono); font-size: 0.75rem; }
+.item-title { font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+.item-impact { border-top: 1px dashed var(--rule); }
+.chart-button { border: 1px solid var(--ship); color: var(--ship); border-radius: var(--radius); font-family: var(--font-mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.chart-button:hover, .chart-button[aria-pressed="true"] { background: var(--ship); color: #04121a; }
+
+.dials { gap: 0.6rem; margin-top: 1rem; }
+.dial, .dial:nth-child(even) {
+  padding: 0.85rem 0.95rem 0.95rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.dial-label { font-family: var(--font-mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.dial-value { font-family: var(--font-mono); font-weight: 700; letter-spacing: -0.04em; }
+.dial-value.is-text { font-family: var(--font-sans); font-weight: 600; }
+.gauge-board { border-color: var(--line); }
+
+.about h2, .notes h2 { font-family: var(--font-mono); font-size: 1rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ship); }
+.stats dd { font-family: var(--font-mono); }
+.site-footer { background: var(--bg); border-top: 1px solid var(--line); }
+.page-title { font-weight: 600; letter-spacing: -0.04em; }
