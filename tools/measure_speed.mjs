@@ -138,7 +138,32 @@ setInterval(() => { memLow = Math.min(memLow, os.freemem()); }, 500).unref();
 const memMark = () => { const low = memLow; memLow = os.freemem(); return Math.round(low / 1048576); };
 
 const PERF_SCRIPT = `
-window.__perf = { lt: [], lcp: 0, fcp: 0, frames: [] };
+window.__perf = { lt: [], lcp: 0, fcp: 0, frames: [], text: 0, map: 0 };
+// News and status visible: the first frame in which the first news item (or "Nothing significant")
+// and the port status are laid out on screen. Frames only run once the page can be painted.
+(function textProbe() {
+  requestAnimationFrame(function (t) {
+    var news = document.querySelector(".panel-title, .panel-quiet"), status = document.querySelector(".panel-status li");
+    if (news && status && news.getBoundingClientRect().height && status.getBoundingClientRect().height) __perf.text = t;
+    else if (document.readyState !== "complete" || !__perf.fcp) textProbe();
+  });
+})();
+// Map visible: the frame after the first drawing on the basemap's canvas (the chart's water,
+// land and lines). The drawing methods are watched until then, and put back after.
+(function mapProbe() {
+  var proto = CanvasRenderingContext2D.prototype, names = ["drawImage", "fill", "stroke"], originals = {};
+  names.forEach(function (name) {
+    originals[name] = proto[name];
+    proto[name] = function () {
+      if (!__perf.map && this.canvas.isConnected && this.canvas.closest && this.canvas.closest(".leaflet-basemap-pane")) {
+        names.forEach(function (n) { proto[n] = originals[n]; });
+        __perf.map = -1;
+        requestAnimationFrame(function () { requestAnimationFrame(function (t) { __perf.map = t; }); });
+      }
+      return originals[name].apply(this, arguments);
+    };
+  });
+})();
 try { new PerformanceObserver(l => l.getEntries().forEach(e => __perf.lt.push([e.startTime, e.duration])))
   .observe({ type: "longtask", buffered: true }); } catch (e) {}
 try { new PerformanceObserver(l => l.getEntries().forEach(e => { __perf.lcp = e.startTime; }))
@@ -281,9 +306,13 @@ async function load(pageName, profileName, diag) {
   const { targetId, sessionId, s } = await openTab(profile);
   const files = new Map();
   let navStart = null;
+  const errors = [];
   const onEvent = (msg) => {
     if (msg.sessionId !== sessionId) return;
-    if (msg.method === "Network.requestWillBeSent") {
+    if (msg.method === "Runtime.exceptionThrown") {
+      const d = msg.params.exceptionDetails;
+      errors.push(`${d.exception?.description?.split("\n")[0] ?? d.text} (${(d.url ?? "").split("/").pop()}:${d.lineNumber + 1})`);
+    } else if (msg.method === "Network.requestWillBeSent") {
       if (navStart === null) navStart = msg.params.timestamp;
       files.set(msg.params.requestId, { start: msg.params.timestamp });
     } else if (msg.method === "Network.responseReceived") {
@@ -311,7 +340,7 @@ async function load(pageName, profileName, diag) {
   const deadline = Date.now() + 40000;
   while (Date.now() < deadline) {
     await sleep(250);
-    const n = await evaluate(s, "__perf.lt.length");
+    const n = await evaluate(s, "__perf.lt.length + (document.getElementById('port-map') && !(__perf.map > 0) ? 0.5 : 0)");
     if (n !== seen) { seen = n; quietSince = Date.now(); }
     else if (Date.now() - quietSince > 2500) break;
   }
@@ -327,7 +356,8 @@ async function load(pageName, profileName, diag) {
     const n = performance.getEntriesByType("navigation")[0] || {};
     const lt = __perf.lt;
     const fcp = __perf.fcp;
-    return { fcp: Math.round(fcp), lcp: Math.round(__perf.lcp), dcl: Math.round(n.domContentLoadedEventEnd),
+    return { fcp: Math.round(fcp), lcp: Math.round(__perf.lcp), text: __perf.text ? Math.round(Math.max(__perf.text, fcp)) : null,
+      map: __perf.map > 0 ? Math.round(__perf.map) : null, dcl: Math.round(n.domContentLoadedEventEnd),
       load: Math.round(n.loadEventEnd), longTasks: lt.length,
       longest: Math.round(Math.max(0, ...lt.map(x => x[1]))),
       tbt: Math.round(lt.filter(x => x[0] >= fcp).reduce((a, x) => a + Math.max(0, x[1] - 50), 0)),
@@ -339,7 +369,7 @@ async function load(pageName, profileName, diag) {
   const list = [...files.values()].filter((f) => f.url !== undefined).map((f) => ({ ...f,
     startMs: Math.round((f.start - navStart) * 1000), endMs: f.end ? Math.round((f.end - navStart) * 1000) : null }));
   return { targetId, sessionId, s, timing: t, busy: busy(before, after), files: list,
-    hot: prof ? hotspots(prof) : null, trace, idle, idleTrace, stuck };
+    hot: prof ? hotspots(prof) : null, trace, idle, idleTrace, stuck, errors };
 }
 
 // ---------- Interactions on a page with a chart ----------
@@ -427,11 +457,12 @@ for (const [pageName] of Object.entries(PAGES)) {
     const files = clean.files.map((f) => ({ ...f, url: f.url.replace(/^.*?static\//, "static/") }))
       .sort((a, b) => b.sent - a.sent);
     const entry = {
-      timing: { fcp: pick("fcp"), lcp: pick("lcp"), dcl: pick("dcl"), load: pick("load"),
+      timing: { fcp: pick("fcp"), lcp: pick("lcp"), text: pick("text"), map: pick("map"), dcl: pick("dcl"), load: pick("load"),
         settled: pick("lastLongTaskEnd"), tbt: pick("tbt"), longest: pick("longest"), longTasks: pick("longTasks") },
       busy: Object.fromEntries(Object.keys(clean.busy).map((k) => [k, median(loads.map((l) => l.busy[k]))])),
       idlePer5s: median(loads.map((l) => l.idle.task)),
       stuckLoads: loads.filter((l) => l.stuck).length,
+      errors: [...new Set(loads.flatMap((l) => l.errors))],
       canvasPx: clean.timing.canvasPx, domNodes: clean.timing.domNodes,
       sent: files.reduce((a, f) => a + f.sent, 0), size: files.reduce((a, f) => a + f.size, 0), requests: files.length,
       files: files.map((f) => [f.url, f.sent, f.size]),
@@ -453,9 +484,10 @@ for (const [pageName] of Object.entries(PAGES)) {
     report.pages[pageName][profileName] = entry;
     const t = entry.timing;
     console.log(`${pageName} / ${profileName}: ${(entry.sent / 1024).toFixed(0)} KB sent (${(entry.size / 1024).toFixed(0)} KB) in ${entry.requests} files; ` +
-      `FCP ${t.fcp} ms, LCP ${t.lcp} ms, load ${t.load} ms, settled ${t.settled} ms, TBT ${t.tbt} ms, longest task ${t.longest} ms; ` +
+      `FCP ${t.fcp} ms, LCP ${t.lcp} ms, ` + (t.text ? `news+status visible ${t.text} ms, ` : "") +
+      (t.map ? `map visible ${t.map} ms, ` : "") + `load ${t.load} ms, settled ${t.settled} ms, TBT ${t.tbt} ms, longest task ${t.longest} ms; ` +
       `main thread ${entry.busy.task} ms (script ${entry.busy.script}, layout ${entry.busy.layout}, style ${entry.busy.style}, other ${entry.busy.other}); ` +
-      `free memory as low as ${entry.freeMemoryLowMB} MB` + (entry.stuckLoads ? `; ${entry.stuckLoads} load(s) stuck > ${LOAD_LIMIT_MS / 1000} s` : ""));
+      `free memory as low as ${entry.freeMemoryLowMB} MB` + (entry.errors.length ? `; JavaScript errors: ${entry.errors.join(" | ")}` : "") + (entry.stuckLoads ? `; ${entry.stuckLoads} load(s) stuck > ${LOAD_LIMIT_MS / 1000} s` : ""));
     if (entry.trace) console.log(`   load trace: ${entry.trace.work.map(([k, v]) => `${k} ${v}`).join(", ")}; ${entry.trace.layouts} layouts ${entry.trace.layoutMs} ms by ${entry.trace.layoutBy.map(([k, n, ms]) => `${k} x${n} ${ms}ms`).join("; ")}`);
     console.log(`   idle: main thread busy ${entry.idlePer5s} ms in 5 s` + (entry.idleTrace ? `; ${entry.idleTrace.work.slice(0, 6).map(([k, v]) => `${k} ${v}`).join(", ")}` : ""));
     console.log(`   last file per run: ${entry.slowest.join(" | ")}`);

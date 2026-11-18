@@ -131,7 +131,8 @@
   var attribution = L.control.attribution({ position: "bottomright", prefix: false }).addTo(map);
   attribution.addAttribution('Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors');
   if (data.ships_source) attribution.addAttribution("Ships: " + escapeHtml(data.ships_source));
-  L.control.scale({ position: "bottomright", imperial: false, maxWidth: 110 }).addTo(map);
+  // updateWhenIdle: the scale bar changes when a move ends, not on every frame of a drag (#104).
+  L.control.scale({ position: "bottomright", imperial: false, maxWidth: 110, updateWhenIdle: true }).addTo(map);
   L.control.zoom({ position: "bottomright" }).addTo(map);
 
   // Above the zoom buttons: back to the whole port. Wide screens show the words "Whole port"
@@ -238,6 +239,16 @@
   var waterCanvas = document.createElement("canvas");
   var waterCtx = waterCanvas.getContext("2d", { alpha: false });
 
+  // The colours, read from the stylesheet once (the site has one colour scheme). Reading them on
+  // every repaint made the browser check the page's styles each time (#104).
+  var colourCache = null;
+  function chartColours() {
+    return colourCache || (colourCache = {
+      water: token("--water"), waterLine: token("--water-line"), land: token("--land"), coast: token("--coast"),
+      road: token("--road"), rail: token("--rail"), tank: token("--tank"), shadow: token("--land-shadow"),
+    });
+  }
+
   function paint(ctx) {
     var zoom = map.getZoom();
     var s = map.getZoomScale(zoom, 0);
@@ -287,10 +298,7 @@
       return coastPaths[tolerance] || (coastPaths[tolerance] = trace(landRings, tolerance, reach, true));
     }
 
-    var colours = {
-      water: token("--water"), waterLine: token("--water-line"), land: token("--land"), coast: token("--coast"),
-      road: token("--road"), rail: token("--rail"), tank: token("--tank"), shadow: token("--land-shadow"),
-    };
+    var colours = chartColours();
 
     // Water and its lines, on the low-resolution canvas (same coordinates as the chart).
     var w = Math.ceil(max.x - min.x), h = Math.ceil(max.y - min.y);
@@ -650,10 +658,11 @@
 
   showCallouts(false);
   map.on("moveend", function () { showCallouts(false); });
-  if (document.fonts) {
-    document.fonts.addEventListener("loadingdone", function () { showCallouts(true); });
-    document.fonts.ready.then(function () { showCallouts(true); });
-  }
+  // Measured once more when the fonts the markers use have arrived, not after every font (#104).
+  if (document.fonts) document.fonts.ready.then(function () { showCallouts(true); });
+
+  // The High marker pings three times (style.css); after that, rebuilt markers stay still.
+  setTimeout(function () { el.classList.add("ping-done"); }, 3 * 2600);
 
   // ---------- Focus: items, groups of ships, one ship ----------
   function markerEl(marker) {

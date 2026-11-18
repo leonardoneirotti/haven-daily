@@ -167,5 +167,6 @@ def test_overlap_keeps_a_gap_between_markers():
 
 
 def test_the_day_page_loads_pins_js_before_map_js():
+    # map.js is added by map-loader.js, which runs after pins.js (both deferred, in order; #104).
     template = (ROOT / "templates" / "day.html").read_text(encoding="utf-8")
-    assert template.index("static/pins.js") < template.index("static/map.js")
+    assert template.index("static/pins.js") < template.index("static/map-loader.js")

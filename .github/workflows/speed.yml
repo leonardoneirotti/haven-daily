@@ -1,6 +1,7 @@
-# Site speed measurement (issue #104): the same script as on the owner's laptop
-# (tools/measure_speed.mjs), on a GitHub runner with more memory, so a slow result
-# can be told apart from a laptop that is short of memory.
+# Site speed, before and after (issue #104): the sample site built from main ("before") and
+# from this branch ("after"), measured one after the other on the same GitHub runner with
+# tools/measure_speed.mjs, on the throttled phone profile. A runner has more memory than the
+# owner's laptop and no graphics chip, so it also shows how the chart behaves without one.
 #
 # Measures the sample site only. Changes nothing, publishes nothing, uses no secrets.
 # The local server listens on 127.0.0.1 and the pages load nothing from other sites.
@@ -10,9 +11,13 @@ name: Speed
 on:
   workflow_dispatch:
   push:
-    branches: [issue-104-site-speed]
+    branches: ["issue-104-*"]
     paths:
+      - static/**
+      - templates/**
+      - haven/render.py
       - tools/measure_speed.mjs
+      - tools/speed_compare.mjs
       - .github/workflows/speed.yml
 
 # Read the code, nothing else.
@@ -26,9 +31,17 @@ concurrency:
 jobs:
   measure:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
+    env:
+      HAVEN_BROWSER: google-chrome
+      # Chrome's sandbox can't start on Ubuntu runners (AppArmor); the browser only ever
+      # opens our own sample site on 127.0.0.1.
+      HAVEN_BROWSER_ARGS: --no-sandbox
+      PAGES: today,day-ships,archive,how-it-works
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # main too, for the "before" site
 
       - uses: actions/setup-python@v7
         with:
@@ -38,8 +51,11 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Build the sample site
-        run: python -m haven.render --briefs data/sample/briefs --out "$RUNNER_TEMP/site"
+      - name: Build the sample site, before (main) and after (this branch)
+        run: |
+          python -m haven.render --briefs data/sample/briefs --out "$RUNNER_TEMP/after"
+          git worktree add "$RUNNER_TEMP/main" origin/main
+          (cd "$RUNNER_TEMP/main" && python -m haven.render --briefs data/sample/briefs --out "$RUNNER_TEMP/before")
 
       # Node 22+ has WebSocket built in; an older Node on the image gets the "ws" package.
       - name: Check Node
@@ -49,68 +65,15 @@ jobs:
           google-chrome --version
           free -m
 
-      # The full measurement on a manual run; a push to the branch runs only the experiments.
-      # --no-sandbox: Chrome's sandbox can't start on Ubuntu runners (AppArmor); the
-      # browser only ever opens our own sample site on 127.0.0.1.
-      - name: Measure
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          HAVEN_BROWSER: google-chrome
-          HAVEN_BROWSER_ARGS: --no-sandbox
+      # The same measuring script (this branch's) for both sites.
+      - name: Measure before
+        timeout-minutes: 20
+        run: node tools/measure_speed.mjs "$RUNNER_TEMP/before" --runs 3 --profiles phone --pages "$PAGES" --json "$RUNNER_TEMP/before.json"
+
+      - name: Measure after
+        timeout-minutes: 20
+        run: node tools/measure_speed.mjs "$RUNNER_TEMP/after" --runs 3 --profiles phone --pages "$PAGES" --json "$RUNNER_TEMP/after.json"
+
+      - name: Compare
         run: |
-          node tools/measure_speed.mjs "$RUNNER_TEMP/site" --runs 3 --json "$RUNNER_TEMP/speed.json" | tee "$RUNNER_TEMP/speed.txt"
-          { echo '```'; cat "$RUNNER_TEMP/speed.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-
-      # Experiments for the proposed fixes, without changing the site: the same pages with
-      # extra CSS, preload links or a script added by the measuring script before the first
-      # layout. One step each, with its own time limit, so a slow one keeps the others' results.
-      - name: Write the experiment settings
-        run: |
-          {
-            echo "LAZY=.brief-layout,.about,.ship-list,.notes,.day-nav,.prose > section,.site-footer{content-visibility:auto;contain-intrinsic-size:auto 700px}"
-            echo "FONTS=static/fonts/ibm-plex-sans-400-700-latin.woff2,static/fonts/ibm-plex-sans-condensed-700-latin.woff2,static/fonts/ibm-plex-sans-condensed-600-latin.woff2,static/fonts/ibm-plex-mono-600-latin.woff2"
-            echo "NOWATER=(function () { var stroke = CanvasRenderingContext2D.prototype.stroke; CanvasRenderingContext2D.prototype.stroke = function () { if (!this.canvas.isConnected && this.lineWidth > 3) return; return stroke.apply(this, arguments); }; })();"
-          } >> "$GITHUB_ENV"
-          cat > "$RUNNER_TEMP/exp.sh" <<'SH'
-          # exp.sh "title" [options...]: one experiment, printed to the log and the summary.
-          title="$1"; shift
-          echo "### $title" | tee -a "$GITHUB_STEP_SUMMARY"
-          node tools/measure_speed.mjs "$RUNNER_TEMP/site" --runs 3 "$@" | grep -v "load JS\|last file\|JS:" | tee "$RUNNER_TEMP/out.txt"
-          { echo '```'; cat "$RUNNER_TEMP/out.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          SH
-
-      - name: "Experiment: baseline"
-        timeout-minutes: 10
-        continue-on-error: true
-        env: { HAVEN_BROWSER: google-chrome, HAVEN_BROWSER_ARGS: --no-sandbox }
-        run: bash "$RUNNER_TEMP/exp.sh" "baseline" --pages today,how-it-works --no-interact
-
-      - name: "Experiment: lazy layout"
-        timeout-minutes: 10
-        continue-on-error: true
-        env: { HAVEN_BROWSER: google-chrome, HAVEN_BROWSER_ARGS: --no-sandbox }
-        run: bash "$RUNNER_TEMP/exp.sh" "lazy layout of sections below the first screen" --pages today,how-it-works --no-interact --css "$LAZY"
-
-      - name: "Experiment: font preload"
-        timeout-minutes: 10
-        continue-on-error: true
-        env: { HAVEN_BROWSER: google-chrome, HAVEN_BROWSER_ARGS: --no-sandbox }
-        run: bash "$RUNNER_TEMP/exp.sh" "the four first-screen fonts preloaded" --pages today,how-it-works --no-interact --preload "$FONTS"
-
-      - name: "Experiment: no web fonts"
-        timeout-minutes: 10
-        continue-on-error: true
-        env: { HAVEN_BROWSER: google-chrome, HAVEN_BROWSER_ARGS: --no-sandbox }
-        run: bash "$RUNNER_TEMP/exp.sh" "no web fonts at all (lower bound)" --pages today,how-it-works --no-interact --block "*.woff2"
-
-      - name: "Experiment: map as it is"
-        timeout-minutes: 10
-        continue-on-error: true
-        env: { HAVEN_BROWSER: google-chrome, HAVEN_BROWSER_ARGS: --no-sandbox }
-        run: bash "$RUNNER_TEMP/exp.sh" "map, as it is" --pages today --profiles laptop
-
-      - name: "Experiment: map without water lines"
-        timeout-minutes: 10
-        continue-on-error: true
-        env: { HAVEN_BROWSER: google-chrome, HAVEN_BROWSER_ARGS: --no-sandbox }
-        run: bash "$RUNNER_TEMP/exp.sh" "map without the water lines (wide strokes on the off-screen water canvas skipped)" --pages today --profiles laptop --js "$NOWATER"
+          node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" | tee -a "$GITHUB_STEP_SUMMARY"
