@@ -58,6 +58,10 @@ const opt = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : null
 // Experiments: only some pages or devices; block files; add CSS before the page's first layout; another pixel density.
 const onlyPages = opt("--pages")?.split(","), onlyProfiles = opt("--profiles")?.split(",");
 const block = opt("--block")?.split(",") ?? [], extraCss = opt("--css"), dprOverride = Number(opt("--dpr")) || null;
+// --preload a,b: <link rel=preload> for these files (paths in the site), added before the page is parsed.
+const preload = opt("--preload")?.split(",") ?? [];
+// --js "...": a script run before the page's own scripts (experiments only, e.g. to skip a drawing step).
+const extraJs = opt("--js");
 const interactions = !args.includes("--no-interact");
 const reducedMotion = args.includes("--reduced-motion");
 if (!args[0] || !fs.existsSync(path.join(site, "index.html"))) {
@@ -138,6 +142,23 @@ try { new PerformanceObserver(l => l.getEntries().forEach(e => { if (e.name === 
   .observe({ type: "paint", buffered: true }); } catch (e) {}
 `;
 
+// Experiments add CSS or preload links as soon as the document exists, before its first layout.
+function injection() {
+  const js = extraJs ? `
+${extraJs}
+` : "";
+  if (!extraCss && !preload.length) return js;
+  const html = (extraCss ? `<style>${extraCss}</style>` : "") + preload.map((f) =>
+    `<link rel="preload" href="${base}${f}" as="${f.endsWith(".woff2") ? "font" : "script"}"${f.endsWith(".woff2") ? " type=\"font/woff2\" crossorigin" : ""}>`).join("");
+  return `
+(function () {
+    function add() { document.documentElement.insertAdjacentHTML("afterbegin", ${JSON.stringify(html)}); }
+    if (document.documentElement) add();
+    else new MutationObserver(function (m, o) { if (document.documentElement) { o.disconnect(); add(); } })
+      .observe(document, { childList: true });
+  })();` + js;
+}
+
 async function openTab(profile) {
   const { targetId } = await send("Target.createTarget", { url: "about:blank" });
   const { sessionId } = await send("Target.attachToTarget", { targetId, flatten: true });
@@ -154,8 +175,7 @@ async function openTab(profile) {
   await s("Emulation.setCPUThrottlingRate", { rate: profile.cpu });
   await s("Network.emulateNetworkConditions", { offline: false, latency: profile.latency,
     downloadThroughput: profile.down / 8, uploadThroughput: profile.up / 8 });
-  await s("Page.addScriptToEvaluateOnNewDocument", { source: PERF_SCRIPT + (extraCss ? `
-(function () { var st = document.createElement("style"); st.textContent = ${JSON.stringify(extraCss)}; document.documentElement.appendChild(st); })();` : "") });
+  await s("Page.addScriptToEvaluateOnNewDocument", { source: PERF_SCRIPT + injection() });
   await s("Profiler.setSamplingInterval", { interval: 200 });
   return { targetId, sessionId, s };
 }

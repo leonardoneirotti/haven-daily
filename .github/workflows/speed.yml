@@ -49,12 +49,37 @@ jobs:
           google-chrome --version
           free -m
 
+      # The full measurement on a manual run; a push to the branch runs only the experiments.
       # --no-sandbox: Chrome's sandbox can't start on Ubuntu runners (AppArmor); the
       # browser only ever opens our own sample site on 127.0.0.1.
       - name: Measure
+        if: github.event_name == 'workflow_dispatch'
         env:
           HAVEN_BROWSER: google-chrome
           HAVEN_BROWSER_ARGS: --no-sandbox
         run: |
           node tools/measure_speed.mjs "$RUNNER_TEMP/site" --runs 3 --json "$RUNNER_TEMP/speed.json" | tee "$RUNNER_TEMP/speed.txt"
           { echo '```'; cat "$RUNNER_TEMP/speed.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      # Experiments for the proposed fixes, without changing the site: the same pages with
+      # extra CSS or preload links added by the measuring script before the first layout.
+      - name: Experiments
+        env:
+          HAVEN_BROWSER: google-chrome
+          HAVEN_BROWSER_ARGS: --no-sandbox
+        run: |
+          LAZY='.brief-layout,.about,.ship-list,.notes,.day-nav,.prose > section,.site-footer{content-visibility:auto;contain-intrinsic-size:auto 700px}'
+          FONTS='static/fonts/ibm-plex-sans-400-700-latin.woff2,static/fonts/ibm-plex-sans-condensed-700-latin.woff2,static/fonts/ibm-plex-sans-condensed-600-latin.woff2,static/fonts/ibm-plex-mono-600-latin.woff2'
+          NOWATER='(function () { var stroke = CanvasRenderingContext2D.prototype.stroke; CanvasRenderingContext2D.prototype.stroke = function () { if (!this.canvas.isConnected && this.lineWidth > 3) return; return stroke.apply(this, arguments); }; })();'
+          run() { echo "### $1"; shift; node tools/measure_speed.mjs "$RUNNER_TEMP/site" --runs 3 --pages today,how-it-works --no-interact "$@" | grep -v "load JS\|last file"; }
+          { run "baseline"
+            run "lazy layout of sections below the first screen" --css "$LAZY"
+            run "the four first-screen fonts preloaded" --preload "$FONTS"
+            run "both" --css "$LAZY" --preload "$FONTS"
+            run "no web fonts at all (lower bound)" --block "*.woff2"
+            echo "### map, as it is"
+            node tools/measure_speed.mjs "$RUNNER_TEMP/site" --runs 3 --pages today --profiles laptop | grep -v "load JS\|last file\|JS:"
+            echo "### map without the water lines (the wide strokes on the off-screen water canvas are skipped)"
+            node tools/measure_speed.mjs "$RUNNER_TEMP/site" --runs 3 --pages today --profiles laptop --js "$NOWATER" | grep -v "load JS\|last file\|JS:"
+          } | tee "$RUNNER_TEMP/experiments.txt"
+          { echo '```'; cat "$RUNNER_TEMP/experiments.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
