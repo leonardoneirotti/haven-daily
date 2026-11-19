@@ -185,6 +185,7 @@ Measured on a GitHub runner with no graphics chip, throttled phone profile. "Bef
 | | Today before | Today after | Day with ships after | Target |
 |---|---|---|---|---|
 | Sent | 509 KB | 367 KB | 320 KB | |
+| `basemap.js`, sent (raw) | 238 KB (840 KB) | about 92 KB (158 KB) | about 92 KB (158 KB) | about 80 KB (the plan's room) |
 | News and status visible | 0.56 s | 0.62 s | 0.59 s | 1.5 s ✅ |
 | Map visible | 6.66 s | **2.85 s** | **2.53 s** | 2.5 s ❌ |
 | Map move, longest freeze | 12.77 s | **0.29 s** | 0.28 s | 1 s ✅ |
