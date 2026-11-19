@@ -33,14 +33,15 @@ def sources_md() -> dict[str, tuple[str, tuple[str, ...]]]:
 
 def test_sources_md_was_parsed():
     listed = sources_md()
-    # K+N moved from use to headline-only because of its terms (#98, 15 Nov 2026).
-    assert sum(v == "use" for v, _ in listed.values()) == 4
-    assert sum(v == "headline-only" for v, _ in listed.values()) == 6
+    # K+N moved from use to headline-only because of its terms (#98, 15 Nov 2026);
+    # RTV Rijnmond moved to use with its written permission (#107, 19 Nov 2026).
+    assert sum(v == "use" for v, _ in listed.values()) == 5
+    assert sum(v == "headline-only" for v, _ in listed.values()) == 5
 
 
 def test_config_and_sources_md_list_the_same_sources_with_the_same_verdicts():
     in_md = {name: verdict for name, (verdict, _) in sources_md().items()}
-    in_config = {s.name: s.verdict for s in load_sources()}
+    in_config = {s.name: s.effective_verdict for s in load_sources()}  # after any written permission (#107)
     assert in_config == in_md
 
 

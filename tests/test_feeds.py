@@ -212,7 +212,7 @@ def test_each_configured_feed_maps_with_the_right_access_and_language(configured
     [item] = result.items  # the same link in two feeds is one item
     assert item.source == configured.id
     assert item.language == configured.language
-    if configured.verdict == "use":
+    if configured.effective_verdict == "use":  # RTV Rijnmond: by written permission (#107)
         assert (item.access, item.snippet) == ("full", SECRET_SNIPPET)
     else:
         assert (item.access, item.snippet) == ("headline-only", None)

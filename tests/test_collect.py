@@ -14,7 +14,7 @@ from haven import collect, storage
 from haven.clock import AMSTERDAM
 from haven.collect import add_article_text, previous_feeds_read_at, run_collect, url_key
 from haven.config import Source, load_sources
-from haven.feeds import PIN_SOURCE_ID, FeedResult, Item
+from haven.feeds import LEAD_PARAGRAPH_FEEDS, PIN_SOURCE_ID, FeedResult, Item
 from haven.fetch import Fetcher, RawResponse, TransportError
 from haven.pages import KN_SOURCE_ID
 
@@ -583,8 +583,9 @@ def test_an_unexpected_error_while_reading_an_article_is_a_failure(monkeypatch):
 
 
 def test_every_use_source_has_a_way_to_get_its_text():
-    use = {s.id for s in load_sources() if s.verdict == "use"}
-    readers = set(collect.ARTICLE_BODY) | {PIN_SOURCE_ID, KN_SOURCE_ID}
+    use = {s.id for s in load_sources() if s.effective_verdict == "use"}
+    # RTV Rijnmond (written permission, #107): the lead paragraph in its feed, no article page.
+    readers = set(collect.ARTICLE_BODY) | {PIN_SOURCE_ID, KN_SOURCE_ID} | LEAD_PARAGRAPH_FEEDS
     # K+N is headline-only by its terms (#98); its Rotterdam-paragraph reader stays for written permission later.
     assert use == readers - {KN_SOURCE_ID}
 
