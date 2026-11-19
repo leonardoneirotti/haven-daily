@@ -192,7 +192,7 @@ Measured on a GitHub runner with no graphics chip, throttled phone profile. "Bef
 
 **Fetching the basemap ahead of the fonts** (owner's option 3) was measured on its own, against the run before it ([44534293643](https://github.com/leonardoneirotti/haven-daily/actions/runs/44534293643)):
 - map visible: 2.93 → 2.85 s on Today, and 2.67 → 2.53 s on the day with ships;
-- first text: 0.06 s later, still well within its target.
+- first text: 0.07 s later (0.56 → 0.62 s on Today, 0.52 → 0.59 s on the day with ships), still well within its 1.5 s target.
 
 The test server speaks HTTP/1.1. GitHub Pages uses HTTP/2, where download priority can count for more, but that is not measured here.
 
