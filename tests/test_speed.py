@@ -125,7 +125,28 @@ def test_fonts_are_not_preloaded(site):
     # page can't paint before it. With font-display: swap the text shows at once anyway.
     for page in pages(site):
         links = [link for link in soup_of(page).find_all("link") if "preload" in link.get("rel", [])]
-        assert not links, page.relative_to(site)
+        assert not [link for link in links if link.get("as") == "font"], page.relative_to(site)
+
+
+def test_day_pages_fetch_the_basemap_ahead_of_the_fonts(site):
+    # Owner, option 3 (19 Nov 2026): the map came 0.2-0.4 s after the 2.5 s target because the
+    # basemap downloaded alongside the fonts. Asked for in <head> with high priority, it starts
+    # before the fonts, which the browser finds only once the stylesheet is in. It still runs
+    # after the first paint: map-loader.js adds the script, which takes the downloaded file.
+    for page in day_pages(site):
+        links = [link for link in soup_of(page).find_all("link") if "preload" in link.get("rel", [])]
+        assert len(links) == 1, page.name
+        link = links[0]
+        assert link["href"].endswith("static/basemap.js") and link["as"] == "script"
+        assert link.get("fetchpriority") == "high"
+        assert not link.has_attr("crossorigin"), "must match the script tag map-loader.js adds, or it is fetched twice"
+        assert (page.parent / link["href"]).resolve().is_file()
+
+
+def test_other_pages_do_not_fetch_the_basemap(site):
+    for page in pages(site):
+        if page not in day_pages(site):
+            assert "basemap.js" not in page.read_text(encoding="utf-8"), page.relative_to(site)
 
 
 def test_pages_show_no_character_that_pulls_in_an_extra_font_file(site):

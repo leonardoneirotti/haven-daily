@@ -178,42 +178,58 @@
     }
     return shape;
   }
-  function landRing(ring) {
-    var pts = new Float64Array(ring.length * 2);
-    ring.forEach(function (lonLat, i) {
-      var p = toWorld(lonLat[1], lonLat[0]);
-      pts[2 * i] = p.x;
-      pts[2 * i + 1] = p.y;
-    });
-    return withBox(pts);
-  }
-  // Detail lines come as grid steps (see tools/build_basemap.py): add them up to get each point.
-  // Every point lies on the 0.0001 degree grid, so the slow part of the conversion (the
-  // Mercator formula for latitude) is worked out once per grid row and then looked up.
-  var detail = basemap.detail;
-  var rowY = new Float64Array(Math.round((bbox[2] - bbox[0]) * detail.grid) + 2);
-  for (var row = 0; row < rowY.length; row++) rowY[row] = toWorld(bbox[0] + row / detail.grid, 0).y;
-  var columnX0 = toWorld(0, bbox[1]).x, columnStep = 256 / 360 / detail.grid;
-  function detailLine(steps) {
-    var pts = new Float64Array(steps.length);
-    for (var i = 0, x = 0, y = 0; i < steps.length; i += 2) {
-      x += steps[i];
-      y += steps[i + 1];
-      pts[i] = columnX0 + x * columnStep;
-      pts[i + 1] = rowY[y];
+  // The shapes come as text (see tools/build_basemap.py): every point lies on a grid of
+  // 0.0001 degrees and is written as the step from the point before, each step in 5-bit
+  // groups as letters (the "encoded polyline" scheme of web maps). A shape's first point is
+  // the step from the first point of the shape before it. About three times smaller than
+  // plain numbers (#104). Because every point is on the grid, the slow part of the conversion
+  // (the Mercator formula for latitude) is worked out once per grid row and then looked up.
+  function numbers(text) {
+    var out = [], value = 0, shift = 0;
+    for (var i = 0; i < text.length; i++) {
+      var c = text.charCodeAt(i) - 63;
+      value |= (c & 0x1f) << shift;
+      if (c & 0x20) {
+        shift += 5;
+        continue;
+      }
+      out.push(value & 1 ? ~(value >> 1) : value >> 1);
+      value = 0;
+      shift = 0;
     }
-    return withBox(pts);
+    return out;
+  }
+  var grid = basemap.grid;
+  var rowY = new Float64Array(Math.round((bbox[2] - bbox[0]) * grid) + 2);
+  for (var row = 0; row < rowY.length; row++) rowY[row] = toWorld(bbox[0] + row / grid, 0).y;
+  var columnX0 = toWorld(0, bbox[1]).x, columnStep = 256 / 360 / grid;
+  function shapes(texts) {
+    var startX = 0, startY = 0;
+    return texts.map(function (text) {
+      var steps = numbers(text), pts = new Float64Array(steps.length);
+      for (var i = 0, x = startX, y = startY; i < steps.length; i += 2) {
+        x += steps[i];
+        y += steps[i + 1];
+        if (i === 0) {
+          startX = x;
+          startY = y;
+        }
+        pts[i] = columnX0 + x * columnStep;
+        pts[i + 1] = rowY[y];
+      }
+      return withBox(pts);
+    });
   }
 
-  var landRings = [];
-  basemap.land.coordinates.forEach(function (polygon) {
-    polygon.forEach(function (ring) { landRings.push(landRing(ring)); });
-  });
+  var landRings = shapes(basemap.land); // outer edges and holes alike: filled "evenodd"
   var lines = {};
-  ["minor", "major", "rail", "jetty"].forEach(function (kind) { lines[kind] = detail[kind].map(detailLine); });
+  ["minor", "major", "rail", "jetty"].forEach(function (kind) { lines[kind] = shapes(basemap.detail[kind]); });
   var tanks = [];
-  for (var t = 0; t < detail.tanks.length; t += 3) {
-    tanks.push({ x: columnX0 + detail.tanks[t] * columnStep, y: rowY[detail.tanks[t + 1]], r: detail.tanks[t + 2] });
+  var tankNumbers = numbers(basemap.detail.tanks); // per tank: step from the tank before, radius in metres
+  for (var t = 0, tx = 0, ty = 0; t < tankNumbers.length; t += 3) {
+    tx += tankNumbers[t];
+    ty += tankNumbers[t + 1];
+    tanks.push({ x: columnX0 + tx * columnStep, y: rowY[ty], r: tankNumbers[t + 2] });
   }
   var worldPerMetre = 256 / (2 * Math.PI * 6378137 * Math.cos((sheet.getCenter().lat * Math.PI) / 180));
 
@@ -231,13 +247,142 @@
   var COAST_LINE_GAP = 6; // minimum pixels between two lines in the water
   var COAST_LINE_REACH = 120; // how far from the shore the lines go, in pixels
   var COAST_LINE_WIDTH = 0.8;
+  var WATER_MARGIN = 0.25; // worked out for the view plus this much of its size on each side
 
-  // The lines in the water are the slowest part to draw (two wide strokes each), so
-  // they are drawn on their own canvas at one pixel per screen point, even on retina
-  // screens, then copied onto the chart. Fine lines on dark water still look sharp,
-  // and it is four times less work on a retina screen.
-  var waterCanvas = document.createElement("canvas");
-  var waterCtx = waterCanvas.getContext("2d", { alpha: false });
+  // ---------- The water and its lines ----------
+  // Each line follows the shore at a fixed distance. They come from a map of distances: the
+  // land is filled in white on a small canvas, then every pixel of water gets its exact
+  // distance to the nearest land pixel (a Euclidean distance transform: two quick passes,
+  // one down the columns and one along the rows). A pixel is part of a line where that
+  // distance is 25, 50, 100... metres. The work depends only on the number of pixels, not on
+  // the coastline or the number of lines: a browser that draws without a graphics chip takes a
+  // fraction of a second, where the old wide strokes of the whole coastline took 4 to 12 s
+  // (#104). One pixel per screen point (fine lines on dark water still look sharp), worked
+  // out once per zoom level for the view plus a margin, and reused while the chart is moved.
+  var water = null; // { zoom, x, y (world pixels at that zoom), canvas }
+  var maskCanvas = document.createElement("canvas");
+  var maskCtx = maskCanvas.getContext("2d", { willReadFrequently: true });
+
+  // Squared distance to the nearest zero along one row or column (Felzenszwalb and
+  // Huttenlocher's lower envelope of parabolas). f: input, d: output, v and z: work space.
+  function distances1d(f, n, d, v, z) {
+    var k = 0;
+    v[0] = 0;
+    z[0] = -Infinity;
+    z[1] = Infinity;
+    for (var q = 1; q < n; q++) {
+      var s = (f[q] + q * q - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+      while (s <= z[k]) {
+        k--;
+        s = (f[q] + q * q - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+      }
+      k++;
+      v[k] = q;
+      z[k] = s;
+      z[k + 1] = Infinity;
+    }
+    k = 0;
+    for (var p = 0; p < n; p++) {
+      while (z[k + 1] < p) k++;
+      d[p] = (p - v[k]) * (p - v[k]) + f[v[k]];
+    }
+  }
+  function distanceMap(cells, w, h) {
+    var n = Math.max(w, h), f = new Float64Array(n), d = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1);
+    var x, y;
+    for (x = 0; x < w; x++) {
+      for (y = 0; y < h; y++) f[y] = cells[y * w + x];
+      distances1d(f, h, d, v, z);
+      for (y = 0; y < h; y++) cells[y * w + x] = d[y];
+    }
+    for (y = 0; y < h; y++) {
+      for (x = 0; x < w; x++) f[x] = cells[y * w + x];
+      distances1d(f, w, d, v, z);
+      for (x = 0; x < w; x++) cells[y * w + x] = d[x];
+    }
+  }
+  // A colour token as red, green, blue (0-255), through the canvas's own colour parser.
+  function rgb(colour) {
+    maskCtx.fillStyle = "#000";
+    maskCtx.fillStyle = colour;
+    var hex = /^#([0-9a-f]{6})$/i.exec(maskCtx.fillStyle);
+    if (hex) return [0, 2, 4].map(function (i) { return parseInt(hex[1].substr(i, 2), 16); });
+    return maskCtx.fillStyle.match(/[\d.]+/g).slice(0, 3).map(Number);
+  }
+
+  // The water picture for a box of world pixels at this zoom (x, y: top left; w, h: size).
+  function paintWater(zoom, s, x, y, w, h, colours) {
+    // Lines every 25, 50, 100, 200... metres: the closest spacing still COAST_LINE_GAP apart.
+    // Zooming in by one step halves the spacing, so the lines already drawn stay where they are.
+    var perMetre = worldPerMetre * s, step = 25;
+    while (step * perMetre < COAST_LINE_GAP) step *= 2;
+    var gap = step * perMetre, count = Math.floor(COAST_LINE_REACH / gap);
+    // Land up to the furthest line outside the box counts too.
+    var edge = Math.ceil(count * gap) + 2, mw = w + 2 * edge, mh = h + 2 * edge;
+    maskCanvas.width = mw;
+    maskCanvas.height = mh;
+    maskCtx.fillStyle = "#000";
+    maskCtx.fillRect(0, 0, mw, mh);
+    maskCtx.fillStyle = "#fff";
+    var box = { minX: x - edge, minY: y - edge, maxX: x + w + edge, maxY: y + h + edge };
+    maskCtx.fill(outline(landRings, s, box, 0.75, true, { x: x - edge, y: y - edge }), "evenodd");
+    var mask = maskCtx.getImageData(0, 0, mw, mh).data;
+    var cells = new Float32Array(mw * mh);
+    for (var i = 0; i < cells.length; i++) cells[i] = mask[4 * i] >= 128 ? 0 : 1e20;
+    distanceMap(cells, mw, mh);
+
+    var picture = water && water.canvas.width === w && water.canvas.height === h ? water.canvas : document.createElement("canvas");
+    picture.width = w;
+    picture.height = h;
+    var pictureCtx = picture.getContext("2d");
+    var image = pictureCtx.createImageData(w, h), out = image.data;
+    var sea = rgb(colours.water), line = rgb(colours.waterLine);
+    // How strong each line is: strongest near the shore, fading outwards (as before #104).
+    var strength = [0];
+    for (var k = 1; k <= count; k++) strength.push(0.06 + 0.5 * Math.pow(1 - (k - 1) / count, 1.8));
+    var half = COAST_LINE_WIDTH / 2;
+    for (var py = 0; py < h; py++) {
+      for (var px = 0, o = 4 * py * w, c = (py + edge) * mw + edge; px < w; px++, o += 4, c++) {
+        // Distance from the shore: to the nearest land pixel's centre, less half a pixel.
+        var dist = Math.sqrt(cells[c]) - 0.5, nearest = Math.round(dist / gap), a = 0;
+        if (nearest >= 1 && nearest <= count) {
+          // How much of this pixel the 0.8 px line covers, times the line's strength.
+          var centre = nearest * gap;
+          a = Math.max(0, Math.min(dist + 0.5, centre + half) - Math.max(dist - 0.5, centre - half)) * strength[nearest];
+        }
+        out[o] = sea[0] + (line[0] - sea[0]) * a;
+        out[o + 1] = sea[1] + (line[1] - sea[1]) * a;
+        out[o + 2] = sea[2] + (line[2] - sea[2]) * a;
+        out[o + 3] = 255;
+      }
+    }
+    pictureCtx.putImageData(image, 0, 0);
+    maskCanvas.width = maskCanvas.height = 1; // the mask's memory back
+    return { zoom: zoom, x: x, y: y, canvas: picture };
+  }
+
+  // Outline of a set of shapes at scale s: only shapes that reach into `box` (world pixels at
+  // that zoom), skipping points closer than `tolerance` pixels to the last one drawn. Drawn
+  // shifted by `shift`, so the canvas gets small numbers: it stores paths with about seven
+  // digits, and world pixels run into the millions at the closest zoom.
+  function outline(shapes, s, box, tolerance, close, shift) {
+    var path = new Path2D();
+    shapes.forEach(function (shape) {
+      if (shape.maxX * s < box.minX || shape.minX * s > box.maxX || shape.maxY * s < box.minY || shape.minY * s > box.maxY) return;
+      var pts = shape.pts, n = pts.length;
+      var lx = pts[0] * s - shift.x, ly = pts[1] * s - shift.y;
+      path.moveTo(lx, ly);
+      for (var i = 2; i < n; i += 2) {
+        var px = pts[i] * s - shift.x, py = pts[i + 1] * s - shift.y;
+        if (i < n - 2 && Math.abs(px - lx) + Math.abs(py - ly) < tolerance) continue;
+        path.lineTo(px, py);
+        lx = px;
+        ly = py;
+      }
+      if (close) path.closePath();
+    });
+    return path;
+  }
 
   // The colours, read from the stylesheet once (the site has one colour scheme). Reading them on
   // every repaint made the browser check the page's styles each time (#104).
@@ -258,83 +403,28 @@
     var min = map.containerPointToLayerPoint(pad.multiplyBy(-1));
     var max = map.containerPointToLayerPoint(size.add(pad));
     var perMetre = worldPerMetre * s; // screen pixels per metre
-
-    // Lines every 25, 50, 100, 200... metres: the closest spacing still COAST_LINE_GAP apart.
-    // Zooming in by one step halves the spacing, so the lines already drawn stay where they are.
-    var step = 25;
-    while (step * perMetre < COAST_LINE_GAP) step *= 2;
-    var gap = step * perMetre;
-    var count = Math.floor(COAST_LINE_REACH / gap);
-    var reach = count * gap;
-
-    // Only shapes near the canvas are drawn. Box in world pixels, widened by `margin` screen pixels.
-    function near(shape, margin) {
-      return shape.maxX * s - origin.x >= min.x - margin && shape.minX * s - origin.x <= max.x + margin &&
-        shape.maxY * s - origin.y >= min.y - margin && shape.minY * s - origin.y <= max.y + margin;
-    }
-    // Outline of a set of shapes, skipping points closer than `tolerance` pixels to the last one.
-    function trace(shapes, tolerance, margin, close) {
-      var path = new Path2D();
-      shapes.forEach(function (shape) {
-        if (!near(shape, margin)) return;
-        var pts = shape.pts, n = pts.length;
-        var lx = pts[0] * s - origin.x, ly = pts[1] * s - origin.y;
-        path.moveTo(lx, ly);
-        for (var i = 2; i < n; i += 2) {
-          var x = pts[i] * s - origin.x, y = pts[i + 1] * s - origin.y;
-          if (i < n - 2 && Math.abs(x - lx) + Math.abs(y - ly) < tolerance) continue;
-          path.lineTo(x, y);
-          lx = x;
-          ly = y;
-        }
-        if (close) path.closePath();
-      });
-      return path;
-    }
-    // Lines far from the shore are smooth, so they can use a much simpler coastline.
-    var coastPaths = {};
-    function coastFor(distance) {
-      var tolerance = [10, 5, 2, 0.75].filter(function (tol) { return tol <= Math.max(0.75, distance / 15); })[0];
-      return coastPaths[tolerance] || (coastPaths[tolerance] = trace(landRings, tolerance, reach, true));
-    }
-
     var colours = chartColours();
+    // The canvas in world pixels at this zoom (= the chart's coordinates plus the pixel origin).
+    var view = { minX: min.x + origin.x, minY: min.y + origin.y, maxX: max.x + origin.x, maxY: max.y + origin.y };
 
-    // Water and its lines, on the low-resolution canvas (same coordinates as the chart).
-    var w = Math.ceil(max.x - min.x), h = Math.ceil(max.y - min.y);
-    if (waterCanvas.width !== w || waterCanvas.height !== h) {
-      waterCanvas.width = w;
-      waterCanvas.height = h;
-    }
-    var wc = waterCtx;
-    wc.setTransform(1, 0, 0, 1, -min.x, -min.y);
-    wc.lineJoin = "round";
-    wc.fillStyle = colours.water;
-    wc.fillRect(min.x, min.y, w, h);
-
-    // Each line in the water: a wide stroke of the coastline in the line colour, then
-    // a slightly narrower one in the water colour on top. What is left is a thin line
-    // at exactly that distance from the nearest shore. Drawn from the outside in.
-    for (var i = count; i >= 1; i--) {
-      var distance = i * gap, coast = coastFor(distance);
-      wc.globalAlpha = 0.06 + 0.5 * Math.pow(1 - (i - 1) / count, 1.8);
-      wc.strokeStyle = colours.waterLine;
-      wc.lineWidth = 2 * distance + COAST_LINE_WIDTH;
-      wc.stroke(coast);
-      wc.globalAlpha = 1;
-      wc.strokeStyle = colours.water;
-      wc.lineWidth = 2 * distance - COAST_LINE_WIDTH;
-      wc.stroke(coast);
+    // The water picture: worked out again only for a new zoom or when the view has left it.
+    var inside = water && water.zoom === zoom && view.minX >= water.x && view.minY >= water.y &&
+      view.maxX <= water.x + water.canvas.width && view.maxY <= water.y + water.canvas.height;
+    if (!inside) {
+      var mx = Math.ceil((view.maxX - view.minX) * WATER_MARGIN), my = Math.ceil((view.maxY - view.minY) * WATER_MARGIN);
+      var x0 = Math.floor(view.minX) - mx, y0 = Math.floor(view.minY) - my;
+      water = paintWater(zoom, s, x0, y0, Math.ceil(view.maxX) + mx - x0, Math.ceil(view.maxY) + my - y0, colours);
     }
 
     ctx.save();
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
-    ctx.drawImage(waterCanvas, min.x, min.y, w, h);
+    ctx.drawImage(water.canvas, water.x - origin.x, water.y - origin.y);
 
     // Land, lifted off the water by a shadow (a dark copy shifted down, much cheaper
     // than a blurred shadow), with grain and a light coastline.
-    var land = coastFor(0);
+    var near = { minX: view.minX - 3, minY: view.minY - 3, maxX: view.maxX + 3, maxY: view.maxY + 3 };
+    var land = outline(landRings, s, near, 0.75, true, origin);
     ctx.fillStyle = colours.shadow;
     ctx.translate(0, 2.5);
     ctx.fill(land, "evenodd");
@@ -354,7 +444,7 @@
     function strokeLines(kind, colour, lineWidth) {
       ctx.strokeStyle = colour;
       ctx.lineWidth = lineWidth;
-      ctx.stroke(trace(lines[kind], 0.75, lineWidth, false));
+      ctx.stroke(outline(lines[kind], s, near, 0.75, false, origin));
     }
     strokeLines("minor", colours.road, width(0.7));
     strokeLines("major", colours.road, width(1.4));

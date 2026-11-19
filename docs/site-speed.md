@@ -176,3 +176,24 @@ Measured on a GitHub runner, throttled phone profile, main against this branch i
   - a test that our own text pulls in no `latin-ext` font file (the sample pages never did: the 9 files are 9 typefaces and weights);
   - the **font budget**: 240 KB and 11 files.
 - **Map visible and map moves** depend on the basemap and on drawing without a graphics chip. That is part 2 (fixes 2 and 3).
+
+## Results, part 2 (fixes 2, 3, and the basemap fetched ahead of the fonts)
+
+Measured on a GitHub runner with no graphics chip, throttled phone profile. "Before" is part 1's branch and "after" is this branch, in the same run
+([run 44569539205](https://github.com/leonardoneirotti/haven-daily/actions/runs/44569539205)):
+
+| | Today before | Today after | Day with ships after | Target |
+|---|---|---|---|---|
+| Sent | 509 KB | 367 KB | 320 KB | |
+| News and status visible | 0.56 s | 0.62 s | 0.59 s | 1.5 s ✅ |
+| Map visible | 6.66 s | **2.85 s** | **2.53 s** | 2.5 s ❌ |
+| Map move, longest freeze | 12.77 s | **0.29 s** | 0.28 s | 1 s ✅ |
+| Blocked while loading (TBT) | 3.51 s | 0.51 s | 0.51 s | |
+
+**Fetching the basemap ahead of the fonts** (owner's option 3) was measured on its own, against the run before it ([44534293643](https://github.com/leonardoneirotti/haven-daily/actions/runs/44534293643)):
+- map visible: 2.93 → 2.85 s on Today, and 2.67 → 2.53 s on the day with ships;
+- first text: 0.07 s later (0.56 → 0.62 s on Today, 0.52 → 0.59 s on the day with ships), still well within its 1.5 s target.
+
+The test server speaks HTTP/1.1. GitHub Pages uses HTTP/2, where download priority can count for more, but that is not measured here.
+
+**Map within 2.5 s: missed by 0.03–0.35 s, accepted** (owner, 19 Nov 2026). What's left is mostly the fonts: up to 192 KB in 9 files share the slow connection with the basemap. The style pass (#102) will replace the fonts. It must bring the map under 2.5 s on this profile within the font budget (240 KB, 11 files), measured with `.github/workflows/speed.yml`.

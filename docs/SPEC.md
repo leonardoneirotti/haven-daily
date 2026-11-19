@@ -1245,8 +1245,10 @@ The review (`docs/design-review.md`) found why the site didn't feel user-friendl
 2. **Land construction**: OSM has no "sea" polygon, only coastlines (land on the left). Cut the bbox rectangle along the coastlines (`polygonize` of bbox edge + coastline pieces), keep faces on the **sea side** (cross product with the nearest coastline segment), union with water areas (multipolygon relations joined from member ways), **land = bbox − all water**.
 3. Clean: drop islets < 6e-6 deg² (~250×150 m), fill holes < 2.5e-5 deg² (~500×350 m), simplify 0.0002° (~15–20 m), round coords to 4 decimals.
 4. **Detail query**: `highway ~ motorway|trunk|primary|secondary|tertiary` (major = first three) and `railway=rail`, **both with `tunnel!=yes`** (tunnels would draw roads across the water), `man_made ~ breakwater|groyne` (jetties), `man_made=storage_tank` (→ circles: centroid + radius = √(area/π) in metres, keep ≥ 4 m).
-5. Lines: `linemerge` → clip to bbox → simplify 0.0001° → **compact encoding**: integer grid of 0.0001° (~10 m) counted from the south-west corner, first point absolute, then each point as the step from the previous one (`[x0, y0, dx1, dy1, …]`). Tanks: flat `[x, y, r_m, …]`.
-6. Output `static/basemap.js`: `window.HAVEN_BASEMAP = {bbox, land (GeoJSON MultiPolygon), detail: {grid: 10000, major, minor, rail, jetty, tanks}, labels}`. Size ≈ **820 KB** (~250 KB gzipped by GitHub Pages). Last run: 205 land polygons, 2,078 major + 11,374 minor road lines, 2,977 rail, 773 jetty, 4,240 tanks.
+5. Lines: `linemerge` → clip to bbox → simplify for the chart (major roads, rail and jetties 0.0002°, minor roads 0.0004°; minor-road pieces under 150 m left out, #104). Tanks: centre and radius in metres.
+6. **The chart's land** is simpler than `data/basemap/land.geojson` (which keeps the 0.0002° outline as the reference): simplified at **0.0004°** (~25–45 m), except a piece whose area that would change by more than 10 % (a dam, a long pier), which keeps its finer outline (#104).
+7. **Compact form** (#104): every point on a grid of 0.0001° (~10 m) counted from the south-west corner, each point as the step from the one before, each step written as letters in 5-bit groups (the "encoded polyline" scheme of web maps). Shapes are sorted by position (bands of 64 grid rows, west to east) and a shape's first point is the step from the first point of the shape before it, so steps stay small. Tanks: one text of (step from the tank before, radius) triples.
+8. Output `static/basemap.js`: `window.HAVEN_BASEMAP = {bbox, grid: 10000, land: [ring texts], detail: {major, minor, rail, jetty: [line texts], tanks: text}, labels}`. **145 KB, 88 KB as sent** (gzip), was 840 KB / 238 KB. Last run: 205 land polygons (260 rings), 2,078 major + 3,433 minor road lines, 2,977 rail, 773 jetty, 4,240 tanks. The 41 places were checked before/after (`tools/basemap_shots.mjs` + `tools/basemap_sheet.py`, sheets in `docs/site-speed-basemap/`; `tests/test_basemap.py`: no place moves between land and water, the shore near each moves 29 m at most).
 
 Place labels (water = italic serif; land = mono caps; city = condensed caps):
 North Sea (51.99, 3.84) · Nieuwe Waterweg (51.951, 4.163, 37°) · Nieuwe Maas (51.9, 4.4) · Oude Maas (51.846, 4.36, 30°) · Waalhaven (51.879, 4.452) · Maasvlakte 2 (51.976, 3.975) · Maasvlakte (51.946, 4.035) · Europoort (51.933, 4.13) · Botlek (51.868, 4.29) · Pernis (51.882, 4.385) · Hoek van Holland (51.984, 4.135) · Rozenburg (51.906, 4.245) · Rotterdam (51.925, 4.48).
@@ -1260,11 +1262,11 @@ A custom Leaflet vector layer (`L.Path.extend`) on its own `L.canvas` renderer i
 Everything is converted once to **"world pixels"** (Web Mercator at zoom 0): `x = 256·(0.5 + lon/360)`, `y = 256·(0.5 − ln((1+sinφ)/(1−sinφ))/(4π))`. At zoom z: screen = world · 2^z − pixelOrigin. Detail points use a **lookup table per grid row** for the latitude formula (≈200,000 points decode in ~40 ms).
 
 Paint order:
-1. **Water + coast lines** (on a separate 1×-resolution canvas, then copied in — see §8.6).
-   - **The trick:** for each line, stroke the coastline very wide in the line colour (`2d + 0.8 px`), then slightly narrower in the water colour (`2d − 0.8 px`). What remains is a thin line at exactly distance *d* from the nearest shore. Drawn from the outside in. No data needed.
-   - Spacing: 25, 50, 100, 200… metres — the smallest that stays ≥ 6 px apart at the current zoom; lines out to 120 px. Zooming in one step halves the spacing, so existing lines stay put and new ones appear between.
+1. **Water + coast lines** (#104: from a distance map, not wide strokes).
+   - **How:** the land is filled in white on a small canvas (one pixel per screen point); every water pixel gets its exact distance to the nearest land pixel (Euclidean distance transform, Felzenszwalb–Huttenlocher: one pass down the columns, one along the rows); a pixel belongs to a line where that distance is a line's distance, with the line's 0.8 px width as coverage. The work depends only on the number of pixels, not on the coastline or the number of lines. (Before #104: each line was a wide stroke of the whole coastline, `2d + 0.8 px` in the line colour then `2d − 0.8 px` in the water colour; 4–12 s per repaint in a browser without a graphics chip.)
+   - **Worked out once per zoom level** for the view plus 25 % of its size on each side, and reused while the chart is moved at that zoom; worked out again only for a new zoom or when the view leaves that area.
+   - Spacing: 25, 50, 100, 200… metres — the smallest that stays ≥ 6 px apart at the current zoom; lines out to 120 px. Zooming in one step halves the spacing, so existing lines stay put and new ones appear between. All lines kept: with the distance map their number doesn't cost time.
    - Opacity fades with distance: `0.06 + 0.5·(1 − (i−1)/count)^1.8`.
-   - Lines far from shore use a simplified coastline (tolerance = distance/15, buckets 10/5/2/0.75 px).
    - **They are decoration, not depth contours** (stated on the Method page).
 2. **Land**: dark copy shifted 2.5 px down (cheap shadow), land fill (`evenodd`), a 128×128 random speckle pattern (grain), 0.8 px light coastline.
 3. **Detail**: minor roads, major roads, rail in darker "cut" colours; jetties in land colour. Widths scale with zoom: `max(0.35, min(base·1.55^(z−11), base·4))`.
@@ -1313,7 +1315,7 @@ bulk       M-1.7,-8h3.4v2.6h-3.4zM-1.7,-4.6h3.4v2.6h-3.4zM-1.7,-1.2h3.4v2.6h-3.4
 
 Measured on a 2× screen: canvas was **13 Mpx**, repaint ~190 ms, setup ~180 ms. Fixes:
 - Canvas renderer padding **0.3 → 0.1** (7.4 Mpx).
-- Coast lines drawn on a separate canvas at **1 px per CSS pixel** (not retina) then `drawImage`d: 4× less work on retina; looks the same on dark water.
+- Coast lines drawn on a separate canvas at **1 px per CSS pixel** (not retina) then `drawImage`d: 4× less work on retina; looks the same on dark water. (Since #104 from a distance map, §8.3.)
 - Fewer lines: min gap 6 px, reach 120 px.
 - Replaced canvas `shadowBlur` with an offset dark fill.
 - **No `backdrop-filter`** on the panel and **no `filter: drop-shadow`** on 40 ship markers (both recomputed every frame while the map moves).
@@ -1324,6 +1326,7 @@ Measured on a 2× screen: canvas was **13 Mpx**, repaint ~190 ms, setup ~180 ms.
 - **Text first, chart after:** Leaflet and `pins.js` are deferred; `static/map-loader.js` adds `basemap.js` and `map.js` once the page has painted, with a quiet "Loading chart…" note in the chart frame until then. If either fails to load, the page falls back to its plain-text stand-ins.
 - The High marker's ping plays **3 times**, then stays still (also when markers are rebuilt); none with reduced motion.
 - Per move: the scale bar updates when a move ends (`updateWhenIdle`), the chart colours are read once, the callouts are measured again only on `document.fonts.ready`.
+- **Lighter basemap** (88 KB as sent, was 238 KB; §8.2) and **water lines from a distance map**, worked out once per zoom and reused while moving (§8.3). Canvas paths stay in screen coordinates (the canvas keeps ~7 digits; world pixels reach millions at zoom 15).
 - Measured before/after on a GitHub runner (`.github/workflows/speed.yml`, `tools/measure_speed.mjs`, `tools/speed_compare.mjs`), never on the owner's laptop (8 GB, often short of memory).
 
 ### 8.7 Testing without the Chrome extension

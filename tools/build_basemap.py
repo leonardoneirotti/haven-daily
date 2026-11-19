@@ -12,8 +12,14 @@ the map rectangle along the coastlines, keep the pieces on the sea side, add the
 water areas, and everything left over is land.
 
 The land detail (roads, railways, breakwaters, storage tanks) gives the chart
-its texture. It is stored compactly: coordinates on a grid of 0.0001 degrees
-(about 10 m), each point written as the step from the previous one.
+its texture.
+
+Everything the browser gets is stored compactly (#104): coordinates on a grid of
+0.0001 degrees (about 10 m), each point written as the step from the previous one,
+and each step in 5-bit groups as letters (the "encoded polyline" scheme of web maps).
+Shapes are sorted by position, and a shape's first point is the step from the first
+point of the shape before it, so the steps stay small. The chart's shapes are also
+simpler than the land in data/basemap/land.geojson, which keeps the finer outline.
 
 Map data © OpenStreetMap contributors, available under the Open Database Licence.
 """
@@ -44,8 +50,13 @@ BBOX = (51.74, 3.40, 52.16, 4.62)
 # Raw downloads, not committed. Delete one to download it again.
 CACHE = PROJECT_DIR / "data" / "basemap" / "osm-cache.json"
 DETAIL_CACHE = PROJECT_DIR / "data" / "basemap" / "osm-detail-cache.json"
-SIMPLIFY_DEG = 0.0002  # about 15-20 m, under one pixel at the map's normal zoom
-DETAIL_SIMPLIFY_DEG = 0.0001  # about 10 m: roads and railways
+SIMPLIFY_DEG = 0.0002  # about 15-20 m: the land in data/basemap/land.geojson
+# The chart's shapes, simpler (#104): the most a simplified line may stray from the original.
+# The chart shows an item at zoom 13.6 at most, about 8 m per pixel.
+CHART_LAND_SIMPLIFY_DEG = 0.0004  # about 25-45 m
+CHART_DETAIL_SIMPLIFY_DEG = {"major": 0.0002, "minor": 0.0004, "rail": 0.0002, "jetty": 0.0002}
+MIN_MINOR_ROAD_M = 150  # shorter pieces of minor road are left out (texture, not navigation)
+MAX_AREA_CHANGE = 0.10  # a piece of land that simplifying changes more than this keeps its finer outline
 MIN_LAND_DEG2 = 6e-6  # drop islets smaller than roughly 250 x 150 m
 MIN_HOLE_DEG2 = 2.5e-5  # fill ponds and polder ditches smaller than roughly 500 x 350 m
 MIN_TANK_RADIUS_M = 4  # smaller tanks are invisible at any zoom the chart allows
@@ -103,7 +114,9 @@ out geom;
 def fetch_osm(cache: Path, query: str) -> dict:
     """Run an Overpass query, or reuse the last download."""
     if cache.exists():
-        return json.loads(cache.read_text(encoding="utf-8"))
+        # Each point as a (lon, lat) pair instead of a dictionary: about a third of the memory
+        # for the ~2 million points (the owner's laptop has little to spare; #104).
+        return json.loads(cache.read_text(encoding="utf-8"), object_hook=point_pair)
     data = download_osm(query)
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps(data), encoding="utf-8")
@@ -123,8 +136,12 @@ def download_osm(query: str) -> dict:
     raise SystemExit("All Overpass servers failed. Try again in a few minutes.")
 
 
-def coords(geometry: list[dict]) -> list[tuple[float, float]]:
-    return [(point["lon"], point["lat"]) for point in geometry if point]
+def point_pair(value: dict):
+    return (value["lon"], value["lat"]) if value.keys() == {"lat", "lon"} else value
+
+
+def coords(geometry: list) -> list[tuple[float, float]]:
+    return [point if isinstance(point, tuple) else (point["lon"], point["lat"]) for point in geometry if point]
 
 
 def relation_polygon(relation: dict):
@@ -182,18 +199,104 @@ def rounded(geometry: dict) -> dict:
     return {"type": geometry["type"], "coordinates": walk(geometry["coordinates"])}
 
 
-def encode_line(line: LineString) -> list[int]:
-    """A line as whole grid steps: the first point counted from the map's
-    south-west corner, every next point as the step from the one before."""
+GRID = 10_000  # grid points per degree
+
+
+def grid_points(line) -> list[tuple[int, int]]:
+    """A line's points on the grid, counted from the map's south-west corner, repeats left out."""
     s, w = BBOX[0], BBOX[1]
-    steps, px, py = [], 0, 0
+    points = []
     for lon, lat in line.coords:
-        x, y = round((lon - w) * 10_000), round((lat - s) * 10_000)
-        if steps and (x, y) == (px, py):
+        point = (round((lon - w) * GRID), round((lat - s) * GRID))
+        if not points or point != points[-1]:
+            points.append(point)
+    return points
+
+
+def polyline_text(numbers: list[int]) -> str:
+    """Whole numbers as letters, 5 bits per letter (the "encoded polyline" scheme): the sign
+    goes into the lowest bit, then 5-bit groups from the lowest, each but the last + 32,
+    all + 63 so they are printable. Small steps take one letter."""
+    letters = []
+    for number in numbers:
+        value = ~(number << 1) if number < 0 else number << 1
+        while value >= 0x20:
+            letters.append(chr((0x20 | (value & 0x1F)) + 63))
+            value >>= 5
+        letters.append(chr(value + 63))
+    return "".join(letters)
+
+
+def polyline_numbers(text: str) -> list[int]:
+    """The reverse of polyline_text (map.js has the same in JavaScript)."""
+    numbers, value, shift = [], 0, 0
+    for letter in text:
+        c = ord(letter) - 63
+        value |= (c & 0x1F) << shift
+        if c & 0x20:
+            shift += 5
             continue
-        steps += [x - px, y - py]
+        numbers.append(~(value >> 1) if value & 1 else value >> 1)
+        value, shift = 0, 0
+    return numbers
+
+
+def by_position(point: tuple[int, int]) -> tuple[int, int]:
+    """Sort order: bands of 64 grid rows (about 700 m) from the south, west to east in each."""
+    return (point[1] // 64, point[0])
+
+
+def encode_shapes(shapes: list[list[tuple[int, int]]]) -> list[str]:
+    """Each shape as text: its first point as the step from the first point of the shape
+    before it (sorted by position, so that step is short), then the steps between its points."""
+    texts, start = [], (0, 0)
+    for points in sorted((p for p in shapes if len(p) >= 2), key=lambda p: by_position(p[0])):
+        steps, (px, py) = [], start
+        for x, y in points:
+            steps += [x - px, y - py]
+            px, py = x, y
+        texts.append(polyline_text(steps))
+        start = points[0]
+    return texts
+
+
+def decode_shapes(texts: list[str]) -> list[list[tuple[int, int]]]:
+    """The reverse of encode_shapes: grid points again."""
+    shapes, start = [], (0, 0)
+    for text in texts:
+        numbers = polyline_numbers(text)
+        x, y = start
+        points = []
+        for i in range(0, len(numbers), 2):
+            x, y = x + numbers[i], y + numbers[i + 1]
+            points.append((x, y))
+        shapes.append(points)
+        start = points[0]
+    return shapes
+
+
+def encode_tanks(tanks: list[tuple[int, int, int]]) -> str:
+    """Tanks as one text: per tank the step from the tank before (sorted by position) and its radius in metres."""
+    numbers, (px, py) = [], (0, 0)
+    for x, y, radius in sorted(tanks, key=lambda t: by_position((t[0], t[1]))):
+        numbers += [x - px, y - py, radius]
         px, py = x, y
-    return steps if len(steps) >= 4 else []
+    return polyline_text(numbers)
+
+
+def chart_shape(polygon: Polygon) -> Polygon:
+    """A piece of land, simpler for the chart. A narrow piece (a dam, a long pier) would
+    collapse at the chart's tolerance, so a piece whose area changes by more than
+    MAX_AREA_CHANGE keeps the finer outline it has in land.geojson."""
+    simple = polygon.simplify(CHART_LAND_SIMPLIFY_DEG, preserve_topology=True)
+    if polygon.symmetric_difference(simple).area > MAX_AREA_CHANGE * polygon.area:
+        return polygon
+    return simple
+
+
+def length_m(line: LineString) -> float:
+    lat0 = math.radians((BBOX[0] + BBOX[2]) / 2)
+    return scale(line, 111_320 * math.cos(lat0), 110_540, origin=(0, 0)).length
 
 
 def lines_of(shape) -> list[LineString]:
@@ -233,17 +336,17 @@ def build_detail(area: Polygon) -> dict:
         else:
             groups["jetty"].append(LineString(points))
 
-    detail: dict = {"grid": 10_000}
+    detail: dict = {}
     for name, lines in groups.items():
         # Join ways that continue each other, so the page draws fewer, longer lines.
-        merged = linemerge(MultiLineString(lines)).intersection(area).simplify(DETAIL_SIMPLIFY_DEG)
-        detail[name] = [steps for line in lines_of(merged) if (steps := encode_line(line))]
+        merged = linemerge(MultiLineString(lines)).intersection(area)
+        kept = [line.simplify(CHART_DETAIL_SIMPLIFY_DEG[name]) for line in lines_of(merged)
+                if name != "minor" or length_m(line) >= MIN_MINOR_ROAD_M]
+        detail[name] = encode_shapes([grid_points(line) for line in kept])
     s, w = BBOX[0], BBOX[1]
-    detail["tanks"] = [
-        value
-        for centre, radius in tanks
-        for value in (round((centre.x - w) * 10_000), round((centre.y - s) * 10_000), round(radius))
-    ]
+    detail["tanks"] = encode_tanks([
+        (round((centre.x - w) * GRID), round((centre.y - s) * GRID), round(radius)) for centre, radius in tanks
+    ])
     counts = ", ".join(f"{len(detail[name])} {name}" for name in groups)
     print(f"Detail: {counts} lines, {len(tanks)} tanks")
     return detail
@@ -282,7 +385,11 @@ def build() -> None:
     out_data.mkdir(parents=True, exist_ok=True)
     (out_data / "land.geojson").write_text(json.dumps(land_geometry), encoding="utf-8")
 
-    basemap = {"bbox": [s, w, n, e], "land": land_geometry, "detail": build_detail(area), "labels": LABELS}
+    # The chart's land: simpler, every ring (outer edge or hole) as one shape, filled "evenodd".
+    chart_land = [grid_points(ring) for polygon in land for simple in [chart_shape(polygon)]
+                  if not simple.is_empty for ring in [simple.exterior, *simple.interiors]]
+    basemap = {"bbox": [s, w, n, e], "grid": GRID, "land": encode_shapes(chart_land),
+               "detail": build_detail(area), "labels": LABELS}
     script = (
         "// Generated by tools/build_basemap.py. Do not edit by hand.\n"
         "// Map data (c) OpenStreetMap contributors, ODbL.\n"

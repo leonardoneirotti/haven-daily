@@ -18,6 +18,7 @@ on:
       - haven/render.py
       - tools/measure_speed.mjs
       - tools/speed_compare.mjs
+      - tools/build_basemap.py
       - .github/workflows/speed.yml
 
 # Read the code, nothing else.
@@ -38,6 +39,9 @@ jobs:
       # opens our own sample site on 127.0.0.1.
       HAVEN_BROWSER_ARGS: --no-sandbox
       PAGES: today,day-ships,archive,how-it-works
+      # "Before" is main; for the second #104 pull request, the first one's branch until it is
+      # merged, so each pull request is measured on its own changes.
+      BEFORE: ${{ github.ref_name == 'issue-104-lighter-map' && 'origin/issue-104-load-first' || 'origin/main' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -51,10 +55,10 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Build the sample site, before (main) and after (this branch)
+      - name: Build the sample site, before and after (this branch)
         run: |
           python -m haven.render --briefs data/sample/briefs --out "$RUNNER_TEMP/after"
-          git worktree add "$RUNNER_TEMP/main" origin/main
+          git worktree add "$RUNNER_TEMP/main" "$BEFORE"
           (cd "$RUNNER_TEMP/main" && python -m haven.render --briefs data/sample/briefs --out "$RUNNER_TEMP/before")
 
       # Node 22+ has WebSocket built in; an older Node on the image gets the "ws" package.
