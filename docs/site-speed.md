@@ -158,3 +158,21 @@ Fixes 4 to 6 are small extras.
 Open `chrome://gpu` (or `edge://gpu`) in the browser where the site feels slow, and look at **"Canvas: Hardware accelerated"**.
 - **If it says "Software only":** fix 1 is the one that matters.
 - **If the site opens in HP Sure Click's isolated browser:** that browser's own `chrome://gpu` page is the one to check.
+
+## Results, part 1 (fixes 1, 4, 5, 6)
+
+Measured on a GitHub runner, throttled phone profile, main against this branch in the same run
+([run 44531754497](https://github.com/leonardoneirotti/haven-daily/actions/runs/44531754497)):
+
+| Today | Before | After | Target |
+|---|---|---|---|
+| News and status visible | 0.67 s | 0.59 s | 1.5 s ✅ |
+| Page ready (DOMContentLoaded) | 7.52 s | 1.34 s | |
+| Map visible | 7.52 s | 7.49 s | 2.5 s: part 2 |
+| Map move, longest freeze | 15.1 s | 15.3 s | 1 s: part 2 |
+
+- **Fix 5 changed after measuring.** The font preloads made the first text *later*: 0.60 → 0.94 s on Today, and 0.46 → 0.73 s on the archive, where the preloads were the only change ([run 44407583387](https://github.com/leonardoneirotti/haven-daily/actions/runs/44407583387)). On a slow connection, about 80 KB of fonts held up the stylesheet. They are gone.
+- **What stays from fix 5:**
+  - a test that our own text pulls in no `latin-ext` font file (the sample pages never did: the 9 files are 9 typefaces and weights);
+  - the **font budget**: 240 KB and 11 files.
+- **Map visible and map moves** depend on the basemap and on drawing without a graphics chip. That is part 2 (fixes 2 and 3).
