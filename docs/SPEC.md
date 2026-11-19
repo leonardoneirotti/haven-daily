@@ -1054,7 +1054,7 @@ Principle: **fact vs interpretation in two typefaces** — the impact is the onl
 5. **The SIL Open Font License is in `static/fonts/OFL.txt`** (IBM's licence file, copyright line included), published with the site; the Method page credit links it and says the fonts are served from this site.
 6. **No download script:** the files are a one-off copy and don't change; updating them means downloading them again by hand. Where they came from is written in the comment above the rules in `style.css`.
 
-**Loading and budget** *(#104, owner, 18 Nov 2026)*: the first-screen fonts (Plex Sans, Condensed 700, Mono 600; day pages also Mono 500) are `<link rel="preload">`ed, so the browser asks for them at once instead of after reading the stylesheet. Our own text uses no letter from the Latin Extended files (tested; a source's headline may, and then the browser loads that file). **Font budget:** the Latin files together at most **240 KB and 11 files** (today 230 KB, 11 files; `tests/test_speed.py`). The style pass (#102) must stay within it.
+**Loading and budget** *(#104, owner, 18 Nov 2026)*: no font is preloaded. Preloading the four first-screen fonts was tried and measured on the throttled phone: the first text came later (0.60 → 0.94 s on Today), because on a slow connection the fonts hold up the stylesheet; with `font-display: swap` the text shows at once anyway. Our own text uses no letter from the Latin Extended files (tested; a source's headline may, and then the browser loads that file). **Font budget:** the Latin files together at most **240 KB and 11 files** (today 230 KB, 11 files; `tests/test_speed.py`). The style pass (#102) must stay within it.
 
 ### 7.4 Layout
 

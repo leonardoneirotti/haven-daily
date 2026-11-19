@@ -2,9 +2,9 @@
 
 The text, news and status come first and the chart after them: the 238 KB basemap is
 loaded by map.js once the page has painted, so the page no longer waits for it.
-The High marker's ping plays three times and stops. The first-screen fonts are loaded
-early, the pages show no character that would pull in an extra font file, and the font
-files stay within a budget. Moving the chart does less work on every move.
+The High marker's ping plays three times and stops. The pages show no character that
+would pull in an extra font file, and the font files stay within a budget (preloading the
+fonts was tried and made the first text later; see below). Moving the chart does less work on every move.
 
 map.js can't run here (it needs Leaflet and a browser), so its parts are checked by
 reading it; tools/measure_speed.mjs measures the result in a real browser (speed.yml).
@@ -25,13 +25,6 @@ SAMPLE_BRIEFS = ROOT / "data" / "sample" / "briefs"
 CSS = (STATIC / "style.css").read_text(encoding="utf-8")
 MAP_JS = (STATIC / "map.js").read_text(encoding="utf-8")
 LOADER_JS = (STATIC / "map-loader.js").read_text(encoding="utf-8")
-
-# The first-screen fonts (measured on Today, the archive and How it works, phone and laptop):
-# Plex Sans (one variable file), Condensed 700 for the titles and Mono 600, which the
-# labels set at weight 700 use (the nearest file). Day pages add Mono 500 (the dates).
-PRELOAD_EVERY_PAGE = ["ibm-plex-sans-400-700-latin.woff2", "ibm-plex-sans-condensed-700-latin.woff2",
-                      "ibm-plex-mono-600-latin.woff2"]
-PRELOAD_DAY_PAGES = PRELOAD_EVERY_PAGE + ["ibm-plex-mono-500-latin.woff2"]
 
 # The font budget (owner, 18 Nov 2026): every font file a page can load, in the main
 # (latin) set, at most this much together. The style pass (#102) must stay within it.
@@ -125,31 +118,14 @@ def test_no_ping_with_reduced_motion():
 
 # ---------- 5. Fonts ----------
 
-def preloads(page):
-    return [link for link in soup_of(page).find_all("link") if "preload" in link.get("rel", [])]
-
-
-def test_first_screen_fonts_are_preloaded(site):
+def test_fonts_are_not_preloaded(site):
+    # Tried and measured (speed run 44407583387, throttled phone): preloading the four
+    # first-screen fonts (about 80 KB) made the first text later, 0.60 -> 0.94 s on Today and
+    # 0.46 -> 0.73 s on the archive. On a slow connection they hold up the stylesheet, and the
+    # page can't paint before it. With font-display: swap the text shows at once anyway.
     for page in pages(site):
-        wanted = PRELOAD_DAY_PAGES if page in day_pages(site) else PRELOAD_EVERY_PAGE
-        links = preloads(page)
-        names = [link["href"].rsplit("/", 1)[-1] for link in links]
-        assert names == wanted, page.relative_to(site)
-        for link in links:
-            # Without crossorigin the browser fetches the font twice.
-            assert link["as"] == "font" and link["type"] == "font/woff2" and link.has_attr("crossorigin")
-            assert (page.parent / link["href"]).resolve().is_file(), link["href"]
-
-
-def test_preloads_come_before_the_stylesheet(site):
-    for page in pages(site):
-        html = page.read_text(encoding="utf-8")
-        assert html.index('rel="preload"') < html.index("style.css"), page.name
-
-
-def test_preloaded_fonts_are_the_ones_style_css_uses():
-    used = {url.rsplit("/", 1)[-1] for face in font_faces(CSS) for url in face["urls"]}
-    assert set(PRELOAD_DAY_PAGES) <= used
+        links = [link for link in soup_of(page).find_all("link") if "preload" in link.get("rel", [])]
+        assert not links, page.relative_to(site)
 
 
 def test_pages_show_no_character_that_pulls_in_an_extra_font_file(site):
