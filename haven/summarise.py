@@ -35,6 +35,12 @@ The checks (any failure = the item is **unrated**: severity, summary and impact 
 - place and tags go through `places.pick` (#14): anything off the lists is dropped and logged
   as `unlisted`, which doesn't make the item unrated.
 
+A source summarised under a publisher's **written permission** (`Source.permission`, RTV Rijnmond
+since 19 Nov 2026, #107) has that permission's limits, for its items only: the summary may have
+at most `max_sentences` sentences, **counted by the code** (more = the same one retry as too long,
+then unrated), and with `impact = false` the request has no impact field at all, so the item has
+no impact (and the page shows no impact block, not "Not enough information").
+
 Strike dates (owner's decisions, 2 Nov 2026): the AI **copies the words** that say when a strike
 starts and ends ("on Thursday", "5 November", "tomorrow"), and **the code works out the date**
 (`resolve_phrase`): "today", "tomorrow" and weekday names against the item's published date
@@ -70,14 +76,14 @@ from typing import Callable
 import anthropic
 
 from haven.clock import AMSTERDAM
-from haven.config import Place, Source, Tag, load_places, load_tag_list
+from haven.config import Permission, Place, Source, Tag, load_places, load_sources, load_tag_list
 from haven.feeds import Item
 from haven.filter import BREAKER, NO_KEY, notice_ended
 from haven.places import pick
 
 __all__ = ["BATCH_WAIT", "BREAKER", "CANCEL_WAIT", "FALLBACK_MODEL", "SUMMARY_MODEL", "BatchRun", "SummaryResult",
            "brief_item", "finish_batch", "known_strikes", "phrase_in", "published_day", "resolve_phrase",
-           "start_batch", "summarise", "summarise_batch", "unrated"]
+           "sentence_count", "start_batch", "summarise", "summarise_batch", "unrated"]
 
 SUMMARY_MODEL = "claude-sonnet-5-5"  # spec §5.5: chosen by the owner after the side-by-side test (#17, 2 Nov 2026)
 FALLBACK_MODEL = "claude-haiku-5-5"  # items the batch didn't answer, whatever the batch model (§5.5 step 3)
@@ -198,7 +204,10 @@ if it is a different strike or none are listed.
 
 Headline only: some items come with the headline alone, because the source does not allow more. \
 Then answer from the headline only, by the same rules: severity, place, tags and strike. There \
-is no summary or impact for these items."""
+is no summary or impact for these items.
+
+Some sources are summarised with the publisher's written permission, on its conditions. The item \
+then says what they are (for example at most 2 sentences and no impact): keep to them exactly."""
 
 
 def system_prompt(places: tuple[Place, ...], tags: tuple[Tag, ...]) -> str:
@@ -224,12 +233,14 @@ _STRIKE_SCHEMA = {
 }
 
 
-def output_format(headline_only: bool) -> dict:
-    """The structured-output schema: no summary or impact when only the headline is sent."""
+def output_format(headline_only: bool, impact: bool = True) -> dict:
+    """The structured-output schema: no summary or impact when only the headline is sent, and no
+    impact when a publisher's permission doesn't cover one (`impact=False`, #107)."""
     properties = {}
     if not headline_only:
         properties["summary"] = {"type": "string"}
-        properties["impact"] = {"anyOf": [{"type": "string"}, {"type": "null"}]}
+        if impact:
+            properties["impact"] = {"anyOf": [{"type": "string"}, {"type": "null"}]}
     properties["severity"] = {"type": "string", "enum": list(SEVERITIES)}
     properties["place"] = {"type": "string"}
     properties["tags"] = {"type": "array", "items": {"type": "string"}}
@@ -264,8 +275,19 @@ _RETRY_NOTE = (
 )
 
 
+def _impact_allowed(permission: Permission | None) -> bool:
+    return permission is None or permission.impact
+
+
+def _permission_line(permission: Permission) -> str:
+    """The publisher's conditions, in the item's own message (#107). Our words, never the source's."""
+    line = (f"This source is summarised with the publisher's written permission: the summary is at most "
+            f"{permission.max_sentences} sentences")
+    return line + ("." if permission.impact else ", and there is no impact: answer without one.")
+
+
 def _request(item: Item, model: str, system: str, known: list[dict], today: date, read_at: datetime,
-             retry_reason: str | None = None) -> dict:
+             retry_reason: str | None = None, permission: Permission | None = None) -> dict:
     headline_only = _headline_only(item)
     task = "Rate this item from its headline only." if headline_only else "Summarise and rate this item."
     read = read_at.astimezone(AMSTERDAM)
@@ -277,6 +299,8 @@ def _request(item: Item, model: str, system: str, known: list[dict], today: date
     ]
     if not headline_only:  # never for headline-only items (hard rule 12)
         parts.append(f"<article>{_escape(item.article_text)}</article>")
+        if permission is not None:
+            parts.append(_permission_line(permission))
     parts.append(_known_block(known))
     if retry_reason is not None:  # our own words, never the AI's or the article's
         parts.append(_RETRY_NOTE.format(reason=retry_reason))
@@ -284,7 +308,8 @@ def _request(item: Item, model: str, system: str, known: list[dict], today: date
         "model": model,
         "max_tokens": SUMMARY_MAX_TOKENS,
         "system": system,
-        "output_config": {"effort": SUMMARY_EFFORT, "format": output_format(headline_only)},
+        "output_config": {"effort": SUMMARY_EFFORT,
+                          "format": output_format(headline_only, _impact_allowed(permission))},
         "messages": [{"role": "user", "content": "\n\n".join(parts)}],
     }
 
@@ -320,7 +345,7 @@ class _Run:
     answer is checked the same way whichever route it came by.
     """
 
-    def __init__(self, client, known: list[dict], today: date, read_at: datetime, places, tags):
+    def __init__(self, client, known: list[dict], today: date, read_at: datetime, places, tags, sources=None):
         if read_at.tzinfo is None or read_at.utcoffset() is None:
             raise ValueError("read_at has no timezone; pass the collect step's feeds_read_at")
         self.client = client
@@ -332,6 +357,9 @@ class _Run:
         tag_list = load_tag_list() if tags is None else tags
         self.tags = tuple(t.name for t in tag_list)  # names, as places.pick matches them
         self.system = system_prompt(self.places, tag_list)
+        # Written permissions by source id (#107): their limits apply to that source's items only.
+        self.permissions = {s.id: s.permission for s in (load_sources() if sources is None else sources)
+                            if s.permission is not None}
         self.failures: list[dict] = []
         self.calls = self.input_tokens = self.output_tokens = 0
         self.batch_input_tokens = self.batch_output_tokens = 0
@@ -339,7 +367,8 @@ class _Run:
         self.streak = 0  # failed standard calls in a row
 
     def request(self, item: Item, model: str, retry_reason: str | None = None) -> dict:
-        return _request(item, model, self.system, self.known, self.today, self.read_at, retry_reason)
+        return _request(item, model, self.system, self.known, self.today, self.read_at, retry_reason,
+                        self.permissions.get(item.source))
 
     def fail(self, item: Item, problem: str) -> Item:
         self.failures.append({"source": SUMMARISER, "error": f"{item.url}: {problem}"})
@@ -362,7 +391,8 @@ class _Run:
 
         notes: list[str] = []  # problems that leave the item rated (a date left out)
         try:
-            ai = _checked(_answer(response), item, self.known_ids, self.today, self.places, self.tags, notes)
+            ai = _checked(_answer(response), item, self.known_ids, self.today, self.places, self.tags, notes,
+                          self.permissions.get(item.source))
         except _Rephrase as problem:
             if retry_reason is None:
                 return _Retry(str(problem))  # this answer's notes are dropped with it
@@ -425,7 +455,7 @@ class _Run:
 
 def summarise(items: list[Item], client, known: list[dict], today: date, model: str = SUMMARY_MODEL,
               places: tuple[Place, ...] | None = None, tags: tuple[Tag, ...] | None = None, *,
-              read_at: datetime) -> SummaryResult:
+              read_at: datetime, sources: tuple[Source, ...] | None = None) -> SummaryResult:
     """The kept items through the standard API, one call each. Never raises for an API problem.
 
     The morning job uses `summarise_batch`; this is its fallback route and what the Haiku vs
@@ -433,10 +463,11 @@ def summarise(items: list[Item], client, known: list[dict], today: date, model: 
     of stored items; `today` is the Amsterdam date of the run (new strike ids and the date check);
     `read_at` is when the sources were read (the collect step's `feeds_read_at`, as for the 48 h
     rule): it goes into the prompt, and a PIN notice whose End Date is at or before it is Low (#67).
+    `sources` (default: config/sources.toml) gives the publishers' written permissions (#107).
     """
     if client is None:
         return _unavailable(items, NO_KEY, calls=0)
-    run = _Run(client, known, today, read_at, places, tags)
+    run = _Run(client, known, today, read_at, places, tags, sources)
     try:
         done = [run.standard(item, model) for item in items]
     except _Unavailable as why:
@@ -465,7 +496,8 @@ def _custom_id(index: int) -> str:
 
 def start_batch(items: list[Item], client, known: list[dict], today: date, model: str = SUMMARY_MODEL,
                 places: tuple[Place, ...] | None = None, tags: tuple[Tag, ...] | None = None,
-                clock: Callable[[], float] | None = None, *, read_at: datetime) -> BatchRun:
+                clock: Callable[[], float] | None = None, *, read_at: datetime,
+                sources: tuple[Source, ...] | None = None) -> BatchRun:
     """Send all kept items as one batch (§5.5 step 1) and return at once, without waiting.
 
     The runner can do other work (in v2 the AIS snapshot, #31) before `finish_batch`; the
@@ -476,7 +508,7 @@ def start_batch(items: list[Item], client, known: list[dict], today: date, model
     items = list(items)
     if client is None:
         return BatchRun(items, model, clock(), clock, unavailable=NO_KEY)
-    run = _Run(client, known, today, read_at, places, tags)
+    run = _Run(client, known, today, read_at, places, tags, sources)
     batch_id = None
     if items:  # an empty batch is not allowed, and there is nothing to wait for
         requests = [{"custom_id": _custom_id(i), "params": run.request(item, model)} for i, item in enumerate(items)]
@@ -523,9 +555,11 @@ def finish_batch(pending: BatchRun, sleep: Callable[[float], None] | None = None
 def summarise_batch(items: list[Item], client, known: list[dict], today: date, model: str = SUMMARY_MODEL,
                     places: tuple[Place, ...] | None = None, tags: tuple[Tag, ...] | None = None,
                     clock: Callable[[], float] | None = None,
-                    sleep: Callable[[float], None] | None = None, *, read_at: datetime) -> SummaryResult:
+                    sleep: Callable[[float], None] | None = None, *, read_at: datetime,
+                    sources: tuple[Source, ...] | None = None) -> SummaryResult:
     """Step 3 of the morning job: `start_batch` and `finish_batch` with nothing in between."""
-    pending = start_batch(items, client, known, today, model, places, tags, clock, read_at=read_at)
+    pending = start_batch(items, client, known, today, model, places, tags, clock, read_at=read_at,
+                          sources=sources)
     return finish_batch(pending, sleep)
 
 
@@ -600,10 +634,11 @@ def _answer(response) -> dict:
     return data
 
 
-def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, tags, notes: list[str]) -> dict:
+def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, tags, notes: list[str],
+             permission: Permission | None = None) -> dict:
     """The item's AI fields from a checked answer (strike id and written_by are added after)."""
     headline_only = _headline_only(item)
-    required = output_format(headline_only)["schema"]["required"]
+    required = output_format(headline_only, _impact_allowed(permission))["schema"]["required"]
     if any(key not in data for key in required):
         raise _ItemFailed("unreadable answer")
 
@@ -615,7 +650,10 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
         summary = _own_words(data["summary"], "summary", SUMMARY_MAX, item.article_text)
         if summary is None:
             raise _ItemFailed("empty summary")
-        impact = _own_words(data["impact"], "impact", IMPACT_MAX, item.article_text)
+        if permission is not None and sentence_count(summary) > permission.max_sentences:
+            raise _Rephrase(f"summary has more than {permission.max_sentences} sentences")
+        if _impact_allowed(permission):  # otherwise an impact sent anyway is never kept (#107)
+            impact = _own_words(data["impact"], "impact", IMPACT_MAX, item.article_text)
 
     if not isinstance(data["tags"], list):
         raise _ItemFailed("unreadable tags")
@@ -642,6 +680,20 @@ def _own_words(value, name: str, limit: int, article: str) -> str | None:
     if copies(text, article):
         raise _Rephrase(f"{name} copies the article ({COPY_RUN}+ words in a row)")
     return text
+
+
+# The end of a sentence: . ! or ? (and any closing quote or bracket), then a space.
+_SENTENCE_BREAK = re.compile(r"(?<=[.!?])[\"'\u2019\u201d)\]]*\s+")
+
+
+def sentence_count(text: str) -> int:
+    """How many sentences a summary has, for a publisher's limit (#107).
+
+    A break is . ! or ? followed by a space, so "3.5 metres" is one sentence. An abbreviation such
+    as "e.g. the" counts as a break: the safe side, since too many means a retry, never a summary
+    that breaks the publisher's limit.
+    """
+    return sum(1 for part in _SENTENCE_BREAK.split(text.strip()) if part.strip())
 
 
 def copies(text: str, article: str, run: int = COPY_RUN) -> bool:
@@ -845,6 +897,13 @@ def brief_item(item: Item, sources: tuple[Source, ...]) -> dict:
     """The item as it goes into the brief (§6). An item the summariser never saw is unrated."""
     ai = item.ai if item.ai is not None else unrated()
     names = {source.id: source.name for source in sources}
+    # A summary written under a publisher's written permission records it, so the page shows the
+    # publisher's note next to it, even after the permission ends (#107, spec §6).
+    permission = next((s.permission for s in sources if s.id == item.source), None)
+    written_under = None
+    if ai["summary"] and permission is not None:
+        written_under = {"granted": permission.granted.isoformat(), "max_sentences": permission.max_sentences,
+                         "impact": permission.impact}
     return {
         "severity": ai["severity"],
         "headline": item.headline,
@@ -859,4 +918,5 @@ def brief_item(item: Item, sources: tuple[Source, ...]) -> dict:
         "written_by": ai["written_by"],
         "map": ai["map"],
         "strike": ai["strike"],
+        "permission": written_under,
     }

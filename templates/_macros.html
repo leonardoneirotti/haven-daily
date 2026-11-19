@@ -117,6 +117,9 @@
     {% if item.affects %}<p class="affects"><strong>Affects</strong> {{ item.affects | join(" · ") }}</p>{% endif %}
     {% else %}
     <p class="item-summary">{{ item.summary }}</p>
+    {# A publisher's written permission (#107): its note next to every summary written under it. #}
+    {% if item.permission_note %}<p class="item-permission">{{ item.permission_note }}</p>{% endif %}
+    {% if item.shows_impact %}
     <div class="item-impact">
       <p class="impact-label">Impact for planners <em>interpretation</em></p>
       {% if item.impact %}
@@ -126,6 +129,10 @@
       {% endif %}
       {% if item.affects %}<p class="affects"><strong>Affects</strong> {{ item.affects | join(" · ") }}</p>{% endif %}
     </div>
+    {% else %}
+    {# The permission covers no impact (#107): no impact block, the tags stay. #}
+    {% if item.affects %}<p class="affects"><strong>Affects</strong> {{ item.affects | join(" · ") }}</p>{% endif %}
+    {% endif %}
     {% endif %}
     <p class="item-actions">
       {% if item.map %}

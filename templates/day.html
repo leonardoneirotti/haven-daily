@@ -40,7 +40,8 @@
               <span class="panel-meta"><span class="sev sev-{{ item.severity_key }}">{{ item.severity_key }}</span></span>
               <span class="panel-title">{{ item.headline }}</span>
               {% if item.headline_note %}<span class="panel-summary is-empty">{{ item.headline_note }}</span>
-              {% else %}<span class="panel-summary">{{ item.summary }}</span>{% endif %}
+              {% else %}<span class="panel-summary">{{ item.summary }}</span>
+              {% if item.permission_note %}<span class="panel-permission">{{ item.permission_note }}</span>{% endif %}{% endif %}
             </span>
           </a>
         </li>

@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import tomllib
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from pathlib import Path
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
@@ -18,7 +19,10 @@ CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 VERDICTS = ("use", "headline-only", "drop")
 ACCESS_TYPES = ("rss", "html")
 
-_SOURCE_FIELDS = {"id", "name", "verdict", "urls", "access", "language", "auto_keep", "note", "why", "home"}
+_SOURCE_FIELDS = {"id", "name", "verdict", "urls", "access", "language", "auto_keep", "note", "why", "home",
+                  "permission"}
+_PERMISSION_FIELDS = ("file", "granted", "max_sentences", "impact")
+_PERMISSION_FILE = re.compile(r"^docs/permissions/[\w.-]+\.md$")
 _LANGUAGE = re.compile(r"^[a-z]{2}$")
 
 # Place list (spec §5.10). "barrier" and "bridge" are Claude's additions to the
@@ -37,6 +41,20 @@ class ConfigError(Exception):
 
 
 @dataclass(frozen=True)
+class Permission:
+    """A publisher's written permission for AI summaries (spec §3 rule 12, owner's decision 19 Nov 2026).
+
+    It overrides the publisher's own robots.txt AI block, for that publisher only. In
+    config/sources.toml it is one line on a headline-only source; deleting that line withdraws it.
+    """
+
+    file: str  # the saved reply, e.g. "docs/permissions/2026-11-19-rtv-rijnmond.md"
+    granted: date  # the day the written permission was received
+    max_sentences: int  # the summary's limit, checked in code (haven/summarise.py)
+    impact: bool  # False: no "impact for planners" line for this publisher's items
+
+
+@dataclass(frozen=True)
 class Source:
     """One source from config/sources.toml (vocabulary: GLOSSARY.md)."""
 
@@ -50,6 +68,14 @@ class Source:
     note: str | None = None  # for people reading the config only, never shown
     why: str | None = None  # one public line on the Method page: why it is headline-only or dropped (#24)
     home: str | None = None  # the source's normal public page, linked from its name on the Method page (PR #76)
+    permission: Permission | None = None  # written permission that lifts a headline-only source (#107)
+
+    @property
+    def effective_verdict(self) -> str:
+        """What Haven Daily does with the source: its verdict, or "use" with written permission."""
+        if self.verdict == "headline-only" and self.permission is not None:
+            return "use"
+        return self.verdict
 
     @property
     def fetched(self) -> bool:
@@ -397,6 +423,12 @@ def _check_source(file: str, number: int, entry: dict) -> Source:
             if entry.get(name) is None:
                 fail(f"missing {name!r} (needed to fetch a {verdict!r} source)")
 
+    permission = None
+    if "permission" in entry:
+        if verdict != "headline-only":
+            fail("a permission only lifts a headline-only source (its own verdict stays headline-only)")
+        permission = _check_permission(entry["permission"], fail)
+
     return Source(
         id=entry["id"],
         name=entry["name"],
@@ -408,7 +440,31 @@ def _check_source(file: str, number: int, entry: dict) -> Source:
         note=note,
         why=why,
         home=home,
+        permission=permission,
     )
+
+
+def _check_permission(value, fail) -> Permission:
+    """The one-line `permission = { file, granted, max_sentences, impact }` table (#107)."""
+    if not isinstance(value, dict):
+        fail("'permission' must be written as permission = { file = ..., granted = ..., "
+             "max_sentences = ..., impact = ... }")
+    unknown = sorted(set(value) - set(_PERMISSION_FIELDS))
+    if unknown:
+        fail(f"permission: unknown field {unknown[0]!r} (allowed: {', '.join(_PERMISSION_FIELDS)})")
+    for name in _PERMISSION_FIELDS:
+        if name not in value:
+            fail(f"permission: missing {name!r}")
+    file, granted, max_sentences, impact = (value[name] for name in _PERMISSION_FIELDS)
+    if not isinstance(file, str) or not _PERMISSION_FILE.match(file):
+        fail("permission: file must be a .md file in docs/permissions/, e.g. docs/permissions/2026-11-19-x.md")
+    if not isinstance(granted, date) or isinstance(granted, datetime):
+        fail("permission: granted must be a date, written as 2026-11-19 (no quotes)")
+    if not isinstance(max_sentences, int) or isinstance(max_sentences, bool) or max_sentences < 1:
+        fail("permission: max_sentences must be a whole number of 1 or more")
+    if not isinstance(impact, bool):
+        fail("permission: impact must be true or false")
+    return Permission(file=file, granted=granted, max_sentences=max_sentences, impact=impact)
 
 
 # ---------- config/site.toml: the site's own addresses (spec §2.3, issue #28) ----------

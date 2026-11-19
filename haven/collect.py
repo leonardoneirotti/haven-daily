@@ -43,7 +43,7 @@ from bs4 import BeautifulSoup
 from haven import clock, storage
 from haven.clock import AMSTERDAM
 from haven.config import Source
-from haven.feeds import ARTICLE_TEXT_MAX, PIN_SOURCE_ID, FeedResult, Item, collect_feed
+from haven.feeds import ARTICLE_TEXT_MAX, LEAD_PARAGRAPH_FEEDS, PIN_SOURCE_ID, FeedResult, Item, collect_feed
 from haven.fetch import Fetcher, FetchError
 from haven.pages import KN_SOURCE_ID, collect_page
 
@@ -56,6 +56,9 @@ DUPLICATE_CHECK = "Duplicate check"  # the `source` of failures in reading store
 KN_QUIET = "no item collected in the last 14 days (weekly port update renamed, or the collector broken?)"
 NO_ARTICLE_TEXT = "article text not found on the page (layout changed?)"
 NO_READER = "the article was not opened: there is no article reader for this source yet"
+# RTV Rijnmond (#107): its summary is written from the lead paragraph in its feed only, so an item
+# whose feed entry has none is rated from its headline; its article page is never opened.
+NO_LEAD = "the feed gave no lead paragraph for this item, so it is rated from its headline"
 # In plain words (issue #84): the line is public, so it names no internal step. The cause is unchanged:
 # no brief of the last 14 days records when the feeds were last read (e.g. the first run).
 GAP_CHECK_SKIPPED = ("couldn't check whether any notices were missed since the last run: "
@@ -260,6 +263,11 @@ def add_article_text(items: list[Item], sources, fetcher: Fetcher) -> ArticleRes
 
         def fail(error: str) -> None:
             failures.append({"source": names.get(item.source, item.source), "error": f"{item.url}: {error}"})
+
+        if item.source in LEAD_PARAGRAPH_FEEDS:  # the feed is the only text we may use (#107)
+            fail(NO_LEAD)
+            done.append(item)
+            continue
 
         selector = ARTICLE_BODY.get(item.source)
         if selector is None:

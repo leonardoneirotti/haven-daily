@@ -27,6 +27,7 @@ from haven import summarise
 from haven.clock import AMSTERDAM
 from haven.config import (CONFIG_DIR, RhineMeanings, RhineThresholds, SiteConfig, Source, load_rhine,
                           load_rhine_meanings, load_site, load_sources, preview_image_size)
+from haven.feeds import LEAD_PARAGRAPH_FEEDS
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = PROJECT_DIR / "templates"
@@ -497,6 +498,20 @@ def headline_note(item: dict) -> str | None:
     return HEADLINE_NOTES["unread"]
 
 
+# Next to every summary written under a publisher's written permission (#107): the publisher asked
+# that the page makes clear Haven Daily is independent and the publisher not responsible.
+PERMISSION_NOTE = ("Summarised with {source}'s permission. Haven Daily is an independent project; "
+                   "{source} is not responsible for this AI-generated summary.")
+SENTENCE_WORDS = {1: "one sentence", 2: "two sentences", 3: "three sentences"}
+
+
+def permission_note(item: dict) -> str | None:
+    """The publisher's note for an item summarised under its written permission, else None."""
+    if not item.get("permission"):
+        return None
+    return PERMISSION_NOTE.format(source=item["source"])
+
+
 def prepare_item(item: dict, brief_date: str) -> None:
     item.setdefault("summary", None)
     item.setdefault("impact", None)
@@ -504,6 +519,10 @@ def prepare_item(item: dict, brief_date: str) -> None:
     item.setdefault("published", None)
     item.setdefault("access", "full")  # "headline-only" for paywalled sources
     item.setdefault("map", None)  # {"lat", "lon", "label"} when the item has a place on the map
+    item.setdefault("permission", None)  # {"granted", "max_sentences", "impact"}: written permission (#107)
+    item["permission_note"] = permission_note(item)
+    # No impact block when the publisher's permission doesn't cover one (#107): not "Not enough information".
+    item["shows_impact"] = not item["permission"] or bool(item["permission"].get("impact"))
     item["severity_key"] = severity_key(item["severity"])
     item["language_name"] = LANGUAGE_NAMES.get(item["language"], item["language"])
     item["published_label"] = published_label(item["published"], brief_date)
@@ -674,6 +693,13 @@ def group_by_month(briefs: list[dict]) -> list[tuple[str, list[dict]]]:
 
 def source_use(source: Source) -> str:
     """One line on how the pipeline uses a source, from its config (Method page, #24)."""
+    if source.effective_verdict == "use" and source.permission is not None:  # #107
+        permission = source.permission
+        text = "the lead paragraph in its feed" if source.id in LEAD_PARAGRAPH_FEEDS else "the article"
+        length = SENTENCE_WORDS.get(permission.max_sentences, f"{permission.max_sentences} sentences")
+        limits = f"at most {length}" + ("" if permission.impact else ", with no impact for planners")
+        return (f"With {source.name}'s written permission: new items go through the AI relevance check, "
+                f"and kept ones are summarised from {text}, in {limits}.")
     if source.verdict == "use" and source.auto_keep:
         return ("Rotterdam-specific, so its new items skip the AI relevance check. Each is summarised "
                 "from the article.")
@@ -682,6 +708,14 @@ def source_use(source: Source) -> str:
     if source.verdict == "headline-only":
         return "Headline and link only. The AI sees the headline alone, to judge relevance and to rate it."
     return "Not collected."
+
+
+def permission_statement(source: Source) -> str:
+    """How it works: who gave written permission, when, and that they aren't responsible (#107)."""
+    granted = source.permission.granted
+    return (f"{source.name} gave Haven Daily written permission on {granted.day} {granted:%B %Y} for short "
+            f"AI-generated summaries of its articles. Haven Daily is an independent project; "
+            f"{source.name} is not responsible for the AI-generated summaries.")
 
 
 def method_page(sources: tuple[Source, ...], rhine: RhineThresholds) -> dict:
@@ -700,12 +734,13 @@ def method_page(sources: tuple[Source, ...], rhine: RhineThresholds) -> dict:
                 "how": source_use(src),
                 "why": src.why,
             }
-            for src in sources if src.verdict == verdict
+            for src in sources if src.effective_verdict == verdict  # after any written permission (#107)
         ]
         if listed:
             groups.append({"verdict": verdict, "label": label, "sources": listed})
     return {
         "source_groups": groups,
+        "permissions": [permission_statement(src) for src in sources if src.permission is not None],
         "rhine": {
             "normal": f"{rhine.watch_at_or_below + 1}–{rhine.watch_above} cm",
             "watch_low": f"{rhine.watch_at_or_below} cm or below",

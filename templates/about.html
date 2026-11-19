@@ -146,7 +146,8 @@
 
     <section aria-labelledby="sources">
       <h2 id="sources">Sources</h2>
-      <p>Every source was tested before use: does it have a feed or a readable page, what do its terms and robots.txt allow, and does it opt out of AI use? Each source's terms and robots.txt are respected. A source that opts out of AI use is headline-only: its article text never goes to an AI, only its headline and link are used.</p>
+      <p>Every source was tested before use: does it have a feed or a readable page, what do its terms and robots.txt allow, and does it opt out of AI use? Each source's terms and robots.txt are respected. A source that opts out of AI use is headline-only: its article text never goes to an AI, only its headline and link are used. The one exception is a publisher's own written permission, for that publisher only.</p>
+      {% for statement in method.permissions %}<p class="permission-statement">{{ statement }}</p>{% endfor %}
       {% for group in method.source_groups %}
       <div class="source-group" id="sources-{{ group.verdict }}">
         <h3>{{ group.label }}</h3>

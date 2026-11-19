@@ -1,7 +1,7 @@
 """Feed collectors: read the RSS sources into one common item shape (spec §4, §5.8; issue #9).
 
-The RSS sources in config/sources.toml: PIN notices (use) and Nieuwsblad Transport,
-PortsEurope, The Loadstar and RTV Rijnmond (all four headline-only).
+The RSS sources in config/sources.toml: PIN notices (use), RTV Rijnmond (use, by written
+permission, #107) and Nieuwsblad Transport, PortsEurope and The Loadstar (headline-only).
 
 Each feed entry becomes an `Item`: source id, headline, url, published (Amsterdam time),
 language and access ("full" or "headline-only"). What may be kept depends on the access:
@@ -15,6 +15,9 @@ language and access ("full" or "headline-only"). What may be kept depends on the
   PIN's description is the whole notice, not a teaser, so it is also kept (up to 6,000
   characters, in memory only) as the item's `article_text` for the summariser: no notice
   page needs to be opened (`FULL_TEXT_FEEDS`, issue #11).
+  RTV Rijnmond's description is the article's lead paragraph; its summary is written from that
+  alone (owner's choice, 19 Nov 2026, #107), so it is kept the same way and no article page is
+  opened (`LEAD_PARAGRAPH_FEEDS`).
 
 A `use` source that opts out of AI use this morning (robots.txt, `haven/fetch.py`) is read
 as headline-only, with a note in the failures so the owner updates SOURCES.md.
@@ -54,6 +57,12 @@ ARTICLE_TEXT_MAX = 6000  # characters of article text kept in memory for the sum
 # Feeds whose description is the whole text, not a teaser (checked 1 Nov 2026): the article text
 # comes from the feed, so no article page is opened for them (spec §5.8, issue #11).
 FULL_TEXT_FEEDS = frozenset({PIN_SOURCE_ID})
+# Feeds whose description is the article's lead paragraph, and the summary is written from that
+# alone: RTV Rijnmond, by its written permission (owner's choice, 19 Nov 2026, #107). Checked on 4
+# live articles that day: the description is exactly the article's first paragraph.
+RIJNMOND_SOURCE_ID = "rtv-rijnmond"
+LEAD_PARAGRAPH_FEEDS = frozenset({RIJNMOND_SOURCE_ID})
+_TEXT_FROM_FEED = FULL_TEXT_FEEDS | LEAD_PARAGRAPH_FEEDS
 
 _DC = "{http://purl.org/dc/elements/1.1/}"
 _ENTITY_DECLARATION = re.compile(rb"<!ENTITY", re.IGNORECASE)
@@ -186,7 +195,7 @@ def collect_feed(source: Source, fetcher: Fetcher, previous_run: datetime | None
                     language=source.language,
                     access="full" if full else "headline-only",
                     snippet=entry.snippet if full else None,
-                    article_text=entry.text if full and source.id in FULL_TEXT_FEEDS else None,
+                    article_text=entry.text if full and source.id in _TEXT_FROM_FEED else None,
                 )
             )
 

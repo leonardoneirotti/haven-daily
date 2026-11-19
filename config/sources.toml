@@ -20,6 +20,13 @@
 #   why        one public line shown on the Method page (issue #24): why a source is
 #              headline-only or dropped (required for those, tests/test_repo_config.py),
 #              or how a "use" source is limited
+#   permission optional, one line, only on a headline-only source: the publisher's written
+#              permission for AI summaries (spec §3 rule 12, §11; #107). It overrides the
+#              publisher's robots.txt AI block for that publisher only, and the source is
+#              summarised (listed under Use in SOURCES.md). Fields: file (the saved reply in
+#              docs/permissions/), granted (date received), max_sentences (checked in code),
+#              impact (false = no "impact for planners" line). Permission withdrawn: delete
+#              the line, and move its row back under Headline-only in SOURCES.md.
 
 # --- use ----------------------------------------------------------------------
 
@@ -114,12 +121,14 @@ note = "Main feed only (robots.txt disallows tag/category pages)."
 id = "rtv-rijnmond"
 name = "RTV Rijnmond"
 verdict = "headline-only"
-why = "Its terms reserve all rights, so there is no summary until RTV Rijnmond gives written permission. Its robots.txt also blocks ClaudeBot and other AI crawlers."
+# Written permission for AI summaries, received 19 Nov 2026 (#107). Withdrawn? Delete this one line.
+permission = { file = "docs/permissions/2026-11-19-rtv-rijnmond.md", granted = 2026-11-19, max_sentences = 2, impact = false }
+why = "Its terms reserve all rights and its robots.txt blocks ClaudeBot and other AI crawlers, so summaries need RTV Rijnmond's written permission."
 home = "https://www.rijnmond.nl/"
 urls = ["https://www.rijnmond.nl/rss/nieuws"]
 access = "rss"
 language = "nl"
-note = "Blocks ClaudeBot and ~130 other bots. Terms (rijnmond.nl/aansprakelijkheid, read by the owner 15 Nov 2026): all rights reserved, any use needs prior permission via info@rijnmond.nl. Headline-only until written permission (#98)."
+note = "Blocks ClaudeBot and ~130 other bots. Terms (rijnmond.nl/aansprakelijkheid, read by the owner 15 Nov 2026): all rights reserved, any use needs prior permission via info@rijnmond.nl. Written permission for summaries of at most two sentences, no impact line until they confirm it (19 Nov 2026, #107): summarised from the lead paragraph in the feed only."
 
 [[source]]
 id = "kn-seanews"

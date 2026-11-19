@@ -733,6 +733,20 @@ html:not(.has-map) .needs-map,
   display: block;
 }
 
+/* A publisher's note next to a summary written under its written permission (#107): opens with
+   the summary, in the same quiet grey, a step smaller. */
+.panel-permission {
+  display: none;
+  margin-top: 0.25rem;
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.panel-item.is-active .panel-permission {
+  display: block;
+}
+
 .panel-quiet {
   flex: 1;
   padding: 1.25rem;
@@ -1888,6 +1902,18 @@ html:not(.has-map) .needs-map,
 
 .item-summary {
   max-width: var(--measure);
+}
+
+/* The publisher's note under a summary written with its permission (#107). */
+.item-permission {
+  max-width: var(--measure);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.permission-statement {
+  color: var(--ink-2);
 }
 
 .item-impact {
