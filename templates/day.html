@@ -68,6 +68,8 @@
       <div class="chart-frame">
         <div id="port-map" class="chart-map" role="region" aria-label="Chart of the Port of Rotterdam{% if ships %} with {{ ships.count }} ships{% endif %}{% if brief.map.callouts %} and today's numbered items{% endif %}. Everything on the chart is also listed on this page."></div>
         <script type="application/json" id="map-data">{{ brief.map | tojson }}</script>
+        {# Until the chart is drawn; aria-hidden: the chart's own label already describes it. #}
+        <p class="chart-loading needs-map" id="chart-loading" aria-hidden="true">Loading chart…</p>
         {% if ships %}
         <div class="chart-filter needs-map" role="group" aria-label="Show ships">
           <button type="button" data-ship-filter="all" aria-pressed="true">All <span>{{ ships.count }}</span></button>
@@ -253,8 +255,9 @@
 </main>
 {% endblock %}
 {% block scripts %}
-<script src="{{ root }}static/vendor/leaflet/leaflet.js"></script>
-<script src="{{ root }}static/basemap.js"></script>
-<script src="{{ root }}static/pins.js"></script>
-<script src="{{ root }}static/map.js"></script>
+{# The text, news and status show first (#104): these wait until the page is read (defer, in
+   this order), and map-loader.js adds the basemap and map.js once the page has painted. #}
+<script defer src="{{ root }}static/vendor/leaflet/leaflet.js"></script>
+<script defer src="{{ root }}static/pins.js"></script>
+<script defer src="{{ root }}static/map-loader.js"></script>
 {% endblock %}

@@ -1,0 +1,79 @@
+# Site speed, before and after (issue #104): the sample site built from main ("before") and
+# from this branch ("after"), measured one after the other on the same GitHub runner with
+# tools/measure_speed.mjs, on the throttled phone profile. A runner has more memory than the
+# owner's laptop and no graphics chip, so it also shows how the chart behaves without one.
+#
+# Measures the sample site only. Changes nothing, publishes nothing, uses no secrets.
+# The local server listens on 127.0.0.1 and the pages load nothing from other sites.
+# Results: in the run's log and its summary page.
+name: Speed
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["issue-104-*"]
+    paths:
+      - static/**
+      - templates/**
+      - haven/render.py
+      - tools/measure_speed.mjs
+      - tools/speed_compare.mjs
+      - .github/workflows/speed.yml
+
+# Read the code, nothing else.
+permissions:
+  contents: read
+
+concurrency:
+  group: speed-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HAVEN_BROWSER: google-chrome
+      # Chrome's sandbox can't start on Ubuntu runners (AppArmor); the browser only ever
+      # opens our own sample site on 127.0.0.1.
+      HAVEN_BROWSER_ARGS: --no-sandbox
+      PAGES: today,day-ships,archive,how-it-works
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # main too, for the "before" site
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Build the sample site, before (main) and after (this branch)
+        run: |
+          python -m haven.render --briefs data/sample/briefs --out "$RUNNER_TEMP/after"
+          git worktree add "$RUNNER_TEMP/main" origin/main
+          (cd "$RUNNER_TEMP/main" && python -m haven.render --briefs data/sample/briefs --out "$RUNNER_TEMP/before")
+
+      # Node 22+ has WebSocket built in; an older Node on the image gets the "ws" package.
+      - name: Check Node
+        run: |
+          node --version
+          node -e "process.exit(globalThis.WebSocket ? 0 : 1)" || npm install --no-save ws@8.18.0
+          google-chrome --version
+          free -m
+
+      # The same measuring script (this branch's) for both sites.
+      - name: Measure before
+        timeout-minutes: 20
+        run: node tools/measure_speed.mjs "$RUNNER_TEMP/before" --runs 3 --profiles phone --pages "$PAGES" --json "$RUNNER_TEMP/before.json"
+
+      - name: Measure after
+        timeout-minutes: 20
+        run: node tools/measure_speed.mjs "$RUNNER_TEMP/after" --runs 3 --profiles phone --pages "$PAGES" --json "$RUNNER_TEMP/after.json"
+
+      - name: Compare
+        run: |
+          node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" | tee -a "$GITHUB_STEP_SUMMARY"

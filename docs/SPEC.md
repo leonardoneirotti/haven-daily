@@ -1054,6 +1054,8 @@ Principle: **fact vs interpretation in two typefaces** — the impact is the onl
 5. **The SIL Open Font License is in `static/fonts/OFL.txt`** (IBM's licence file, copyright line included), published with the site; the Method page credit links it and says the fonts are served from this site.
 6. **No download script:** the files are a one-off copy and don't change; updating them means downloading them again by hand. Where they came from is written in the comment above the rules in `style.css`.
 
+**Loading and budget** *(#104, owner, 18 Nov 2026)*: no font is preloaded. Preloading the four first-screen fonts was tried and measured on the throttled phone: the first text came later (0.60 → 0.94 s on Today), because on a slow connection the fonts hold up the stylesheet; with `font-display: swap` the text shows at once anyway. Our own text uses no letter from the Latin Extended files (tested; a source's headline may, and then the browser loads that file). **Font budget:** the Latin files together at most **240 KB and 11 files** (today 230 KB, 11 files; `tests/test_speed.py`). The style pass (#102) must stay within it.
+
 ### 7.4 Layout
 
 **Wide screens (≥ 64rem): the "stage"**
@@ -1317,6 +1319,12 @@ Measured on a 2× screen: canvas was **13 Mpx**, repaint ~190 ms, setup ~180 ms.
 - **No `backdrop-filter`** on the panel and **no `filter: drop-shadow`** on 40 ship markers (both recomputed every frame while the map moves).
 - Mercator lookup table for detail decoding.
 - Repaint only on `moveend`; during zoom Leaflet scales the canvas with CSS.
+
+**Site speed, #104** (measured 18 Nov 2026, `docs/site-speed.md`; targets on the throttled phone: news and status visible within 1.5 s, map within 2.5 s, a map move under 1 s without a graphics chip):
+- **Text first, chart after:** Leaflet and `pins.js` are deferred; `static/map-loader.js` adds `basemap.js` and `map.js` once the page has painted, with a quiet "Loading chart…" note in the chart frame until then. If either fails to load, the page falls back to its plain-text stand-ins.
+- The High marker's ping plays **3 times**, then stays still (also when markers are rebuilt); none with reduced motion.
+- Per move: the scale bar updates when a move ends (`updateWhenIdle`), the chart colours are read once, the callouts are measured again only on `document.fonts.ready`.
+- Measured before/after on a GitHub runner (`.github/workflows/speed.yml`, `tools/measure_speed.mjs`, `tools/speed_compare.mjs`), never on the owner's laptop (8 GB, often short of memory).
 
 ### 8.7 Testing without the Chrome extension
 

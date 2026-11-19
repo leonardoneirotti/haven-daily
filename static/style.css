@@ -1050,7 +1050,32 @@ html:not(.has-map) .needs-map,
   font-weight: 600;
 }
 
+/* While the chart is on its way (map-loader.js hides it once the chart is drawn). Quiet: grey
+   letters on the water, in the middle of the part of the chart that the panel doesn't cover. */
+.chart-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 402;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+.chart-loading[hidden] {
+  display: none;
+}
+
 @media (min-width: 64rem) {
+  .chart-loading {
+    padding-left: var(--panel-width);
+  }
+
   .chart-note {
     top: 1rem;
     left: calc(var(--panel-width) + 2rem);
@@ -1502,7 +1527,12 @@ html:not(.has-map) .needs-map,
   position: absolute;
   inset: -2px;
   border: 2px solid var(--high);
-  animation: ping 2.6s ease-out infinite;
+  animation: ping 2.6s ease-out 3; /* three times, then a still ring (#104) */
+}
+
+/* map.js adds .ping-done after the three pings: markers rebuilt after a move don't ping again. */
+.ping-done .callout-item.sev-high .num::after {
+  animation: none;
 }
 
 @keyframes ping {
