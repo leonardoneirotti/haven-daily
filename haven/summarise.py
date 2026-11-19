@@ -898,7 +898,8 @@ def brief_item(item: Item, sources: tuple[Source, ...]) -> dict:
     ai = item.ai if item.ai is not None else unrated()
     names = {source.id: source.name for source in sources}
     # A summary written under a publisher's written permission records it, so the page shows the
-    # publisher's note next to it, even after the permission ends (#107, spec §6).
+    # publisher's note next to it and the brief keeps a record of the terms it was written under
+    # (#107, spec §6). After a withdrawal past briefs lose these summaries (spec §11, not built yet).
     permission = next((s.permission for s in sources if s.id == item.source), None)
     written_under = None
     if ai["summary"] and permission is not None:

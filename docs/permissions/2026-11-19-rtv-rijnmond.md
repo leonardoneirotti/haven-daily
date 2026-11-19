@@ -34,8 +34,8 @@
 | Summary | at most **two sentences**, own words, **checked in code** |
 | Impact line | **none** until RTV Rijnmond confirms it in writing |
 | Credit | source name and a direct "Read original" link on every item (as for every source) |
-| Note | next to every Rijnmond summary and on How it works: Haven Daily is an independent project; RTV Rijnmond is not responsible for the AI-generated summaries |
-| Withdrawal | delete the one `permission` line for RTV Rijnmond in `config/sources.toml` (and move its row back under Headline-only in `SOURCES.md`): headline-only again from the next run |
+| Note | next to every Rijnmond summary (card and chart panel): "AI summary, with RTV Rijnmond's permission. Haven Daily is independent; RTV Rijnmond is not responsible for it." On How it works, in full: Haven Daily is an independent project; RTV Rijnmond is not responsible for the AI-generated summaries |
+| Withdrawal | delete the one `permission` line for RTV Rijnmond in `config/sources.toml` (and move its row back under Headline-only in `SOURCES.md`): headline-only again from the next run. Past briefs lose their Rijnmond summaries too and show those items as headline-only, each with a correction (owner's decision, 19 Nov 2026; built only if a withdrawal ever happens) |
 
 How each condition is met: spec §11.
 

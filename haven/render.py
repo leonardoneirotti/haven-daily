@@ -499,9 +499,11 @@ def headline_note(item: dict) -> str | None:
 
 
 # Next to every summary written under a publisher's written permission (#107): the publisher asked
-# that the page makes clear Haven Daily is independent and the publisher not responsible.
-PERMISSION_NOTE = ("Summarised with {source}'s permission. Haven Daily is an independent project; "
-                   "{source} is not responsible for this AI-generated summary.")
+# that the page makes clear Haven Daily is independent and the publisher not responsible. The owner's
+# short wording for card and panel (PR #108 review); How it works has the full sentence
+# (`permission_statement`).
+PERMISSION_NOTE = ("AI summary, with {source}'s permission. Haven Daily is independent; "
+                   "{source} is not responsible for it.")
 SENTENCE_WORDS = {1: "one sentence", 2: "two sentences", 3: "three sentences"}
 
 

@@ -11,8 +11,9 @@ for AI-generated summaries of one or two sentences, on conditions. What these te
   article page is opened;
 - the summary is at most two sentences, checked in code (condition 1), and there is no impact
   line until RTV Rijnmond confirms it;
-- next to every such summary, and on How it works: Haven Daily is an independent project and
-  RTV Rijnmond is not responsible for the AI-generated summaries.
+- next to every such summary (short note, owner's wording, PR #108 review) and on How it works
+  (full wording): Haven Daily is independent and RTV Rijnmond is not responsible for the
+  AI-generated summaries.
 
 Headlines and article text are invented (hard rule 13).
 """
@@ -344,8 +345,9 @@ def test_an_item_without_a_summary_or_from_another_source_records_no_permission(
 
 # --- the page: the note next to every summary, and no impact block -------------------------------
 
-NOTE_PARTS = ("with RTV Rijnmond's permission", "Haven Daily is an independent project",
-              "RTV Rijnmond is not responsible for this AI-generated summary")
+# The owner's short wording for card and panel (PR #108 review, 19 Nov 2026); How it works keeps
+# the full sentence (test_how_it_works_says_haven_daily_is_independent_and_rijnmond_not_responsible).
+NOTE = "AI summary, with RTV Rijnmond's permission. Haven Daily is independent; RTV Rijnmond is not responsible for it."
 
 
 def rijnmond_news(**fields):
@@ -356,16 +358,12 @@ def rijnmond_news(**fields):
 
 
 def test_the_note_names_the_publisher():
-    note = permission_note({"source": "RTV Rijnmond", "permission": {"impact": False}})
-    for part in NOTE_PARTS:
-        assert part in note
+    assert permission_note({"source": "RTV Rijnmond", "permission": {"impact": False}}) == NOTE
 
 
 def test_the_card_shows_the_note_and_no_impact_block(tmp_path):
     text = text_of(card_of(tmp_path, rijnmond_news()))
-    assert TWO in text
-    for part in NOTE_PARTS:
-        assert part in text
+    assert TWO in text and NOTE in text
     assert "Impact for planners" not in text and "Not enough information" not in text
     assert "Affects Labour" in text and "Read original" in text
 
@@ -373,9 +371,7 @@ def test_the_card_shows_the_note_and_no_impact_block(tmp_path):
 def test_the_panel_shows_the_note_next_to_the_summary(tmp_path):
     [entry_html] = panel_entries(render_day(tmp_path, make_brief(items=[rijnmond_news()])))
     text = text_of(entry_html)
-    assert TWO in text
-    for part in NOTE_PARTS:
-        assert part in text
+    assert TWO in text and NOTE in text
 
 
 def test_an_impact_allowed_by_a_later_permission_is_shown(tmp_path):
@@ -383,12 +379,12 @@ def test_an_impact_allowed_by_a_later_permission_is_shown(tmp_path):
                          permission={"granted": "2026-11-19", "max_sentences": 2, "impact": True})
     text = text_of(card_of(tmp_path, item))
     assert "Impact for planners" in text and "Invented impact." in text
-    assert NOTE_PARTS[1] in text
+    assert NOTE in text
 
 
 def test_cards_without_a_permission_have_no_note(tmp_path):
     html = render_day(tmp_path, make_brief(items=[news("high")]))  # older briefs have no such field
-    assert "independent project" not in text_of(html[html.index('class="panel-items"'):])
+    assert "Haven Daily is independent" not in text_of(html[html.index('class="panel-items"'):])
 
 
 # --- How it works -------------------------------------------------------------------------------
