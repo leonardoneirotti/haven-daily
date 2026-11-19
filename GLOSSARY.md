@@ -16,6 +16,10 @@ _Avoid_: Feed, outlet, site, publisher
 The decision on how a source may be used: **use** (headline, link and own-words summary), **headline-only** (headline and link), or **drop** (not collected).
 _Avoid_: Status, permission level
 
+**Written permission**:
+A publisher's written OK for AI summaries of its articles, saved in `docs/permissions/`. It lifts that one source from headline-only to use, on the publisher's conditions (spec §3 rule 12, §11); the source's own verdict stays headline-only.
+_Avoid_: Licence, consent, whitelist
+
 **Discovery service**:
 A service that only finds headlines and links from other sources (GDELT); it is never a source itself, and each result follows its own source's verdict.
 _Avoid_: Aggregator, news API
