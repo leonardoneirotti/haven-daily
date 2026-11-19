@@ -3,6 +3,9 @@
 {% block title %}{% if is_index %}{{ site.name }}{% else %}{{ brief.day | long_date }} · {{ site.name }}{% endif %}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ root }}static/vendor/leaflet/leaflet.css">
+{# The basemap is fetched at once, ahead of the fonts (found only once the stylesheet is in), but
+   runs only after the first paint: map-loader.js adds the script, which takes this download (#104). #}
+<link rel="preload" href="{{ root }}static/basemap.js" as="script" fetchpriority="high">
 {% endblock %}
 {% block topbar_note %}<p class="topbar-note">{{ brief.day | short_date }} · No. {{ "%03d" % brief.edition }}</p>{% endblock %}
 {% block main %}
