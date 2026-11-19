@@ -13,7 +13,8 @@ What it does on every request:
 It also tells a collector whether a source opts out of AI use (hard rule 12): robots.txt
 blocks a named AI crawler for the source's pages, or a `Content-Signal` line says
 `ai-train=no` / `ai-input=no`. A `use` source is then treated as headline-only for the run,
-with a note for the owner to update SOURCES.md.
+with a note for the owner to update SOURCES.md. A source whose publisher gave written
+permission (`Source.permission`, #107) skips that check: the permission is the answer.
 
 robots.txt is parsed here, not with `urllib.robotparser`: the standard-library parser takes
 the *first* matching rule instead of the *longest* (RFC 9309), and ignores `*` and `$`. With
@@ -351,7 +352,15 @@ class Fetcher:
         return None
 
     def source_access(self, source: Source) -> SourceAccess:
-        """A `use` source that opts out of AI use is headline-only for this run, with a note."""
+        """A `use` source that opts out of AI use is headline-only for this run, with a note.
+
+        A source with the publisher's written permission is `use` whatever its robots.txt says
+        about AI crawlers (spec §3 rule 12, owner's decision 19 Nov 2026, #107): the permission is
+        the publisher's own answer, for that publisher only. Its Disallow rules still apply to
+        every request (`fetch`), so hard rule 4 is unchanged.
+        """
+        if source.permission is not None:
+            return SourceAccess(verdict=source.effective_verdict)
         if source.verdict != "use":
             return SourceAccess(verdict=source.verdict)
         for url in source.urls:

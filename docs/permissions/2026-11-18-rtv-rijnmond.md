@@ -36,4 +36,4 @@ When the answer comes, add it to this file (below) and update spec §4, §11, `S
 
 ## Follow-up
 
-*(none yet)*
+- **19 Nov 2026:** RTV Rijnmond gave written permission for AI-generated summaries, on six conditions; saved in its own file, `2026-11-19-rtv-rijnmond.md` (#107).

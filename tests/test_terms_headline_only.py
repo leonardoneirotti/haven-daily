@@ -5,6 +5,9 @@ The owner read both sources' terms on 15 Nov 2026 (spec §4, §11):
 - K+N SeaNews (seaexplorer.com/legal-notice): a limited, non-transferable right to use the content as-is.
 Decision: both headline-only, with a link to the original and no summaries, until each gives
 written permission. These tests read the real config, so the decision can't be undone by accident.
+
+RTV Rijnmond gave that permission on 19 Nov 2026 (#107): its own verdict stays headline-only and a
+`permission` line lifts it to summaries (tests/test_publisher_permission.py).
 """
 
 import re
@@ -66,9 +69,8 @@ def test_kn_item_from_the_real_config_gets_no_summary_or_impact_from_the_ai():
     assert content.startswith("Rate this item from its headline only.")
 
 
-def test_the_method_page_lists_both_under_headline_only():
+def test_the_method_page_lists_kn_under_headline_only_and_rijnmond_under_use_by_permission():
     page = render_method(sources=load_sources())
     groups = dict(re.findall(r'<div class="source-group" id="sources-([\w-]+)">(.*?)</div>', page, re.S))
-    for name in ("RTV Rijnmond", "Kuehne+Nagel SeaNews"):
-        assert name in groups["headline-only"]
-        assert name not in groups["use"]
+    assert "Kuehne+Nagel SeaNews" in groups["headline-only"] and "Kuehne+Nagel SeaNews" not in groups["use"]
+    assert "RTV Rijnmond" in groups["use"] and "RTV Rijnmond" not in groups["headline-only"]  # #107

@@ -42,7 +42,7 @@ THRESHOLDS = RhineThresholds(alert_at_or_below=80, watch_at_or_below=150, watch_
 # The §6 shape: what every brief and brief item must have (sample briefs and spec §6).
 BRIEF_KEYS = {"date", "sample", "built_at", "corrections", "status", "items", "build", "ships"}
 ITEM_KEYS = {"severity", "headline", "url", "source", "language", "published", "summary", "impact",
-             "affects", "access", "written_by", "map", "strike"}
+             "affects", "access", "written_by", "map", "strike", "permission"}  # permission: #107, spec §6
 STATUS_KEYS = {"key", "label", "icon", "value", "level", "place", "observed_at", "source_name",
                "source_url", "note"}
 BUILD_KEYS = {"sources_checked", "items_collected", "duplicates", "items_kept", "summaries",

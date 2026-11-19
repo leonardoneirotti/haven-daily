@@ -628,7 +628,8 @@ def test_known_strikes_are_listed_oldest_first_and_skip_items_without_an_id():
 
 
 BRIEF_ITEM_KEYS = {"severity", "headline", "url", "source", "language", "published", "summary", "impact",
-                   "affects", "access", "written_by", "map", "strike"}
+                   "affects", "access", "written_by", "map", "strike",
+                   "permission"}  # written permission the summary was made under, or None (#107)
 
 
 def test_a_rated_item_maps_to_the_brief_item_shape():
