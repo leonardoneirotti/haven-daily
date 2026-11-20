@@ -1,9 +1,9 @@
 """The social preview image, static/social-preview.png (spec §7.7, issue #95).
 
 LinkedIn and other link previews show it (og:image, #28). It is made by a committed script,
-tools/make_social_preview.py, so it can be remade: 1200 × 630, the site's dark colours,
-"Haven Daily" large, the owner's one-liner below it and "Independent portfolio project" small
-at the bottom, in the self-hosted IBM Plex fonts. Nothing from anyone else: no map data, no
+tools/make_social_preview.py, so it can be remade: 1200 × 630, the site's colours
+(Harbour Light since #102), "Haven Daily" large, the owner's one-liner below it and "Independent
+portfolio project" small at the bottom, in the site's self-hosted fonts (Manrope, IBM Plex Mono). Nothing from anyone else: no map data, no
 photos, no third-party content (hard rule 13).
 """
 
@@ -113,13 +113,13 @@ def test_every_colour_in_the_image_is_a_mix_of_the_tokens_it_names(remade):
     assert not strays, strays[:10]
 
 
-def test_the_fonts_are_the_self_hosted_ibm_plex_files():
+def test_the_fonts_are_the_sites_self_hosted_files():
     css = (STATIC_DIR / "style.css").read_text(encoding="utf-8")
     assert card.FONTS, "the script names the fonts it uses"
     for role, path in card.FONTS.items():
         path = Path(path).resolve()
         assert path.parent == FONTS_DIR.resolve(), (role, path)
-        assert path.name.startswith("ibm-plex-") and path.suffix == ".woff2", (role, path)
+        assert path.name.startswith(("manrope-", "ibm-plex-")) and path.suffix == ".woff2", (role, path)
         assert path.exists() and f"fonts/{path.name}" in css, (role, path)  # a file the site serves
 
 

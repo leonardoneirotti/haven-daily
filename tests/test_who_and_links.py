@@ -75,10 +75,11 @@ def how(pages):
 
 def test_the_one_liner_is_exact_under_the_brand_on_every_page(pages):
     for name, page in pages.items():
-        header = part(page, r'<header class="topbar">.*?</header>')
-        assert ONE_LINER in text_of(header), name
-        # under the brand: after the brand name in the header
-        assert text_of(header).index("Haven Daily") < text_of(header).index(ONE_LINER), name
+        # Under the brand: the header bar holds the brand and the nav; since #102 the one-liner is the
+        # first thing right under it, so it stays put while the bar slides away on scrolling.
+        top = part(page, r'<header class="topbar">.*?</header>\s*<div class="masthead">.*?</div>')
+        assert ONE_LINER in text_of(top), name
+        assert text_of(top).index("Haven Daily") < text_of(top).index(ONE_LINER), name
 
 
 def test_every_page_has_exactly_the_owners_description(pages):
