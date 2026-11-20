@@ -1,106 +1,47 @@
 /* Haven Daily: one stylesheet, no build step.
 
-   One dark palette for the whole site, like a printed relief map under a lamp:
-   warm charcoal, ivory type, charcoal water with fine lines that follow the
-   coast, textured land, teal ships, an orange accent. map.js reads the chart
-   colours from the same tokens.
+   Harbour Light (#102, the owner's pick, 20 Nov 2026): calm and maritime, like a pilot's chart
+   in daylight. Fog-white page, deep navy ink, white cards with soft corners, a pale-blue sea with
+   fine lines that follow the coast, sand-coloured land drawn flat, deep teal ships. map.js reads
+   the chart colours from the same tokens.
 
-   Layout: on wide screens the chart fills the first screen and today's items
-   sit in a panel over its western side (open sea); selecting one flies the
-   chart there. On phones the panel comes first and the chart follows. On a day
-   with nothing on the chart it is only a short strip. The full brief and the
-   port status follow below.
-   Type: IBM Plex. Condensed for headlines and readings, Mono for labels and
-   data (like an instrument panel), Serif only for the planner impact (with a
-   rose label), so interpretation never looks like fact.
-   Colour carries meaning only: severity, status, and ships linked to the news. */
+   Colour carries meaning only: severity (red / amber / slate), status (green / amber / red),
+   ships, the plum label of an interpretation, and one harbour blue for what you can press or
+   have selected. Nothing is coloured for decoration.
 
-/* IBM Plex, self-hosted (#27): the files sit in static/fonts/, so a page never asks
-   Google (or anyone else) for a font and no visitor's IP address leaves the site.
-   They are the exact files Google Fonts served (downloaded 2 Nov 2026), Latin and
-   Latin Extended only: the browser fetches a file only when a page uses a letter
-   in its unicode-range. Plex Sans upright is a variable font: one file, 400-700.
-   Licence: SIL Open Font License 1.1, static/fonts/OFL.txt. */
+   Layout: on wide screens the chart fills the first screen and today's items sit in a panel over
+   its western side (open sea); selecting one flies the chart there. On phones the panel comes
+   first and the chart follows. On a day with nothing on the chart it is only a short strip. The
+   full brief and the port status follow below, as cards.
+   Type: Manrope for text, headlines and labels; IBM Plex Mono for data only (times, readings,
+   AIS text); IBM Plex Serif only for the planner impact (with a plum label) and water names on
+   the chart, so interpretation never looks like fact. */
+
+/* Fonts, self-hosted (#27): the files sit in static/fonts/, so a page never asks Google (or
+   anyone else) for a font and no visitor's IP address leaves the site. Latin and Latin Extended
+   only: the browser fetches a file only when a page uses a letter in its unicode-range.
+   - Manrope: one variable file for every weight, 400-800 (Fontsource @fontsource-variable/manrope
+     5.3.0, from Google Fonts; licence static/fonts/OFL-Manrope.txt).
+   - IBM Plex Mono 400, Plex Serif 400 and Serif italic 400: the files Google Fonts served on
+     2 Nov 2026 (licence static/fonts/OFL.txt).
+   Four Latin files, about 80 KB, where IBM Plex needed eleven (230 KB): the fonts no longer hold
+   up the chart on a slow phone (#102, docs/site-speed.md). */
 
 @font-face {
-  font-family: "IBM Plex Sans";
+  font-family: "Manrope";
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 400 800;
   font-display: swap;
-  src: url("fonts/ibm-plex-sans-400-700-latin.woff2") format("woff2");
+  src: url("fonts/manrope-variable-latin.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: "IBM Plex Sans";
+  font-family: "Manrope";
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 400 800;
   font-display: swap;
-  src: url("fonts/ibm-plex-sans-400-700-latin-ext.woff2") format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: "IBM Plex Sans";
-  font-style: italic;
-  font-weight: 400;
-  font-display: swap;
-  src: url("fonts/ibm-plex-sans-italic-400-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "IBM Plex Sans";
-  font-style: italic;
-  font-weight: 400;
-  font-display: swap;
-  src: url("fonts/ibm-plex-sans-italic-400-latin-ext.woff2") format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: "IBM Plex Sans Condensed";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url("fonts/ibm-plex-sans-condensed-500-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "IBM Plex Sans Condensed";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url("fonts/ibm-plex-sans-condensed-500-latin-ext.woff2") format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: "IBM Plex Sans Condensed";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("fonts/ibm-plex-sans-condensed-600-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "IBM Plex Sans Condensed";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("fonts/ibm-plex-sans-condensed-600-latin-ext.woff2") format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: "IBM Plex Sans Condensed";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("fonts/ibm-plex-sans-condensed-700-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "IBM Plex Sans Condensed";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("fonts/ibm-plex-sans-condensed-700-latin-ext.woff2") format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  src: url("fonts/manrope-variable-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
   font-family: "IBM Plex Mono";
@@ -116,38 +57,6 @@
   font-weight: 400;
   font-display: swap;
   src: url("fonts/ibm-plex-mono-400-latin-ext.woff2") format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: "IBM Plex Mono";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url("fonts/ibm-plex-mono-500-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "IBM Plex Mono";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url("fonts/ibm-plex-mono-500-latin-ext.woff2") format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: "IBM Plex Mono";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("fonts/ibm-plex-mono-600-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "IBM Plex Mono";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("fonts/ibm-plex-mono-600-latin-ext.woff2") format("woff2");
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
@@ -168,22 +77,6 @@
 }
 @font-face {
   font-family: "IBM Plex Serif";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("fonts/ibm-plex-serif-600-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "IBM Plex Serif";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("fonts/ibm-plex-serif-600-latin-ext.woff2") format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: "IBM Plex Serif";
   font-style: italic;
   font-weight: 400;
   font-display: swap;
@@ -200,63 +93,62 @@
 }
 
 :root {
-  --bg: #151311;            /* page */
-  --surface: #211e1a;       /* raised: panels, popups, hovered rows */
-  --surface-2: #2b2723;     /* the selected item */
-  --ink: #f2ebe0;
-  --ink-2: #aea294;
-  --rule: #352f29;
-  --shadow: rgba(0, 0, 0, 0.55);
-  --overprint: #f08ac6;     /* interpretation */
-  --gauge-water: rgba(96, 164, 214, 0.45);
-  --gauge-line: #7cb8e4;
+  --bg: #f3f5f4;            /* page: fog white */
+  --surface: #ffffff;       /* cards, panel, header, popups */
+  --surface-2: #e4eef1;     /* hovered rows, the sample-data note */
+  --ink: #0f2231;           /* deep navy */
+  --ink-2: #4b5e6d;
+  --rule: #d6dee2;          /* hairlines between things */
+  --edge: #728390;          /* the outline of a control: 3:1 on every background it sits on */
+  --shadow: rgba(15, 34, 49, 0.14);
+  --overprint: #8a3a6c;     /* interpretation: the "Impact for planners" label */
+  --overprint-wash: #f8f2f6; /* under the impact text */
+  --gauge-water: rgba(46, 120, 170, 0.3);
+  --gauge-line: #2e78aa;
 
   /* Chart (read by map.js) */
-  --water: #1b1917;
-  --water-line: #a8988a;    /* the lines that follow the coast */
-  --land: #564c44;
-  --land-shadow: rgba(0, 0, 0, 0.65);
-  --coast: #a29384;
-  --road: #463d36;
-  --rail: #4b423a;
-  --tank: #827366;
-  --water-label: #bdb1a3;
-  --land-label: #e6d8c6;
-  --label-halo: rgba(0, 0, 0, 0.85);
-  --ship: #6fd6bc;
+  --water: #dbe7ed;
+  --water-line: #6f97ad;    /* the lines that follow the coast */
+  --land: #efebe3;
+  --land-shadow: rgba(15, 34, 49, 0.16);
+  --coast: #8fa6b3;
+  --road: #d9d2c5;
+  --rail: #cbc2b2;
+  --tank: #c2b8a6;
+  --water-label: #35627d;
+  --land-label: #23384a;
+  --label-halo: rgba(255, 255, 255, 0.92);
+  --ship: #0f8a7c;          /* deep teal */
 
-  /* Controls */
-  --button: #f6f1ea;
-  --on-button: #151311;
-  --accent: #ff801d;
-  --on-accent: #151311;
-  --cta: #fae8d9;
-  --on-cta: #151311;
+  /* Controls: one button set (.btn). The accent marks what is pressed or selected, nothing else. */
+  --accent: #0f6e8c;        /* harbour blue */
+  --on-accent: #ffffff;
+  --btn-h: 2.25rem;         /* 36 px; 44 px on touch screens, below */
+  --btn-radius: 8px;
+  --radius: 14px;           /* cards */
 
   /* Severity: fills for the numbered squares, inks for text */
-  --high: #d93a24;
+  --high: #c8321e;
   --on-high: #ffffff;
-  --high-ink: #ff8b7b;
-  --medium: #f2a51a;
-  --on-medium: #1f1600;
-  --medium-ink: #f5b84f;
-  --low: #607286;
+  --high-ink: #ad2a17;
+  --medium: #eaa419;
+  --on-medium: #231800;
+  --medium-ink: #875800;
+  --low: #5d7186;
   --on-low: #ffffff;
-  --low-ink: #a9b8c6;
-  --ok-ink: #6bd49a;
-  --nodata-ink: #9aa6b1;
+  --low-ink: #475a6d;
+  --ok-ink: #1b7a4c;
+  --nodata-ink: #5f6b77;
 
   /* Logo: signal flags H and D */
   --flag-white: #ffffff;
   --flag-red: #d7262e;
   --flag-yellow: #f5c400;
   --flag-blue: #1c4fa0;
-  --flag-edge: #151311;
+  --flag-edge: #0f2231;
 
-  /* IBM Plex: one engineered family. Sans for text, Condensed for headlines and
-     big readings, Mono for labels, times and AIS data, Serif for interpretation. */
-  --font-sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
-  --font-cond: "IBM Plex Sans Condensed", "Arial Narrow", "IBM Plex Sans", sans-serif;
+  /* Manrope for text, headlines and labels; Mono for data; Serif for interpretation. */
+  --font-sans: "Manrope", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
   --font-serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
 
@@ -264,7 +156,12 @@
   --page-width: 96rem;
   --measure: 62ch;
   --panel-width: 25rem;
-  color-scheme: dark;
+  --topbar-h: 3.5rem;       /* the header bar; things scrolled to stay clear of it */
+  color-scheme: light;
+}
+
+@media (pointer: coarse) {
+  :root { --btn-h: 2.75rem; }
 }
 
 @media (min-width: 40rem) {
@@ -289,7 +186,7 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 1.0625rem;
-  line-height: 1.55;
+  line-height: 1.6;
   overflow-wrap: break-word;
 }
 
@@ -298,7 +195,7 @@ h1, h2, h3, p, dl, dd {
 }
 
 h1, h2, h3 {
-  line-height: 1.1;
+  line-height: 1.15;
   text-wrap: balance;
 }
 
@@ -318,7 +215,7 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -366,9 +263,9 @@ html:not(.has-map) .needs-map,
   top: 1rem;
 }
 
+/* Grey, upright: Manrope has no italic, and a slanted copy of it looks like a mistake. */
 .is-empty {
   color: var(--ink-2);
-  font-style: italic;
 }
 
 .ais-text {
@@ -395,6 +292,53 @@ html:not(.has-map) .needs-map,
   text-decoration-thickness: 2px;
 }
 
+/* ---------- Buttons: one set ----------
+   Every button and button-like link has the same height, corners, border and type: white with a
+   navy label and a grey-blue edge. Pressed or selected, it turns harbour blue. Leaflet makes the
+   zoom buttons itself, so they are named here too. Each button's own rules set only its layout. */
+.btn,
+.leaflet-container .leaflet-bar a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: var(--btn-h);
+  height: auto;
+  margin: 0;
+  padding: 0 0.85rem;
+  border: 1px solid var(--edge);
+  border-radius: var(--btn-radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn:hover,
+.leaflet-container .leaflet-bar a:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.btn[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Over the chart, buttons float a little */
+.chart .btn,
+.leaflet-container .leaflet-bar a {
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
 /* Numbered squares: an item in the list and on the chart */
 .num {
   display: inline-grid;
@@ -402,9 +346,10 @@ html:not(.has-map) .needs-map,
   width: 2.25rem;
   height: 2.25rem;
   flex: none;
-  font-size: 1.375rem;
-  font-weight: 700;
-  font-family: var(--font-cond);
+  border-radius: 7px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  font-family: var(--font-sans);
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -424,9 +369,8 @@ html:not(.has-map) .needs-map,
 
 .sev {
   font-size: 0.75rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  letter-spacing: 0.06em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -452,33 +396,61 @@ html:not(.has-map) .needs-map,
   color: var(--ink);
 }
 
-/* ---------- Top bar ---------- */
+/* ---------- Top bar ----------
+   One white bar: the brand and the navigation. With JavaScript it stays at the top of the window
+   but slides away while you scroll down, and comes back when you scroll up, move the cursor to the
+   top of the screen or tab into it (site.js, #102). Without JavaScript it scrolls away with the
+   page. The one-liner and the sample-data note sit right under it and scroll with the page. */
 
 .topbar {
+  position: relative;
+  z-index: 1100;
+  background: var(--surface);
   border-bottom: 1px solid var(--rule);
+}
+
+html.js .topbar {
+  position: sticky;
+  top: 0;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.topbar.is-stuck {
+  box-shadow: 0 6px 20px rgba(15, 34, 49, 0.08);
+}
+
+.topbar.is-hidden {
+  transform: translateY(-100%);
+  box-shadow: none;
+}
+
+/* Keyboard focus inside the bar always shows it (also before site.js reacts). */
+.topbar:focus-within {
+  transform: none;
 }
 
 .topbar-inner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.25rem 1.25rem;
+  gap: 0 1rem;
+  min-height: 3.5rem;
   max-width: calc(var(--page-width) + 2 * var(--gutter));
   margin-inline: auto;
-  padding: 0.4rem max(var(--gutter), env(safe-area-inset-right, 0px)) 0.4rem max(var(--gutter), env(safe-area-inset-left, 0px));
+  padding: 0 max(var(--gutter), env(safe-area-inset-right, 0px)) 0 max(var(--gutter), env(safe-area-inset-left, 0px));
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.6rem;
   min-height: 44px;
   text-decoration: none;
 }
 
 .flags {
-  width: 2.5rem;
-  height: 1.2rem;
+  width: 2.25rem;
+  height: 1.06rem;
   flex: none;
 }
 
@@ -488,31 +460,30 @@ html:not(.has-map) .needs-map,
 .flag-blue { fill: var(--flag-blue); }
 .flag-edge { fill: none; stroke: var(--flag-edge); stroke-width: 1; }
 
+/* The name in words, not a code in spaced capitals */
 .brand-name {
-  font-size: 1.0625rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
 }
 
 .topbar-note {
   color: var(--ink-2);
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .topbar-tools {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0.25rem 1rem;
   margin-left: auto;
 }
 
 .site-nav ul {
   display: flex;
-  gap: 0.15rem;
+  gap: 0.1rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -527,6 +498,7 @@ html:not(.has-map) .needs-map,
   font-size: 0.9375rem;
   font-weight: 600;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .site-nav a:hover {
@@ -535,43 +507,91 @@ html:not(.has-map) .needs-map,
 
 .site-nav a[aria-current="page"] {
   color: var(--ink);
-  box-shadow: inset 0 -3px 0 var(--ink);
+  box-shadow: inset 0 -3px 0 var(--accent);
 }
 
-/* Phones: navigation gets its own row */
-@media (max-width: 40rem) {
+/* Phones: brand and nav share one row while they fit; the date is in the panel just below. */
+@media (max-width: 47.99rem) {
+  .topbar-note {
+    display: none;
+  }
+}
+
+@media (max-width: 30rem) {
+  .topbar-inner {
+    gap: 0 0.5rem;
+  }
+
+  .brand {
+    gap: 0.45rem;
+  }
+
+  .flags {
+    width: 1.9rem;
+    height: 0.9rem;
+  }
+
+  .brand-name {
+    font-size: 1rem;
+  }
+
+  .site-nav a {
+    padding-inline: 0.4rem;
+    font-size: 0.8125rem;
+  }
+
   .topbar-tools {
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .site-nav {
-    margin-left: -0.6rem;
+    margin-right: -0.4rem;
   }
 }
 
-/* What this is, under the brand on every page (S1, #86) */
-.tagline {
+/* What this is (S1, #86), right under the bar, and the sample-data note (hard rule 10). */
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 1.5rem;
   max-width: calc(var(--page-width) + 2 * var(--gutter));
   margin-inline: auto;
-  padding: 0 max(var(--gutter), env(safe-area-inset-right, 0px)) 0.5rem max(var(--gutter), env(safe-area-inset-left, 0px));
+  padding: 0.55rem max(var(--gutter), env(safe-area-inset-right, 0px)) 0.6rem max(var(--gutter), env(safe-area-inset-left, 0px));
+}
+
+.tagline {
   color: var(--ink-2);
   font-size: 0.875rem;
   line-height: 1.4;
 }
 
 .sample-note {
-  max-width: calc(var(--page-width) + 2 * var(--gutter));
-  margin-inline: auto;
-  padding: 0.35rem max(var(--gutter), env(safe-area-inset-right, 0px)) 0.45rem max(var(--gutter), env(safe-area-inset-left, 0px));
-  color: var(--medium-ink);
+  padding: 0.2rem 0.65rem;
+  background: var(--surface-2);
+  border-radius: 999px;
+  color: var(--ink);
   font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 40rem) {
+  .tagline,
+  .sample-note {
+    font-size: 0.8125rem;
+  }
+
+  .sample-note {
+    border-radius: 10px;
+  }
 }
 
 /* ---------- Stage: the chart, with today's items in a panel over it ---------- */
 
 .stage {
   position: relative;
+}
+
+.chart {
+  /* map.js scrolls up to the chart when an item below is selected; the header comes back then */
+  scroll-margin-top: var(--topbar-h);
 }
 
 .chart-frame {
@@ -585,13 +605,13 @@ html:not(.has-map) .needs-map,
   background: var(--water);
 }
 
-/* Darker towards the edges, as if lit from the centre. Above the map, below its panels and buttons. */
+/* A faint shade at the edges, so the chart reads as a sheet. Above the map, below its panels and buttons. */
 .chart-frame::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 401;
-  box-shadow: inset 0 0 110px 16px rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 80px 0 rgba(15, 34, 49, 0.1);
   pointer-events: none;
 }
 
@@ -623,9 +643,11 @@ html:not(.has-map) .needs-map,
     width: var(--panel-width);
     /* Nearly opaque instead of a blurred glass panel: a blur behind the panel would
        have to be recomputed on every frame while the chart moves. */
-    background: rgba(21, 19, 17, 0.95);
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.97);
     border: 1px solid var(--rule);
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    border-radius: var(--radius);
+    box-shadow: 0 18px 50px rgba(15, 34, 49, 0.18);
   }
 }
 
@@ -638,23 +660,24 @@ html:not(.has-map) .needs-map,
 
 .panel-head h1 {
   color: var(--ink-2);
-  font-family: var(--font-mono);
   font-size: 0.9375rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.3;
 }
 
 .panel-head h1 span {
   display: block;
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.2rem;
   color: var(--ink);
-  font-family: var(--font-sans);
   font-size: clamp(2.3rem, 1.9rem + 1.2vw, 2.9rem);
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.035em;
 }
 
+/* When the list is longer than the panel, a soft shade at the edge that has more shows that it
+   scrolls (critique 7: item 4 was cut mid-line with no hint). The white covers scroll with the
+   list ("local"), the shades stay put, so a shade shows only where there is more to see. */
 .panel-items {
   flex: 1;
   min-height: 0;
@@ -664,6 +687,16 @@ html:not(.has-map) .needs-map,
   list-style: none;
   scrollbar-width: thin;
   scrollbar-color: var(--rule) transparent;
+}
+
+@media (min-width: 64rem) {
+  .panel-items {
+    background:
+      linear-gradient(var(--surface) 30%, rgba(255, 255, 255, 0)) top / 100% 2.5rem no-repeat local,
+      linear-gradient(rgba(255, 255, 255, 0), var(--surface) 70%) bottom / 100% 2.5rem no-repeat local,
+      linear-gradient(rgba(15, 34, 49, 0.12), rgba(15, 34, 49, 0)) top / 100% 0.9rem no-repeat scroll,
+      linear-gradient(rgba(15, 34, 49, 0), rgba(15, 34, 49, 0.16)) bottom / 100% 1.4rem no-repeat scroll;
+  }
 }
 
 .panel-item {
@@ -677,18 +710,19 @@ html:not(.has-map) .needs-map,
 }
 
 .panel-item:hover {
-  background: var(--surface);
+  background: var(--bg);
 }
 
 .panel-item.is-active {
   background: var(--surface-2);
-  border-left-color: var(--ink);
+  border-left-color: var(--accent);
 }
 
 .panel-item .num {
   width: 1.8rem;
   height: 1.8rem;
-  font-size: 1.1rem;
+  border-radius: 6px;
+  font-size: 1.05rem;
 }
 
 .panel-text {
@@ -716,9 +750,9 @@ html:not(.has-map) .needs-map,
 }
 
 .panel-title {
-  font-size: 1.03rem;
+  font-size: 1rem;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .panel-summary {
@@ -751,8 +785,8 @@ html:not(.has-map) .needs-map,
   flex: 1;
   padding: 1.25rem;
   color: var(--ink-2);
-  font-family: var(--font-cond);
   font-size: 1.25rem;
+  font-weight: 700;
 }
 
 /* Port status in brief, like the weather corner of a map */
@@ -792,8 +826,7 @@ html:not(.has-map) .needs-map,
   align-items: center;
   gap: 0.35rem;
   font-size: 1.0625rem;
-  font-weight: 700;
-  font-family: var(--font-cond);
+  font-weight: 800;
   line-height: 1.2;
 }
 
@@ -816,7 +849,7 @@ html:not(.has-map) .needs-map,
 }
 
 .panel-more:hover {
-  background: var(--surface);
+  background: var(--bg);
 }
 
 @media (min-width: 64rem) {
@@ -837,9 +870,23 @@ html:not(.has-map) .needs-map,
 /* Phones and tablets: the brief comes first (#81). The panel, with its item list, sits above
    the chart in the page flow; the chart follows as the index of the list just read. */
 @media (max-width: 63.99rem) {
+  .panel {
+    background: var(--surface);
+    border-block: 1px solid var(--rule);
+  }
+
   .panel-item {
     padding-right: var(--gutter);
     padding-left: calc(var(--gutter) - 3px);
+  }
+
+  /* The ship filter fits one row on a phone: the same buttons, a little narrower */
+  .chart-filter {
+    gap: 4px;
+  }
+
+  .chart-filter .btn {
+    padding-inline: 0.55rem;
   }
 }
 
@@ -855,7 +902,7 @@ html:not(.has-map) .needs-map,
 }
 
 .stage-empty .chart-frame::after {
-  box-shadow: inset 0 0 60px 8px rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 40px 0 rgba(15, 34, 49, 0.08);
 }
 
 @media (min-width: 64rem) {
@@ -869,9 +916,10 @@ html:not(.has-map) .needs-map,
   .stage-empty .panel {
     position: static;
     width: auto;
-    background: var(--bg);
+    background: var(--surface);
     border: 0;
     border-right: 1px solid var(--rule);
+    border-radius: 0;
     box-shadow: none;
   }
 
@@ -909,16 +957,18 @@ html:not(.has-map) .needs-map,
   padding-top: 2.5rem;
 }
 
+/* The port status column is wider than before (24rem), so two dials fit side by side without
+   12 px text (critique 6). It stays put while the brief scrolls, below the header when it shows. */
 @media (min-width: 64rem) {
   .brief-layout {
-    grid-template-columns: minmax(0, 1fr) 24rem;
-    column-gap: 4rem;
-    padding-top: 4rem;
+    grid-template-columns: minmax(0, 1fr) 28rem;
+    column-gap: 3.5rem;
+    padding-top: 3.5rem;
   }
 
   .brief-layout .status {
     position: sticky;
-    top: 1rem;
+    top: calc(var(--topbar-h) + 1rem);
     align-self: start;
   }
 }
@@ -929,11 +979,10 @@ html:not(.has-map) .needs-map,
 
 .section-title {
   padding-bottom: 0.6rem;
-  border-bottom: 3px solid var(--ink);
-  font-family: var(--font-sans);
-  letter-spacing: -0.02em;
+  border-bottom: 1px solid var(--rule);
+  letter-spacing: -0.03em;
   font-size: clamp(1.75rem, 1.5rem + 1vw, 2.25rem);
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .brief-intro {
@@ -941,6 +990,7 @@ html:not(.has-map) .needs-map,
   color: var(--ink-2);
 }
 
+/* Ship filter: a row of ordinary buttons; the one pressed shows which ships are on the chart. */
 .chart-filter {
   position: absolute;
   top: 10px;
@@ -948,39 +998,14 @@ html:not(.has-map) .needs-map,
   z-index: 450;
   display: flex;
   flex-wrap: wrap;
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  box-shadow: 0 4px 14px var(--shadow);
-}
-
-.chart-filter button,
-.chart-focus button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  min-height: 32px;
-  padding: 0 0.6rem;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.chart-filter button + button {
-  border-left: 1px solid var(--rule);
+  gap: 6px;
+  max-width: calc(100% - 20px);
 }
 
 .chart-filter button span {
   color: var(--ink-2);
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-}
-
-.chart-filter button[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--bg);
 }
 
 .chart-filter button[aria-pressed="true"] span {
@@ -989,17 +1014,22 @@ html:not(.has-map) .needs-map,
 
 .chart-focus {
   position: absolute;
-  top: 54px;
+  top: calc(var(--btn-h) + 20px);
   left: 10px;
   z-index: 450;
   display: flex;
   align-items: center;
   gap: 0.75rem;
   max-width: calc(100% - 20px);
-  padding: 0.4rem 0.4rem 0.4rem 0.5rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.6rem;
   background: var(--surface);
   border: 1px solid var(--rule);
+  border-radius: var(--btn-radius);
   box-shadow: 0 4px 14px var(--shadow);
+}
+
+.chart-focus .btn {
+  box-shadow: none;
 }
 
 .chart-focus[hidden] {
@@ -1017,11 +1047,8 @@ html:not(.has-map) .needs-map,
 .chart-focus-text .num {
   width: 1.6rem;
   height: 1.6rem;
-  font-size: 1rem;
-}
-
-.chart-focus button {
-  border-left: 1px solid var(--rule);
+  border-radius: 5px;
+  font-size: 0.95rem;
 }
 
 @media (min-width: 40rem) {
@@ -1059,6 +1086,7 @@ html:not(.has-map) .needs-map,
   padding: 0.45rem 0.7rem;
   background: var(--surface);
   border: 1px solid var(--medium-ink);
+  border-radius: var(--btn-radius);
   box-shadow: 0 4px 14px var(--shadow);
   font-size: 0.8125rem;
   font-weight: 600;
@@ -1074,10 +1102,9 @@ html:not(.has-map) .needs-map,
   place-items: center;
   margin: 0;
   color: var(--ink-2);
-  font-family: var(--font-mono);
   font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   pointer-events: none;
 }
 
@@ -1113,8 +1140,9 @@ html:not(.has-map) .needs-map,
     z-index: 450;
     max-width: calc(100% - var(--panel-width) - 9rem);
     padding: 0.45rem 0.8rem;
-    background: rgba(21, 19, 17, 0.85);
+    background: rgba(255, 255, 255, 0.92);
     border: 1px solid var(--rule);
+    border-radius: var(--btn-radius);
   }
 }
 
@@ -1140,10 +1168,11 @@ html:not(.has-map) .needs-map,
   place-items: center;
   width: 1.1rem;
   height: 1.1rem;
+  border-radius: 4px;
   background: var(--ink);
-  color: var(--bg);
+  color: var(--surface);
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 /* ---------- Leaflet, restyled for the chart ---------- */
@@ -1154,7 +1183,9 @@ html:not(.has-map) .needs-map,
   font-size: 0.8125rem;
 }
 
-/* Zoom: two separate ivory squares; above them the orange "whole port" button */
+/* Zoom: two square buttons from the shared set (.btn, above); above them "Whole port", another
+   button of the same set. It used to be the only filled orange button, beside amber squares that
+   mean Medium, so it read like a severity (critique 10). */
 .leaflet-container .leaflet-bar {
   display: grid;
   gap: 6px;
@@ -1164,40 +1195,27 @@ html:not(.has-map) .needs-map,
 }
 
 .leaflet-container .leaflet-bar a {
-  width: 32px;
-  height: 32px;
-  line-height: 32px;
-  background: var(--button);
-  color: var(--on-button);
-  border: 0;
-  border-radius: 0;
-  box-shadow: 0 3px 10px var(--shadow);
+  width: var(--btn-h);
+  padding: 0;
 }
 
-.leaflet-container .leaflet-bar a:hover {
-  background: #ffffff;
+/* The + and - are Leaflet's own text: drawn larger, like the icon in the button above them. */
+.leaflet-container .leaflet-bar a.leaflet-control-zoom-in,
+.leaflet-container .leaflet-bar a.leaflet-control-zoom-out {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .leaflet-container .leaflet-bar a.leaflet-disabled {
-  background: var(--surface);
-  color: var(--ink-2);
+  background: var(--bg);
+  color: var(--nodata-ink);
+  cursor: default;
 }
 
 .chart-home {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
+  width: var(--btn-h);
   padding: 0;
-  border: 0;
-  background: var(--accent);
-  color: var(--on-accent);
-  box-shadow: 0 3px 10px var(--shadow);
-  cursor: pointer;
-}
-
-.chart-home:hover {
-  filter: brightness(1.1);
 }
 
 /* "Whole port" in words on wide screens only (S10, #82); phones keep the icon square. */
@@ -1207,16 +1225,12 @@ html:not(.has-map) .needs-map,
 
 @media (min-width: 64rem) {
   .chart-home {
-    grid-auto-flow: column;
-    gap: 0.4rem;
     width: auto;
-    padding: 0 0.7rem 0 0.55rem;
+    padding: 0 0.8rem 0 0.65rem;
   }
 
   .chart-home-label {
     display: inline;
-    font-size: 0.8125rem;
-    font-weight: 700;
   }
 }
 
@@ -1228,7 +1242,7 @@ html:not(.has-map) .needs-map,
 }
 
 .leaflet-container .leaflet-control-attribution {
-  background: rgba(26, 24, 22, 0.75);
+  background: rgba(255, 255, 255, 0.85);
   color: var(--ink-2);
   font-size: 0.6875rem;
 }
@@ -1242,8 +1256,11 @@ html:not(.has-map) .needs-map,
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--rule);
-  border-radius: 0;
   box-shadow: 0 12px 32px var(--shadow);
+}
+
+.chart-popup .leaflet-popup-content-wrapper {
+  border-radius: var(--radius);
 }
 
 .chart-popup .leaflet-popup-content {
@@ -1257,9 +1274,8 @@ html:not(.has-map) .needs-map,
 }
 
 .pop-name {
-  font-family: var(--font-cond);
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.2rem;
+  font-weight: 800;
   line-height: 1.2;
 }
 
@@ -1288,30 +1304,22 @@ html:not(.has-map) .needs-map,
   color: var(--ink-2);
 }
 
-/* A pale button, with the item's severity colour down its left edge */
+/* A button of the shared set, full width, with the item's severity colour down its left edge */
 .pop-news {
-  display: block;
+  justify-content: flex-start;
   width: 100%;
   margin-top: 0.85rem;
-  padding: 0.55rem 0.75rem;
-  border: 0;
   border-left: 4px solid var(--low);
-  background: var(--cta);
-  color: var(--on-cta);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
   text-align: left;
-  text-transform: uppercase;
-  cursor: pointer;
+  white-space: normal;
 }
 
-.pop-news.sev-high { border-left-color: var(--high); color: var(--on-cta); }
-.pop-news.sev-medium { border-left-color: var(--medium); color: var(--on-cta); }
-.pop-news.sev-unrated { border-left-color: var(--nodata-ink); color: var(--on-cta); }
+.pop-news.sev-high { border-left-color: var(--high); }
+.pop-news.sev-medium { border-left-color: var(--medium); }
+.pop-news.sev-unrated { border-left-color: var(--nodata-ink); }
 
-/* Place names: water in italic (the chart convention), land in spaced mono capitals
-   like a map overlay, the city in condensed capitals */
+/* Place names: water in serif italic (the chart convention), land in small spaced capitals,
+   the city in bold capitals; a white halo keeps each clear of the lines under it. */
 .chart-label span {
   position: absolute;
   left: 0;
@@ -1332,19 +1340,17 @@ html:not(.has-map) .needs-map,
 
 .chart-label-land span {
   color: var(--land-label);
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.16em;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .chart-label-city span {
   color: var(--ink);
-  font-family: var(--font-cond);
-  font-size: 1.125rem;
-  font-weight: 700;
-  letter-spacing: 0.24em;
+  font-size: 1.0625rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
@@ -1377,16 +1383,17 @@ html:not(.has-map) .needs-map,
   cursor: pointer;
 }
 
-/* A dark outline instead of a drop shadow: filters on 40 moving symbols are slow */
+/* A white outline instead of a drop shadow (filters on 40 moving symbols are slow): it lifts the
+   hull off the pale sea and off the lines in the water */
 .ship .hull {
   fill: var(--ship);
-  stroke: rgba(0, 0, 0, 0.8);
+  stroke: rgba(255, 255, 255, 0.9);
   stroke-width: 1.2px;
   vector-effect: non-scaling-stroke;
 }
 
 .ship .deck {
-  fill: rgba(0, 0, 0, 0.42);
+  fill: rgba(255, 255, 255, 0.35);
 }
 
 /* Under way: a wake behind the stern, longer when faster */
@@ -1432,7 +1439,7 @@ html:not(.has-map) .needs-map,
   display: inline;
 }
 
-.chart-map[data-zoom="far"] .chart-label-land span { font-size: 0.6875rem; }
+.chart-map[data-zoom="far"] .chart-label-land span { font-size: 0.625rem; }
 
 /* Focus: one item or one group of ships stands out, the rest steps back */
 .chart-map.is-focused .ship:not(.is-hot) { opacity: 0.3; }
@@ -1521,19 +1528,19 @@ html:not(.has-map) .needs-map,
 
 .callout .num {
   position: relative;
-  box-shadow: 0 0 0 2px var(--bg);
+  box-shadow: 0 0 0 2px var(--surface), 0 4px 10px rgba(15, 34, 49, 0.25);
   transition: transform 0.2s;
 }
 
-/* On the chart an unrated square sits on the page colour, so lines and ships don't show through it */
+/* On the chart an unrated square is filled white, so lines and ships don't show through it */
 .callout .num-unrated {
-  background: var(--bg);
+  background: var(--surface);
 }
 
 .callout-item.is-hover .num,
 .callout-item.is-active .num {
   transform: scale(1.2);
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
 }
 
 .callout-item.sev-high .num::after {
@@ -1541,6 +1548,7 @@ html:not(.has-map) .needs-map,
   position: absolute;
   inset: -2px;
   border: 2px solid var(--high);
+  border-radius: 9px;
   animation: ping 2.6s ease-out 3; /* three times, then a still ring (#104) */
 }
 
@@ -1554,12 +1562,17 @@ html:not(.has-map) .needs-map,
   70%, 100% { transform: scale(2); opacity: 0; }
 }
 
+/* The item's label on its own small card, so it stays readable over place names and lines
+   ("Terminal strike" sat over "MAASVLAKTE 2", critique 8). */
 .callout-label {
+  padding: 0.1rem 0.45rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(15, 34, 49, 0.15);
   color: var(--ink);
-  font-family: var(--font-cond);
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-weight: 700;
-  text-shadow: 0 0 2px var(--bg), 0 0 6px var(--bg), 0 0 10px var(--bg);
 }
 
 /* ---------- Port status ---------- */
@@ -1575,14 +1588,13 @@ html:not(.has-map) .needs-map,
   justify-content: space-between;
   gap: 0.25rem 1rem;
   padding-bottom: 0.6rem;
-  border-bottom: 3px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
 }
 
 .status-head h2 {
-  font-family: var(--font-sans);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   font-size: clamp(1.75rem, 1.5rem + 1vw, 2.25rem);
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .status-head a {
@@ -1590,31 +1602,33 @@ html:not(.has-map) .needs-map,
   font-size: 0.8125rem;
 }
 
+/* Each dial a card. Two side by side; four on a tablet; one on a narrow phone. */
 .dials {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 0;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
   padding: 0;
   list-style: none;
 }
 
+@media (max-width: 24rem) {
+  .dials { grid-template-columns: minmax(0, 1fr); }
+}
+
 @media (min-width: 40rem) and (max-width: 63.99rem) {
   .dials { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .dial:nth-child(odd):not(:first-child) { padding-left: 1rem; border-left: 1px solid var(--rule); }
 }
 
 .dial {
   display: grid;
   align-content: start;
-  gap: 0.35rem;
+  gap: 0.4rem;
   min-width: 0;
-  padding: 0.85rem 0.9rem 0.95rem 0;
-  border-bottom: 1px solid var(--rule);
-}
-
-.dial:nth-child(even) {
-  padding-left: 0.9rem;
-  border-left: 1px solid var(--rule);
+  padding: 0.9rem 1rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
 }
 
 .dial-label {
@@ -1622,8 +1636,8 @@ html:not(.has-map) .needs-map,
   align-items: center;
   gap: 0.4rem;
   color: var(--ink-2);
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 700;
 }
 
 .dial-reading {
@@ -1635,16 +1649,17 @@ html:not(.has-map) .needs-map,
 }
 
 .dial-value {
-  font-size: 2.6rem;
-  font-weight: 700;
-  font-family: var(--font-cond);
+  font-size: 2.4rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
   line-height: 0.95;
   font-variant-numeric: tabular-nums;
 }
 
 .dial-value.is-text {
-  font-size: 1.625rem;
-  line-height: 1;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
 }
 
 .dial-value.is-missing {
@@ -1656,14 +1671,16 @@ html:not(.has-map) .needs-map,
   color: var(--ink-2);
   font-size: 1rem;
   font-weight: 600;
-
+  letter-spacing: 0;
 }
 
+/* 13 px at the smallest, where it was 12 and 11 px (critique 6) */
 .dial-place,
 .dial-note,
 .dial-meta {
   color: var(--ink-2);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
 }
 
 .dial-place {
@@ -1674,7 +1691,7 @@ html:not(.has-map) .needs-map,
   display: flex;
   flex-wrap: wrap;
   gap: 0.15rem 0.8rem;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
 }
 
 /* Level + meaning wrap as one sentence; the change since yesterday goes on its own line */
@@ -1705,10 +1722,10 @@ html:not(.has-map) .needs-map,
   color: var(--ink);
 }
 
-/* Weather: KNMI's own level next to ours (MeteoAlarm requirement) */
+/* Weather: KNMI's own level next to ours (MeteoAlarm requirement): data, so mono */
 .dial-mapping {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
 }
 
 /* Strike flag: the item(s) that decided it */
@@ -1718,8 +1735,8 @@ html:not(.has-map) .needs-map,
   margin: 0.1rem 0 0;
   padding: 0;
   list-style: none;
-  font-size: 0.8125rem;
-  line-height: 1.35;
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 .dial-links a { color: var(--ink); }
@@ -1727,15 +1744,15 @@ html:not(.has-map) .needs-map,
 
 .dial-link-role {
   display: block;
-  color: var(--medium-ink);
-  font-size: 0.75rem;
-  font-weight: 600;
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  font-weight: 700;
 }
 
 .dial-link-meta {
   display: block;
   color: var(--ink-2);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
 }
 
 .dial-link-meta a { color: var(--ink-2); }
@@ -1743,8 +1760,8 @@ html:not(.has-map) .needs-map,
 /* MeteoAlarm's disclaimer, verbatim, under the weather dial */
 .dial-disclaimer {
   color: var(--ink-2);
-  font-size: 0.6875rem;
-  line-height: 1.4;
+  font-size: 0.75rem;
+  line-height: 1.45;
 }
 
 /* River gauge: a board with alternating marks on its left half, water rising from below, and
@@ -1762,9 +1779,10 @@ html:not(.has-map) .needs-map,
   width: 1.25rem;
   overflow: hidden;
   border: 1px solid var(--ink-2);
+  border-radius: 3px;
   background:
-    linear-gradient(to right, transparent 50%, var(--bg) 50%),
-    repeating-linear-gradient(to top, var(--ink) 0 2.5%, var(--bg) 2.5% 5%);
+    linear-gradient(to right, transparent 50%, var(--surface) 50%),
+    repeating-linear-gradient(to top, var(--ink) 0 2.5%, var(--surface) 2.5% 5%);
 }
 
 .gauge-water {
@@ -1794,7 +1812,7 @@ html:not(.has-map) .needs-map,
 
 .gauge-scale {
   position: relative;
-  width: 1.6rem;
+  width: 1.9rem;
 }
 
 .gauge-tick {
@@ -1802,7 +1820,7 @@ html:not(.has-map) .needs-map,
   left: 0;
   transform: translateY(50%);
   font-family: var(--font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1;
 }
 
@@ -1817,14 +1835,14 @@ html:not(.has-map) .needs-map,
   gap: 0.25rem 1rem;
   color: var(--ink-2);
   font-size: 0.75rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  letter-spacing: 0.08em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
+/* "Archived. Go to today": a link, so the link colour, not amber (amber means Medium/Watch) */
 .kicker a {
-  color: var(--medium-ink);
+  color: var(--accent);
 }
 
 .publication {
@@ -1837,31 +1855,42 @@ html:not(.has-map) .needs-map,
   white-space: nowrap;
 }
 
+/* Each item a white card with soft corners (the page below the first screen used to be one
+   flat column with 1 px rules, critique 3). The selected one gets a harbour-blue edge. */
 .items {
-  margin: 0;
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0 0;
   padding: 0;
   list-style: none;
 }
 
 .item {
-  margin-inline: -0.9rem;
-  padding: 1.35rem 0.9rem 1.45rem;
-  border-bottom: 1px solid var(--rule);
-  scroll-margin-top: 1rem;
-  transition: background-color 0.2s;
+  padding: 1.35rem 1.5rem 1.45rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(15, 34, 49, 0.05);
+  scroll-margin-top: calc(var(--topbar-h) + 1rem);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+@media (max-width: 40rem) {
+  .item {
+    padding: 1.1rem 1rem 1.2rem;
+  }
 }
 
 .has-map .item[data-place] {
   cursor: pointer;
 }
 
-.has-map .item[data-place]:hover,
-.item.is-active {
-  background: var(--surface);
+.has-map .item[data-place]:hover {
+  border-color: var(--edge);
 }
 
 .item.is-active {
-  box-shadow: inset 4px 0 0 var(--ink);
+  box-shadow: inset 4px 0 0 var(--accent), 0 6px 20px rgba(15, 34, 49, 0.1);
 }
 
 .item article {
@@ -1885,10 +1914,10 @@ html:not(.has-map) .needs-map,
 }
 
 .item-title {
-  font-size: clamp(1.4rem, 1.2rem + 0.6vw, 1.75rem);
-  font-weight: 700;
-  font-family: var(--font-cond);
-  line-height: 1.06;
+  font-size: clamp(1.3rem, 1.15rem + 0.5vw, 1.6rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.18;
 }
 
 .item-title a {
@@ -1916,19 +1945,20 @@ html:not(.has-map) .needs-map,
   color: var(--ink-2);
 }
 
+/* The interpretation on a faint plum wash, under its plum label: never mistaken for the facts above */
 .item-impact {
   display: grid;
-  gap: 0.35rem;
-  padding-top: 0.7rem;
-  border-top: 1px solid var(--rule);
+  gap: 0.4rem;
+  padding: 0.8rem 1rem 0.9rem;
+  background: var(--overprint-wash);
+  border-radius: 10px;
 }
 
 .impact-label {
   color: var(--overprint);
   font-size: 0.75rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  letter-spacing: 0.07em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -1959,53 +1989,30 @@ html:not(.has-map) .needs-map,
   color: var(--ink);
 }
 
+/* "Show on chart", "Read original", "Read in English": buttons of the shared set, side by side */
 .item-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem 1.1rem;
-  margin-top: 0.2rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.item-actions a {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 2rem;
-}
-
-.chart-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-height: 34px;
-  padding: 0 0.75rem;
-  border: 1.5px solid var(--ink);
-  background: transparent;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.chart-button:hover,
-.chart-button[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--bg);
+  gap: 0.5rem;
+  margin-top: 0.35rem;
 }
 
 .quiet {
   display: grid;
   gap: 0.75rem;
-  padding-block: 2rem;
-  border-bottom: 1px solid var(--rule);
+  margin-top: 1.25rem;
+  padding: 1.75rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
 }
 
 .quiet h3 {
-  font-size: clamp(2rem, 1.5rem + 2vw, 3rem);
-  font-weight: 700;
-  font-family: var(--font-cond);
-  line-height: 0.95;
+  font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
 
 .quiet p {
@@ -2025,7 +2032,7 @@ html:not(.has-map) .needs-map,
   align-items: baseline;
   gap: 0.2rem 1rem;
   padding-block: 0.9rem;
-  border-top: 3px solid var(--ink);
+  border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
   cursor: pointer;
   list-style: none;
@@ -2052,8 +2059,8 @@ html:not(.has-map) .needs-map,
 .ship-list summary h2 {
   display: inline;
   font-size: 1.375rem;
-  font-weight: 700;
-  font-family: var(--font-cond);
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .ship-list summary span {
@@ -2081,7 +2088,7 @@ tr.is-linked th {
 
 .table-scroll {
   overflow-x: auto;
-  border-top: 2px solid var(--ink);
+  border-top: 1px solid var(--edge);
 }
 
 table {
@@ -2103,9 +2110,8 @@ td {
 thead th {
   color: var(--ink-2);
   font-size: 0.75rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  letter-spacing: 0.06em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -2125,10 +2131,13 @@ td.ais-text {
 
 /* ---------- About this project (Today page, L2, #86): laid out like the build notes ---------- */
 
+/* About and "How this brief was made": sections with a heading on the left, set off by a rule */
 .about {
   display: grid;
   gap: 1.25rem;
-  padding-block: 3rem 0;
+  margin-top: 3.5rem;
+  padding-top: 2.5rem;
+  border-top: 1px solid var(--rule);
 }
 
 @media (min-width: 64rem) {
@@ -2137,8 +2146,8 @@ td.ais-text {
 
 .about h2 {
   font-size: 1.375rem;
-  font-weight: 700;
-  font-family: var(--font-cond);
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .about-body {
@@ -2171,7 +2180,9 @@ td.ais-text {
 .notes {
   display: grid;
   gap: 1.25rem;
-  padding-block: 3rem 2.5rem;
+  margin-top: 3rem;
+  padding-block: 2.5rem;
+  border-top: 1px solid var(--rule);
 }
 
 @media (min-width: 64rem) {
@@ -2180,8 +2191,8 @@ td.ais-text {
 
 .notes h2 {
   font-size: 1.375rem;
-  font-weight: 700;
-  font-family: var(--font-cond);
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .notes-body {
@@ -2201,9 +2212,9 @@ td.ais-text {
 }
 
 .stats dd {
-  font-size: 2.25rem;
-  font-weight: 700;
-  font-family: var(--font-cond);
+  font-size: 2.1rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -2213,7 +2224,7 @@ td.ais-text {
   margin-top: 0.35rem;
   font-size: 1.0625rem;
   font-weight: 600;
-  font-family: var(--font-sans);
+  letter-spacing: 0;
   line-height: 1.3;
 }
 
@@ -2285,7 +2296,7 @@ td.ais-text {
   align-items: center;
   gap: 1rem;
   padding-block: 1rem 3rem;
-  border-top: 3px solid var(--ink);
+  border-top: 1px solid var(--rule);
   font-weight: 700;
 }
 
@@ -2308,8 +2319,11 @@ td.ais-text {
 
 /* ---------- Footer ---------- */
 
+/* White, in two columns on wide screens: what this is and the privacy note on the left, the
+   links and credits on the right (it was a block of small grey text, critique 5). */
 .site-footer {
-  border-top: 1px solid var(--ink);
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
   color: var(--ink-2);
   font-size: 0.875rem;
 }
@@ -2317,13 +2331,29 @@ td.ais-text {
 .footer-inner {
   display: grid;
   gap: 1rem;
-  padding-block: 2.25rem 2.75rem;
+  padding-block: 2.5rem 3rem;
+}
+
+@media (min-width: 52rem) {
+  .footer-inner {
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 22rem);
+    column-gap: 4rem;
+    align-items: start;
+  }
+
+  .footer-inner > .disclaimer,
+  .footer-inner > .privacy { grid-column: 1; }
+
+  .footer-inner > .footer-links { grid-column: 2; grid-row: 1 / span 2; }
+
+  .footer-inner > .credits { grid-column: 2; }
 }
 
 .disclaimer {
   max-width: var(--measure);
   color: var(--ink);
   font-size: 1rem;
+  font-weight: 600;
 }
 
 .privacy {
@@ -2339,6 +2369,12 @@ td.ais-text {
   list-style: none;
 }
 
+@media (min-width: 52rem) {
+  .footer-links {
+    flex-direction: column;
+  }
+}
+
 .footer-links a {
   display: inline-flex;
   align-items: center;
@@ -2348,59 +2384,72 @@ td.ais-text {
 
 /* ---------- Archive and Method pages ---------- */
 
+/* A page title, not a poster: it was 88 px over small body text (critique 4). */
 .page-head {
   display: grid;
   gap: 0.75rem;
-  padding-block: 2.75rem 2rem;
+  padding-block: 2.5rem 2rem;
 }
 
 .page-title {
-  font-size: clamp(3rem, 2rem + 4vw, 5.5rem);
-  font-weight: 700;
-  font-family: var(--font-cond);
-  line-height: 0.88;
+  font-size: clamp(2.25rem, 1.6rem + 2.4vw, 3.5rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
 }
 
 .page-lede {
-  max-width: 34em;
+  max-width: 40em;
   color: var(--ink-2);
   font-size: 1.1875rem;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
+/* Archive: each month a white card of day rows, the full width of the page */
 .month {
-  max-width: 64rem;
-  padding-bottom: 3rem;
+  padding-bottom: 2.5rem;
 }
 
 .month h2 {
   padding-bottom: 0.6rem;
-  border-bottom: 3px solid var(--ink);
   font-size: 1.375rem;
-  font-weight: 700;
-  font-family: var(--font-cond);
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .days {
   margin: 0;
   padding: 0;
   list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.days li + li {
+  border-top: 1px solid var(--rule);
 }
 
 .day-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0.6rem;
-  padding-block: 1.1rem;
-  border-bottom: 1px solid var(--rule);
+  padding: 1.1rem 1.25rem;
   text-decoration: none;
+  transition: background-color 0.15s;
+}
+
+.day-row:hover {
+  background: var(--bg);
 }
 
 @media (min-width: 52rem) {
   .day-row {
-    grid-template-columns: 8.5rem auto minmax(0, 1fr) auto;
-    column-gap: 1.75rem;
+    grid-template-columns: 9rem auto minmax(0, 1fr) auto;
+    column-gap: 2rem;
     align-items: center;
+    padding-inline: 1.5rem;
   }
 }
 
@@ -2415,9 +2464,9 @@ td.ais-text {
 }
 
 .day-date {
-  font-size: 1.625rem;
-  font-weight: 700;
-  font-family: var(--font-cond);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 
@@ -2436,19 +2485,25 @@ td.ais-text {
   place-items: center;
   width: 1.5rem;
   height: 1.5rem;
-  font-size: 0.875rem;
-  font-weight: 700;
-  font-family: var(--font-cond);
+  border-radius: 5px;
+  font-size: 0.8125rem;
+  font-weight: 800;
 }
 
-.slot-empty {
-  border: 1px solid var(--rule);
+/* No item in this slot: a short dash, not a box. Unrated items keep their outlined square, so the
+   two no longer look alike (critique 12). */
+.slot-empty::before {
+  content: "";
+  width: 0.6rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--rule);
 }
 
 .day-top {
   font-size: 1.0625rem;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .day-top.is-quiet {
@@ -2482,12 +2537,15 @@ td.ais-text {
 .mark-alert { color: var(--high-ink); }
 .mark-nodata { color: var(--nodata-ink); }
 
-/* Contents list at the top of "How it works" (S3, #86) */
+/* Contents list at the top of "How it works" (S3, #86): a white card. On wide screens it stands
+   beside the text and stays in view while you read (the page used half the width, critique 4). */
 .contents {
   max-width: 48rem;
-  margin-bottom: 2.75rem;
+  margin-bottom: 2.5rem;
   padding: 1rem 1.25rem;
+  background: var(--surface);
   border: 1px solid var(--rule);
+  border-radius: var(--radius);
 }
 
 .contents ol {
@@ -2501,9 +2559,44 @@ td.ais-text {
   break-inside: avoid;
 }
 
-.contents a {
-  display: inline-block;
+.contents li {
   padding-block: 0.3rem;
+}
+
+.contents a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.contents a:hover {
+  text-decoration: underline;
+}
+
+@media (min-width: 72rem) {
+  .page-method {
+    display: grid;
+    grid-template-columns: 18rem minmax(0, 50rem);
+    column-gap: 4rem;
+    align-items: start;
+  }
+
+  .page-method .page-head {
+    grid-column: 1 / -1;
+  }
+
+  .page-method .contents {
+    position: sticky;
+    top: calc(var(--topbar-h) + 1.5rem);
+    margin-bottom: 0;
+  }
+
+  .page-method .contents ol {
+    columns: auto;
+  }
+
+  .page-method .prose {
+    grid-column: 2;
+  }
 }
 
 /* Phones: each status icon gets its short name as text (design review S9, #84), since a
@@ -2553,12 +2646,16 @@ td.ais-text {
   gap: 0.9rem;
 }
 
+.prose section {
+  scroll-margin-top: calc(var(--topbar-h) + 1rem);
+}
+
 .prose h2 {
   padding-bottom: 0.5rem;
-  border-bottom: 3px solid var(--ink);
-  font-size: clamp(1.625rem, 1.35rem + 1vw, 2.125rem);
-  font-weight: 700;
-  font-family: var(--font-cond);
+  border-bottom: 1px solid var(--rule);
+  font-size: clamp(1.5rem, 1.3rem + 0.9vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 
 .prose p,
@@ -2617,10 +2714,9 @@ td.ais-text {
 }
 
 .source-group h3 {
-  font-family: var(--font-mono);
   font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-2);
 }
@@ -2629,6 +2725,7 @@ td.ais-text {
   display: inline-block;
   width: 1rem;
   height: 1rem;
+  border-radius: 4px;
 }
 
 /* ---------- Motion ---------- */
