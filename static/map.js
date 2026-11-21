@@ -63,12 +63,16 @@
   var map = L.map(el, {
     zoomControl: false,
     attributionControl: false,
-    scrollWheelZoom: false, // the page scrolls past the chart; zoom with buttons, pinch or double-click
-    zoomSnap: 0,
-    zoomDelta: 0.5,
+    // Only Ctrl + wheel and a touchpad pinch reach Leaflet's wheel zoom; a plain wheel scrolls
+    // the page (the gate under "Wheel and touchpad", #111).
+    scrollWheelZoom: true,
+    zoomSnap: 0, // flying to an item lands exactly
+    zoomDelta: 1, // buttons, double-click and keys: one level a step (#111; was 0.5)
     maxZoom: 15,
     maxBounds: sheet,
-    maxBoundsViscosity: 1,
+    // The edges give a little while dragging and spring back on release, so the chart shows it
+    // is at an edge instead of seeming stuck (#111; was 1, a hard stop).
+    maxBoundsViscosity: 0.8,
   });
   map.setMinZoom(map.getBoundsZoom(sheet, true)); // smallest zoom that stays inside the sheet
 
@@ -688,7 +692,9 @@
           html: markerHtml(planned.ranks, planned.rows),
         }),
       }).addTo(calloutLayer);
-      L.DomEvent.disableClickPropagation(marker.getElement()); // no map drag or zoom from a number
+      // A drag that starts on a marker moves the chart, like anywhere else on it (#111); only a
+      // double-click on a number is kept from zooming the chart. A click still picks the item.
+      L.DomEvent.on(marker.getElement(), "dblclick", L.DomEvent.stopPropagation);
     });
     markCallouts();
     if (focusedRank) {
@@ -869,8 +875,102 @@
     }
   }
 
+  // ---------- Wheel and touchpad ----------
+  // Ctrl + wheel, and a touchpad pinch (which the browser sends as Ctrl + wheel), zoom the chart
+  // around the cursor through Leaflet's own wheel zoom, which also keeps the browser from
+  // zooming the whole page. A plain wheel or two-finger scroll scrolls the page, as anywhere
+  // else, and shows a short hint (#111). The gate sits on the chart's frame and runs first
+  // (capture), so Leaflet never sees a plain wheel; it never cancels one.
+  var hint = document.getElementById("chart-hint"), hintTimer = 0;
+  var zoomKey = /Mac|iPhone|iPad/.test(navigator.platform || "") ? "⌘" : "Ctrl";
+  var keyNames = document.querySelectorAll("[data-zoom-key]");
+  for (var n = 0; n < keyNames.length; n++) keyNames[n].textContent = zoomKey;
+
+  function showHint() {
+    if (!hint) return;
+    hint.classList.add("is-shown");
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(function () { hint.classList.remove("is-shown"); }, 1500);
+  }
+  el.parentNode.addEventListener("wheel", function (event) {
+    if (event.ctrlKey || event.metaKey) return; // Leaflet zooms
+    if (!el.contains(event.target)) return; // the ship filter and the focus box keep their own
+    event.stopPropagation();
+    if (event.deltaY) showHint();
+  }, { capture: true, passive: true });
+
+  // ---------- One finger on the chart ----------
+  // One finger moves the chart (P1, #111). But a mostly vertical swipe scrolls the page whenever
+  // the chart can't move that way (at its smallest zoom on a phone it can't move north or south
+  // at all), so the page never gets stuck on the chart. Who takes a swipe is decided once it has
+  // moved SWIPE_DECIDE pixels (pins.js swipeTaker); until then Leaflet doesn't see the moves.
+  // A swipe that goes to the page never reaches Leaflet; a second finger leaves it to the pinch.
+  var SWIPE_DECIDE = 8;
+  var swipe = null, glide = 0;
+
+  // How far the chart can still move to show more of the north and of the south, in pixels.
+  function chartRoom() {
+    var bounds = map.options.maxBounds, size = map.getSize();
+    return {
+      north: -map.latLngToContainerPoint([bounds.getNorth(), bounds.getWest()]).y,
+      south: map.latLngToContainerPoint([bounds.getSouth(), bounds.getWest()]).y - size.y,
+    };
+  }
+  el.addEventListener("touchstart", function (event) {
+    cancelAnimationFrame(glide);
+    swipe = null;
+    if (event.touches.length !== 1 || event.target.closest(".leaflet-control, .leaflet-popup")) return;
+    var touch = event.touches[0];
+    swipe = { x: touch.clientX, y: touch.clientY, lastY: touch.clientY, lastT: event.timeStamp, speed: 0, taker: null, room: chartRoom() };
+  }, { capture: true, passive: true });
+  window.addEventListener("touchmove", function (event) {
+    if (!swipe) return;
+    if (event.touches.length !== 1) {
+      swipe = null; // a second finger: Leaflet's pinch
+      return;
+    }
+    var touch = event.touches[0];
+    if (!swipe.taker) {
+      swipe.taker = pinGeometry.swipeTaker(touch.clientX - swipe.x, touch.clientY - swipe.y, swipe.room, SWIPE_DECIDE);
+      if (swipe.taker === "map") {
+        swipe = null; // Leaflet moves the chart from where the finger started
+        return;
+      }
+      if (!swipe.taker) {
+        event.stopPropagation(); // too short to tell: the chart waits
+        return;
+      }
+    }
+    event.stopPropagation(); // the page's swipe: Leaflet doesn't see it
+    var step = touch.clientY - swipe.lastY, time = Math.max(1, event.timeStamp - swipe.lastT);
+    window.scrollBy(0, -step);
+    swipe.speed = 0.8 * (step / time) + 0.2 * swipe.speed; // pixels per millisecond, smoothed
+    swipe.lastY = touch.clientY;
+    swipe.lastT = event.timeStamp;
+  }, { capture: true, passive: true });
+  // Leaflet still sees the end of every touch: it ends its own (unmoved) drag there.
+  window.addEventListener("touchend", function () {
+    if (!swipe || swipe.taker !== "page") {
+      swipe = null;
+      return;
+    }
+    // A flick glides on and slows down, as the page itself would; not with reduced motion.
+    var speed = swipe.speed, last = performance.now();
+    swipe = null;
+    if (reduceMotion || Math.abs(speed) < 0.1) return;
+    glide = requestAnimationFrame(function step(now) {
+      var dt = now - last;
+      last = now;
+      window.scrollBy(0, -speed * dt);
+      speed *= Math.pow(0.995, dt);
+      if (Math.abs(speed) > 0.02) glide = requestAnimationFrame(step);
+    });
+  }, { capture: true, passive: true });
+
   // ---------- Wiring ----------
   document.addEventListener("click", function (event) {
+    // A drag that started on a number and ended on it is a drag, not a pick (#111).
+    if (event.target.closest(".leaflet-marker-pane") && map.dragging.moved()) return;
     var target = event.target.closest("[data-action], [data-ship-filter]");
     if (target) {
       var action = target.getAttribute("data-action");

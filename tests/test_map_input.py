@@ -95,8 +95,10 @@ def test_on_a_mac_the_key_is_named_command():
 def test_the_hint_fades_without_motion_when_motion_is_reduced():
     assert re.search(r"\.chart-hint \{[^}]*opacity: 0;[^}]*pointer-events: none;", CSS, re.S)
     assert re.search(r"\.chart-hint\.is-shown \{[^}]*opacity: 1;", CSS, re.S)
+    # The site-wide rule for reduced motion turns every transition off, the hint's included.
     reduced = CSS[CSS.index("@media (prefers-reduced-motion: reduce)"):]
-    assert ".chart-hint" in reduced
+    assert re.search(r"\*::after \{\s*animation: none !important;\s*transition: none !important;", reduced)
+    assert re.search(r"\.chart-hint \{[^}]*transition: opacity", CSS, re.S)
 
 
 # ---------- P1 and the phone fix: one finger ----------
