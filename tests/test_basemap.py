@@ -195,4 +195,5 @@ def test_canvas_paths_use_small_numbers():
     # The canvas keeps about seven digits; world pixels reach millions at the closest zoom,
     # so every path is drawn shifted to the screen's own coordinates.
     assert "ctx.translate(-origin.x" not in MAP_JS
-    assert MAP_JS.count("outline(") >= 4 and "shift.x" in MAP_JS
+    # (The land mask for the water lines is made in the worker since #111, without a canvas.)
+    assert MAP_JS.count("outline(") >= 3 and "shift.x" in MAP_JS
