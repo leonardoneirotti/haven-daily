@@ -196,15 +196,38 @@ def test_the_land_goes_to_the_worker_once():
     assert len(re.findall(r"\.postMessage\(\{\s*land:", MAP_JS)) == 1
 
 
+def function(name: str) -> str:
+    body = MAP_JS[MAP_JS.index(f"function {name}("):]
+    return body[:body.index("\n  }\n")]
+
+
+def test_the_water_is_a_layer_of_its_own_under_the_basemap():
+    # Measured in the first speed run of this PR (#111): repainting the whole basemap canvas when
+    # a new picture arrived was itself a long task without a graphics chip. So the land canvas
+    # draws no water, and the picture is a <canvas> of its own in a pane just under it.
+    assert re.search(r'map\.createPane\("water"\)\.style\.zIndex = 240;', MAP_JS)
+    assert re.search(r'map\.createPane\("basemap"\)\.style\.zIndex = 250;', MAP_JS)
+    assert "drawImage(water" not in function("paint")
+
+
+def test_a_new_picture_is_handed_over_and_repaints_nothing_else():
+    take = function("takeWater")
+    assert "transferFromImageBitmap(picture)" in take
+    assert 'getContext("bitmaprenderer")' in take
+    assert "redraw" not in take
+
+
 def test_until_the_new_picture_arrives_the_previous_one_is_shown_scaled():
-    paint = MAP_JS[MAP_JS.index("function paint(ctx)"):]
-    paint = paint[:paint.index("\n  }\n")]
-    assert re.search(r"getZoomScale\(zoom, water\.zoom\)", paint)
-    assert re.search(r"drawImage\(water\.image, [^;]+\* k[^;]+\* k[^;]+\* k[^;]+\* k\)", paint)
+    place = function("placeWater")
+    assert re.search(r"var k = map\.getZoomScale\(zoom, water\.zoom\);", place)
+    assert re.search(r"L\.DomUtil\.setTransform\(waterEl, L\.point\(water\.x \* k - origin\.x, water\.y \* k - origin\.y\), k\)", place)
 
 
-def test_a_new_picture_is_painted_through_leaflets_public_redraw():
-    assert re.search(r"chartBase\.redraw\(\)", MAP_JS)
+def test_the_picture_moves_with_every_kind_of_zoom_using_leaflets_public_parts():
+    assert re.search(r'map\.on\("zoomanim", function \(event\) \{', MAP_JS)
+    assert re.search(r'L\.DomUtil\.getPosition\(map\.getPane\("mapPane"\)\)', MAP_JS)
+    assert re.search(r'map\.on\("zoom viewreset zoomend", function \(\) \{ placeWater\(map\.getZoom\(\), map\.getPixelOrigin\(\)\); \}\);', MAP_JS)
+    assert "_getNewPixelOrigin" not in MAP_JS and "_getMapPanePos" not in MAP_JS
 
 
 def test_one_picture_is_worked_out_at_a_time():

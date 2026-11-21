@@ -185,10 +185,15 @@ def test_water_lines_come_from_a_distance_map_not_wide_strokes():
 
 
 def test_the_water_is_worked_out_once_per_zoom_and_reused_while_moving():
+    # Since #111 every repaint checks the water picture (checkWater), which asks the worker
+    # for a new one only for a new zoom or when the view has left it.
     paint = MAP_JS[MAP_JS.index("function paint(ctx)"):]
     paint = paint[:paint.index("\n  }\n")]
-    assert re.search(r"water\.zoom === zoom", paint)
-    assert "wantWater(" in paint and "if (!inside)" in paint
+    assert "checkWater();" in paint
+    check = MAP_JS[MAP_JS.index("function checkWater()"):]
+    check = check[:check.index("\n  }\n")]
+    assert re.search(r"water\.zoom === zoom", check)
+    assert "wantWater(" in check and "if (!inside)" in check
 
 
 def test_canvas_paths_use_small_numbers():

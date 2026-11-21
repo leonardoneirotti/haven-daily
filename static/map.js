@@ -241,11 +241,18 @@
   // Each line follows the shore at a fixed distance, from a map of distances to the land
   // (static/water.js). That takes a second or more for a laptop-sized chart, so a background
   // worker does it (#111): it gets the land once, then one picture per zoom level for the view
-  // plus a margin, reused while the chart is moved. Until a new picture arrives the previous
-  // one is shown, scaled to the new zoom, so the page never waits for it. If the worker can't
-  // start (or fails), the chart shows plain water: the lines are decoration.
-  var water = null; // the latest picture: { zoom, x, y, w, h (world pixels at that zoom), image }
+  // plus a margin, reused while the chart is moved. If the worker can't start (or fails), the
+  // chart shows plain water: the lines are decoration.
+  // The picture is a layer of its own, under the basemap's canvas: a <canvas> handed the finished
+  // picture (no drawing on the page's thread), placed and scaled with a CSS transform. Until a new
+  // picture arrives the previous one is shown scaled, and when it arrives nothing else is
+  // repainted: repainting the whole basemap for it froze the page on a computer without a
+  // graphics chip (measured, #111).
+  var water = null; // the picture shown: { zoom, x, y, w, h (world pixels at that zoom) }
   var waterJob = null; // the picture being worked out
+  map.createPane("water").style.zIndex = 240; // just under the basemap (250)
+  var waterEl = L.DomUtil.create("canvas", "chart-water leaflet-zoom-animated", map.getPane("water"));
+  var waterShow = null; // hands a picture to waterEl: "bitmaprenderer", or 2D where there is none
   var waterWorker = null;
   try {
     waterWorker = new Worker(folder + "water.js");
@@ -278,25 +285,56 @@
     waterWorker.postMessage(waterJob);
   }
 
-  // A picture from the worker: turned into an image (off the page's thread where the browser
-  // can), then the chart is painted with it.
+  // A picture from the worker: handed to the water layer as it is (an ImageBitmap, made off the
+  // page's thread), or copied in where the browser has no "bitmaprenderer". Then placed, and asked
+  // for again if the chart has moved on meanwhile.
   function takeWater(event) {
-    var done = event.data;
-    var image = new ImageData(done.pixels, done.w, done.h);
-    var ready = window.createImageBitmap ? createImageBitmap(image) : Promise.resolve(onCanvas(image));
-    ready.then(function (picture) {
-      if (water && water.image.close) water.image.close();
-      water = { zoom: done.zoom, x: done.x, y: done.y, w: done.w, h: done.h, image: picture };
+    var done = event.data, image = new ImageData(done.pixels, done.w, done.h);
+    function show(picture) {
+      waterEl.width = done.w;
+      waterEl.height = done.h;
+      waterEl.style.width = done.w + "px";
+      waterEl.style.height = done.h + "px";
+      if (picture) waterShow.transferFromImageBitmap(picture);
+      else waterShow.putImageData(image, 0, 0);
+      water = { zoom: done.zoom, x: done.x, y: done.y, w: done.w, h: done.h };
       waterJob = null;
-      chartBase.redraw();
-    }, function () { waterJob = null; });
+      placeWater(map.getZoom(), map.getPixelOrigin());
+      checkWater();
+    }
+    if (!waterShow) waterShow = (window.createImageBitmap && waterEl.getContext("bitmaprenderer")) || waterEl.getContext("2d");
+    if (waterShow.transferFromImageBitmap) createImageBitmap(image).then(show, function () { waterJob = null; });
+    else show(null);
   }
-  function onCanvas(image) {
-    var canvas = document.createElement("canvas");
-    canvas.width = image.width;
-    canvas.height = image.height;
-    canvas.getContext("2d").putImageData(image, 0, 0);
-    return canvas;
+
+  // The picture on the chart at `zoom`, for a view whose top left is `origin` (world pixels at that
+  // zoom: Leaflet's pixel origin). Moved and scaled by the browser, like Leaflet's own layers.
+  function placeWater(zoom, origin) {
+    if (!water) return;
+    var k = map.getZoomScale(zoom, water.zoom);
+    L.DomUtil.setTransform(waterEl, L.point(water.x * k - origin.x, water.y * k - origin.y), k);
+  }
+  // A zoom by button, double-click or wheel is animated: the picture moves and scales with the
+  // chart, towards the view Leaflet is zooming to (worked out as Leaflet does, from public parts).
+  map.on("zoomanim", function (event) {
+    var pane = L.DomUtil.getPosition(map.getPane("mapPane")) || L.point(0, 0);
+    placeWater(event.zoom, map.project(event.center, event.zoom).subtract(map.getSize().divideBy(2)).add(pane).round());
+  });
+  // Flying and pinching move the view frame by frame; a reset at once.
+  map.on("zoom viewreset zoomend", function () { placeWater(map.getZoom(), map.getPixelOrigin()); });
+
+  // The view in world pixels at the current zoom, with the basemap canvas's margin.
+  function viewBox() {
+    var origin = map.getPixelOrigin(), size = map.getSize(), pad = size.multiplyBy(base.options.padding);
+    var min = map.containerPointToLayerPoint(pad.multiplyBy(-1)), max = map.containerPointToLayerPoint(size.add(pad));
+    return { minX: min.x + origin.x, minY: min.y + origin.y, maxX: max.x + origin.x, maxY: max.y + origin.y };
+  }
+  // A new picture is asked for only for a new zoom, or when the view has left the picture.
+  function checkWater() {
+    var zoom = map.getZoom(), view = viewBox();
+    var inside = water && water.zoom === zoom && view.minX >= water.x && view.minY >= water.y &&
+      view.maxX <= water.x + water.w && view.maxY <= water.y + water.h;
+    if (!inside) wantWater(zoom, map.getZoomScale(zoom, 0), view, chartColours());
   }
 
   // Outline of a set of shapes at scale s: only shapes that reach into `box` (world pixels at
@@ -345,20 +383,13 @@
     // The canvas in world pixels at this zoom (= the chart's coordinates plus the pixel origin).
     var view = { minX: min.x + origin.x, minY: min.y + origin.y, maxX: max.x + origin.x, maxY: max.y + origin.y };
 
-    // The water picture: asked for again only for a new zoom or when the view has left it.
-    var inside = water && water.zoom === zoom && view.minX >= water.x && view.minY >= water.y &&
-      view.maxX <= water.x + water.w && view.maxY <= water.y + water.h;
-    if (!inside) wantWater(zoom, s, view, colours);
+    // The water and its lines are a layer of their own, under this canvas ("The water and its
+    // lines", above); this canvas draws the land on a clear background.
+    checkWater();
 
     ctx.save();
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
-    // The latest picture, scaled if it was worked out for another zoom (until the new one arrives).
-    // Where it doesn't reach, the chart's background is the same plain water.
-    if (water) {
-      var k = map.getZoomScale(zoom, water.zoom);
-      ctx.drawImage(water.image, water.x * k - origin.x, water.y * k - origin.y, water.w * k, water.h * k);
-    }
 
     // Land, lifted off the water by a shadow (a dark copy shifted down, much cheaper
     // than a blurred shadow), and a fine coastline. Flat, like a drawn chart: the random grain
@@ -419,7 +450,7 @@
   });
   map.createPane("basemap").style.zIndex = 250; // under the place names and ships
   var base = L.canvas({ pane: "basemap", padding: 0.1 }); // a small margin, so a short pan shows no gap
-  var chartBase = new ChartBase({ renderer: base }).addTo(map);
+  new ChartBase({ renderer: base }).addTo(map);
 
   // Place names: water in italic, land in spaced capitals (nautical chart convention).
   basemap.labels.forEach(function (label) {
