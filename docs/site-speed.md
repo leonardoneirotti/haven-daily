@@ -197,4 +197,25 @@ Measured on a GitHub runner with no graphics chip, throttled phone profile. "Bef
 
 The test server speaks HTTP/1.1. GitHub Pages uses HTTP/2, where download priority can count for more, but that is not measured here.
 
-**Map within 2.5 s: missed by 0.03–0.35 s, accepted** (owner, 19 Nov 2026). What's left is mostly the fonts: up to 192 KB in 9 files share the slow connection with the basemap. The style pass (#102) will replace the fonts. It must bring the map under 2.5 s on this profile within the font budget (240 KB, 11 files), measured with `.github/workflows/speed.yml`.
+**Map within 2.5 s: missed by 0.03–0.35 s, accepted** (owner, 19 Nov 2026); **met since the style pass (#102), part 3 below.** What's left is mostly the fonts: up to 192 KB in 9 files share the slow connection with the basemap. The style pass (#102) will replace the fonts. It must bring the map under 2.5 s on this profile within the font budget (240 KB, 11 files), measured with `.github/workflows/speed.yml`.
+
+## Results, part 3 (the style pass's fonts, #102)
+
+Harbour Light (#102) replaced IBM Plex Sans and Sans Condensed with **Manrope**, one variable file for every weight, and kept only Plex Mono 400 and Plex Serif 400 / italic. In the font budget's terms (the Latin files): **4 files, 80 KB**, was 11 files, 230 KB.
+
+Measured on a GitHub runner with no graphics chip, throttled phone profile, main ("before") against the style pass branch ("after") in the same run
+([run 44762261727](https://github.com/leonardoneirotti/haven-daily/actions/runs/44762261727)):
+
+| | Today before | Today after | Day with ships before | Day with ships after | Target |
+|---|---|---|---|---|---|
+| Sent | 367 KB | 257 KB | 320 KB | 233 KB | |
+| Fonts | 192 KB, 9 files | 79 KB, 4 files | 149 KB, 7 files | 60 KB, 3 files | |
+| News and status visible | 0.60 s | 0.64 s | 0.56 s | 0.60 s | 1.5 s ✅ |
+| Map visible | 2.80 s | **2.24 s** | 2.45 s | **2.00 s** | 2.5 s ✅ |
+| Load event | 2.32 s | 1.45 s | 2.42 s | 1.22 s | |
+| Map move, longest freeze | 0.30 s | 0.62 s | 0.28 s | 0.27 s | 1 s ✅ |
+
+- **The map now comes within 2.5 s on this profile** (it missed by 0.03–0.35 s in part 2): about 110 KB fewer font bytes share the slow connection with the basemap.
+- **First text:** 0.04 s later (0.60 → 0.64 s, 0.56 → 0.60 s), within its 1.5 s target. The stylesheet is about the same size; the small difference is within what varies between runs.
+- **Archive and How it works** send less than half (95 → 43 KB, 124 → 49 KB): one font file each instead of three or four.
+- **Today's map move**, 0.30 → 0.62 s, still within its target. This is one drag in one profiled load. The longest *frame* (what a visitor sees) went 0.67 → 0.62 s; only the longest *task* grew (0.27 → 0.62 s), and zoom (0.30 → 0.28 s) and the day with ships (0.28 → 0.27 s) didn't change. To watch in the next speed run, not a change the style pass is known to cause.

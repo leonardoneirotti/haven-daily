@@ -1,8 +1,10 @@
-"""Self-hosted IBM Plex fonts (#27, spec §7.3).
+"""Self-hosted fonts (#27, spec §7.3; Manrope since the style pass, #102).
 
 The pages used to load IBM Plex from Google Fonts, which sends every visitor's IP
 address to Google. The font files now live in static/fonts/ and style.css points at
-them with @font-face rules, so a page never asks Google for anything.
+them with @font-face rules, so a page never asks Google for anything. Harbour Light
+(#102) uses Manrope for text and headlines, IBM Plex Mono for data and IBM Plex Serif
+for the planner impact.
 """
 
 import re
@@ -20,17 +22,13 @@ SAMPLE_BRIEFS = PROJECT_DIR / "data" / "sample" / "briefs"
 
 GOOGLE_HOSTS = ("fonts.googleapis.com", "fonts.gstatic.com")
 
-# What the design uses (spec §7.3) = what the old Google Fonts link loaded.
+# What the design uses (spec §7.3, Harbour Light, #102): Manrope is one variable file,
+# 400-800; Plex Mono only for data (400); Plex Serif for the impact and water names.
 NEEDED = [
-    ("IBM Plex Sans", "normal", 400), ("IBM Plex Sans", "normal", 500),
-    ("IBM Plex Sans", "normal", 600), ("IBM Plex Sans", "normal", 700),
-    ("IBM Plex Sans", "italic", 400),
-    ("IBM Plex Sans Condensed", "normal", 500), ("IBM Plex Sans Condensed", "normal", 600),
-    ("IBM Plex Sans Condensed", "normal", 700),
-    ("IBM Plex Mono", "normal", 400), ("IBM Plex Mono", "normal", 500),
-    ("IBM Plex Mono", "normal", 600),
-    ("IBM Plex Serif", "normal", 400), ("IBM Plex Serif", "normal", 600),
-    ("IBM Plex Serif", "italic", 400),
+    ("Manrope", "normal", 400), ("Manrope", "normal", 500), ("Manrope", "normal", 600),
+    ("Manrope", "normal", 700), ("Manrope", "normal", 800),
+    ("IBM Plex Mono", "normal", 400),
+    ("IBM Plex Serif", "normal", 400), ("IBM Plex Serif", "italic", 400),
 ]
 
 # Letters the pages show: English, Dutch, German and other European place and
@@ -148,17 +146,22 @@ def test_ofl_licence_ships_with_the_fonts():
     licence = (FONTS_DIR / "OFL.txt").read_text(encoding="utf-8")
     assert "SIL OPEN FONT LICENSE Version 1.1" in licence
     assert 'Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"' in licence
+    manrope = (FONTS_DIR / "OFL-Manrope.txt").read_text(encoding="utf-8")
+    assert "SIL Open Font License, Version 1.1" in manrope
+    assert "Copyright 2019 The Manrope Project Authors" in manrope
 
 
 def test_fonts_and_licence_are_published_with_the_site(site, faces):
     for url in {url for face in faces for url in face["urls"]}:
         assert (site / "static" / url).is_file(), url
     assert (site / "static" / "fonts" / "OFL.txt").is_file()
+    assert (site / "static" / "fonts" / "OFL-Manrope.txt").is_file()
 
 
 def test_method_page_credits_the_fonts_and_links_the_licence(site):
     about = (site / "about.html").read_text(encoding="utf-8")
-    credit = re.search(r"Fonts: IBM Plex Sans, Sans Condensed, Mono and Serif \((.*?)\)", about)
+    credit = re.search(r"Fonts: Manrope, IBM Plex Mono and IBM Plex Serif \((.*?)\), served", about)
     assert credit, "font credit missing on the Method page"
+    assert 'href="static/fonts/OFL-Manrope.txt"' in credit.group(1)
     assert 'href="static/fonts/OFL.txt"' in credit.group(1)
     assert "SIL Open Font License" in credit.group(1)

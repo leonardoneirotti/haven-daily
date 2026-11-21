@@ -140,7 +140,7 @@
   var HomeControl = L.Control.extend({
     options: { position: "bottomright" },
     onAdd: function () {
-      var button = L.DomUtil.create("button", "chart-home");
+      var button = L.DomUtil.create("button", "btn chart-home");
       button.type = "button";
       button.title = "Whole port";
       button.setAttribute("aria-label", "Show the whole port");
@@ -232,17 +232,6 @@
     tanks.push({ x: columnX0 + tx * columnStep, y: rowY[ty], r: tankNumbers[t + 2] });
   }
   var worldPerMetre = 256 / (2 * Math.PI * 6378137 * Math.cos((sheet.getCenter().lat * Math.PI) / 180));
-
-  // Fine speckle laid over the land, so it reads as a material rather than a flat fill.
-  var grain = document.createElement("canvas");
-  grain.width = grain.height = 128;
-  var grainCtx = grain.getContext("2d");
-  var speckle = grainCtx.createImageData(128, 128);
-  for (var g = 0; g < speckle.data.length; g += 4) {
-    speckle.data[g] = speckle.data[g + 1] = speckle.data[g + 2] = Math.random() < 0.5 ? 0 : 255;
-    speckle.data[g + 3] = Math.random() * 22;
-  }
-  grainCtx.putImageData(speckle, 0, 0);
 
   var COAST_LINE_GAP = 6; // minimum pixels between two lines in the water
   var COAST_LINE_REACH = 120; // how far from the shore the lines go, in pixels
@@ -422,7 +411,8 @@
     ctx.drawImage(water.canvas, water.x - origin.x, water.y - origin.y);
 
     // Land, lifted off the water by a shadow (a dark copy shifted down, much cheaper
-    // than a blurred shadow), with grain and a light coastline.
+    // than a blurred shadow), and a fine coastline. Flat, like a drawn chart: the random grain
+    // that used to lie over the land looked like a photo (#102).
     var near = { minX: view.minX - 3, minY: view.minY - 3, maxX: view.maxX + 3, maxY: view.maxY + 3 };
     var land = outline(landRings, s, near, 0.75, true, origin);
     ctx.fillStyle = colours.shadow;
@@ -430,8 +420,6 @@
     ctx.fill(land, "evenodd");
     ctx.translate(0, -2.5);
     ctx.fillStyle = colours.land;
-    ctx.fill(land, "evenodd");
-    ctx.fillStyle = ctx.createPattern(grain, "repeat");
     ctx.fill(land, "evenodd");
     ctx.strokeStyle = colours.coast;
     ctx.lineWidth = 0.8;
@@ -533,7 +521,7 @@
       "<div><dt>Destination</dt><dd>" + destination + ' <span class="ais-text">AIS: ' + raw + "</span></dd></div>" +
       "</dl>";
     if (ship.news_item) {
-      html += '<button type="button" class="pop-news sev-' + ship.news_severity + '" data-action="show-item" data-rank="' +
+      html += '<button type="button" class="btn pop-news sev-' + ship.news_severity + '" data-action="show-item" data-rank="' +
         ship.news_item + '">At the terminal in item ' + ship.news_item + "</button>";
     }
     return html;

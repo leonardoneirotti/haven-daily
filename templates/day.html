@@ -76,9 +76,9 @@
         <p class="chart-loading needs-map" id="chart-loading" aria-hidden="true">Loading chart…</p>
         {% if ships %}
         <div class="chart-filter needs-map" role="group" aria-label="Show ships">
-          <button type="button" data-ship-filter="all" aria-pressed="true">All <span>{{ ships.count }}</span></button>
+          <button type="button" class="btn" data-ship-filter="all" aria-pressed="true">All <span>{{ ships.count }}</span></button>
           {% for kind, count in ships.by_type.items() if count %}
-          <button type="button" data-ship-filter="{{ kind }}" aria-pressed="false">{{ ship_type_plurals[kind] }} <span>{{ count }}</span></button>
+          <button type="button" class="btn" data-ship-filter="{{ kind }}" aria-pressed="false">{{ ship_type_plurals[kind] }} <span>{{ count }}</span></button>
           {% endfor %}
         </div>
         {% elif ais_snapshot_built %}
@@ -87,7 +87,7 @@
         {% endif %}
         <div class="chart-focus" id="chart-focus" hidden>
           <p class="chart-focus-text" id="chart-focus-text"></p>
-          <button type="button" data-action="overview">{{ m.icon("expand") }}Overview</button>
+          <button type="button" class="btn" data-action="overview">{{ m.icon("expand") }}Overview</button>
         </div>
         <p class="visually-hidden" id="chart-announcer" aria-live="polite"></p>
       </div>

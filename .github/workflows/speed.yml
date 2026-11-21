@@ -11,7 +11,7 @@ name: Speed
 on:
   workflow_dispatch:
   push:
-    branches: ["issue-104-*"]
+    branches: ["issue-104-*", "issue-102-*"] # the speed work (#104) and the style pass (#102)
     paths:
       - static/**
       - templates/**

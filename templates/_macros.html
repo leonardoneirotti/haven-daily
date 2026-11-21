@@ -136,10 +136,10 @@
     {% endif %}
     <p class="item-actions">
       {% if item.map %}
-      <button type="button" class="chart-button needs-map" data-action="show-item" data-rank="{{ rank }}" aria-pressed="false">{{ icon("map-pin") }}Show on chart</button>
+      <button type="button" class="btn chart-button needs-map" data-action="show-item" data-rank="{{ rank }}" aria-pressed="false">{{ icon("map-pin") }}Show on chart</button>
       {% endif %}
-      <a href="{{ item.url }}">Read original{% if item.language != "en" %} ({{ item.language_name }}){% endif %}{{ icon("external") }}</a>
-      {% if item.translate_url %}<a href="{{ item.translate_url }}">{{ icon("languages") }}Read in English{{ icon("external") }}</a>{% endif %}
+      <a class="btn" href="{{ item.url }}">Read original{% if item.language != "en" %} ({{ item.language_name }}){% endif %}{{ icon("external") }}</a>
+      {% if item.translate_url %}<a class="btn" href="{{ item.translate_url }}">{{ icon("languages") }}Read in English{{ icon("external") }}</a>{% endif %}
     </p>
   </article>
 </li>

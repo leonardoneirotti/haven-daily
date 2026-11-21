@@ -45,12 +45,15 @@
       </nav>
     </div>
   </div>
-  {# What this is, under the brand on every page (S1, #86): the owner's words, spec §7.8. #}
+</header>
+{# What this is, right under the brand on every page (S1, #86): the owner's words, spec §7.8. Outside
+   the header bar since #102: the bar slides away on scrolling and comes back; these scroll with the page. #}
+<div class="masthead">
   <p class="tagline">{{ site.tagline }}</p>
   {% if sample %}
   <p class="sample-note"><strong>Sample data.</strong> The ships, news and readings on this page are invented to preview the design.</p>
   {% endif %}
-</header>
+</div>
 {% block main %}{% endblock %}
 <footer class="site-footer">
   <div class="wrap footer-inner">

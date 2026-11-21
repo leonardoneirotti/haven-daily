@@ -996,79 +996,80 @@ Rules:
 
 ### 7.1 Visual direction
 
-Reference: Dribbble shot **"Pergamum University Map"** (dark warm map, contour lines hugging the coast, orange route/pins, teal markers, white square zoom buttons, peach call-to-action). Owner's reaction to our version: *"looks like Call of Duty, not bad"*.
+**Harbour Light** *(#102, the owner's pick, 20 Nov 2026, from three mockups in draft PR #103; built in the PR that closes #102)*: calm and maritime, like a pilot's chart in daylight. Fog-white page, deep navy ink, white cards with soft corners, a pale-blue sea with fine lines that follow the coast, sand-coloured land drawn flat, deep teal ships. Before it, the site had one dark palette "like a printed relief map under a lamp" (reference: the Dribbble shot "Pergamum University Map"); the critique in `design/style-pass/README.md` says why it changed, and has before/after screenshots of every page on phone and laptop (sample data only).
 
-**One dark palette for the whole site, like a printed relief map under a lamp**: warm charcoal, ivory type, charcoal water with fine lines following the coast, textured land, teal ships, one orange accent. **Colour carries meaning only**: severity, status, ships linked to the news.
+**Colour carries meaning only**: severity (red / amber / slate), status (green / amber / red), ships (teal), interpretation (plum), and **one harbour blue for what can be pressed or is selected** (a pressed button, the current page, the selected item, links in labels, focus rings). Nothing is coloured for decoration: there is no orange, and the "Whole port" button is an ordinary button (it used to be filled orange beside amber Medium squares and read like a severity). Tested in `tests/test_style_pass.py`.
+
+**For the newspaper view (#101):** the same tokens, cards and buttons carry over, and its masthead and lead can use IBM Plex Serif, already on the site, so it needs no new font.
 
 ### 7.2 Colour tokens (top of `style.css`; `map.js` reads the chart ones)
 
 ```css
 :root {
-  --bg: #151311;          /* page */
-  --surface: #211e1a;     /* panels, popups, hovered rows */
-  --surface-2: #2b2723;   /* selected item */
-  --ink: #f2ebe0;  --ink-2: #aea294;  --rule: #352f29;
-  --shadow: rgba(0,0,0,.55);
-  --overprint: #f08ac6;   /* "Impact for planners" label = interpretation */
-  --gauge-water: rgba(96,164,214,.45);  --gauge-line: #7cb8e4;
+  --bg: #f3f5f4;  --surface: #ffffff;  --surface-2: #e4eef1;   /* page, cards/panel/header, hover/sample note */
+  --ink: #0f2231;  --ink-2: #4b5e6d;  --rule: #d6dee2;
+  --edge: #728390;        /* the outline of a control: 3:1 on every background it sits on */
+  --shadow: rgba(15,34,49,.14);
+  --overprint: #8a3a6c;  --overprint-wash: #f8f2f6;   /* "Impact for planners" label and its wash */
+  --gauge-water: rgba(46,120,170,.3);  --gauge-line: #2e78aa;
 
   /* chart */
-  --water: #1b1917;  --water-line: #a8988a;  --land: #564c44;
-  --land-shadow: rgba(0,0,0,.65);  --coast: #a29384;
-  --road: #463d36;  --rail: #4b423a;  --tank: #827366;
-  --water-label: #bdb1a3;  --land-label: #e6d8c6;  --label-halo: rgba(0,0,0,.85);
-  --ship: #6fd6bc;        /* teal */
+  --water: #dbe7ed;  --water-line: #6f97ad;  --land: #efebe3;
+  --land-shadow: rgba(15,34,49,.16);  --coast: #8fa6b3;
+  --road: #d9d2c5;  --rail: #cbc2b2;  --tank: #c2b8a6;
+  --water-label: #35627d;  --land-label: #23384a;  --label-halo: rgba(255,255,255,.92);
+  --ship: #0f8a7c;        /* deep teal */
 
-  /* controls */
-  --button: #f6f1ea;  --on-button: #151311;   /* ivory zoom squares */
-  --accent: #ff801d;  --on-accent: #151311;   /* orange "whole port" button */
-  --cta: #fae8d9;     --on-cta: #151311;      /* peach popup button */
+  /* controls: one button set (.btn) */
+  --accent: #0f6e8c;  --on-accent: #fff;   /* harbour blue: pressed or selected only */
+  --btn-h: 2.25rem (2.75rem on touch screens);  --btn-radius: 8px;  --radius: 14px (cards);
 
   /* severity (fills for numbered squares / inks for text) */
-  --high: #d93a24;   --on-high: #fff;     --high-ink: #ff8b7b;
-  --medium: #f2a51a; --on-medium: #1f1600; --medium-ink: #f5b84f;
-  --low: #607286;    --on-low: #fff;      --low-ink: #a9b8c6;
-  --ok-ink: #6bd49a; --nodata-ink: #9aa6b1;
+  --high: #c8321e;   --on-high: #fff;     --high-ink: #ad2a17;
+  --medium: #eaa419; --on-medium: #231800; --medium-ink: #875800;
+  --low: #5d7186;    --on-low: #fff;      --low-ink: #475a6d;
+  --ok-ink: #1b7a4c; --nodata-ink: #5f6b77;
 
   --panel-width: 25rem;  --gutter: 16px (28px from 40rem);  --page-width: 96rem;  --measure: 62ch;
-  color-scheme: dark;
+  --topbar-h: 3.5rem;     /* the header bar: things scrolled to stop below it */
+  color-scheme: light;
 }
 ```
 
-Reference colours sampled from the Dribbble shot: frame `#1a1816`, water `#2e2925`, land `#4a403a`, orange `#ff801d`, teal `#5a9f8e`, peach `#fae8d9`, ivory `#fdfbfc`.
+Every text colour passes WCAG AA (4.5 : 1) on the backgrounds it is used on, including the number on each severity square, the chart's labels on water and land and the white label of a pressed button; tested pair by pair. Gone with #102: `--cta`/`--on-cta` (the peach popup button), `--button`/`--on-button` (the ivory zoom squares) and `--font-cond`.
 
-### 7.3 Typography — IBM Plex (self-hosted in `static/fonts/`, #27)
+### 7.3 Typography — Manrope, IBM Plex Mono and Serif (self-hosted in `static/fonts/`, #27, #102)
 
 | Role | Font |
 |---|---|
-| Body text, UI, panel date ("Thursday"), section titles | IBM Plex Sans (400–700) |
-| Headlines, big readings (94 cm, 40), callout labels, ship names, city label | IBM Plex Sans Condensed (500–700) |
-| Kickers, severity tags, table headers, brand name, timestamps, AIS text, land place names on the map, the date line | IBM Plex Mono (400–600), uppercase + letter-spacing for labels |
-| **Planner impact only** (+ water names in italic on the map) | IBM Plex Serif |
+| Body text, UI, headlines, big readings (94 cm, 40), the brand, the panel date, labels (kickers, severity words, table headers, land names on the chart: small capitals with letter-spacing) | **Manrope** (one variable file, 400–800; headlines and readings 800) |
+| Data only: times, the KNMI mapping line, AIS text, gauge marks | IBM Plex Mono 400 |
+| **Planner impact only** (+ water names in italic on the chart) | IBM Plex Serif 400 and italic |
 
-Principle: **fact vs interpretation in two typefaces** — the impact is the only serif text, with a rose label "IMPACT FOR PLANNERS *interpretation*". Max weight 700.
+Principle: **fact vs interpretation in two typefaces** — the impact is the only serif text, with a plum label "IMPACT FOR PLANNERS *interpretation*" on a faint plum wash. *(Since #102, 20 Nov 2026: Manrope replaced Plex Sans and Sans Condensed; spaced monospace capitals had done six jobs, brand, kickers, severity words, the date, land names and table headers, and made the site feel like an early-2020s dashboard. Manrope has no italic, so the grey "headline only" lines are upright.)*
 
 **Self-hosted, no Google Fonts** *(#27, 2 Nov 2026)*: the font files sit in `static/fonts/` and `style.css` loads them with `@font-face` rules, so a page never asks Google for a font and no visitor's IP address is sent to Google (EU privacy; checked again by #68). The pages look exactly as before: headless Edge screenshots before/after are pixel-identical outside the map (the map's texture differs between any two renders, also before the change). `tests/test_fonts.py` checks: no page, template or static file mentions `fonts.googleapis.com` / `fonts.gstatic.com`; every family, weight and style above has a rule pointing at a real woff2 file; no unused files; the licence ships with the site. *Claude's defaults, all 6 confirmed by the owner (2 Nov 2026, PR #78):*
 1. **The exact files Google Fonts served** (downloaded 2 Nov 2026), not IBM's own release, so the letters render the same as before.
-2. **Latin and Latin Extended only** (22 files, 452 KB in the repo; a visitor downloads only the files whose letters a page uses). Greek, Cyrillic and Vietnamese are left out: no page shows them today (checked), and such a letter would fall back to Helvetica/Arial.
-3. **Plex Sans upright is one variable file** covering weights 400–700, as Google serves it; every other weight/style is its own file.
+2. **Latin and Latin Extended only** (since #102: 8 files, 141 KB in the repo; was 22 files, 452 KB; a visitor downloads only the files whose letters a page uses). Greek, Cyrillic and Vietnamese are left out: no page shows them today (checked), and such a letter would fall back to Helvetica/Arial.
+3. **Manrope is one variable file** covering weights 400–800 (Fontsource `@fontsource-variable/manrope` 5.3.0, from Google Fonts; *#102*); every Plex weight/style is its own file. *(Was: Plex Sans upright as one variable file, 400–700.)*
 4. **`font-display: swap` kept** (as the old `&display=swap`): text shows at once in the fallback font and swaps when Plex has loaded.
-5. **The SIL Open Font License is in `static/fonts/OFL.txt`** (IBM's licence file, copyright line included), published with the site; the Method page credit links it and says the fonts are served from this site.
+5. **The SIL Open Font License is in `static/fonts/OFL.txt`** (IBM's licence file, copyright line included) **and `static/fonts/OFL-Manrope.txt`** (#102), published with the site; the How it works credit ("Fonts: Manrope, IBM Plex Mono and IBM Plex Serif") links both and says the fonts are served from this site.
 6. **No download script:** the files are a one-off copy and don't change; updating them means downloading them again by hand. Where they came from is written in the comment above the rules in `style.css`.
 
-**Loading and budget** *(#104, owner, 18 Nov 2026)*: no font is preloaded. Preloading the four first-screen fonts was tried and measured on the throttled phone: the first text came later (0.60 → 0.94 s on Today), because on a slow connection the fonts hold up the stylesheet; with `font-display: swap` the text shows at once anyway. Our own text uses no letter from the Latin Extended files (tested; a source's headline may, and then the browser loads that file). **Font budget:** the Latin files together at most **240 KB and 11 files** (today 230 KB, 11 files; `tests/test_speed.py`). The style pass (#102) must stay within it.
+**Loading and budget** *(#104, owner, 18 Nov 2026)*: no font is preloaded. Preloading the four first-screen fonts was tried and measured on the throttled phone: the first text came later (0.60 → 0.94 s on Today), because on a slow connection the fonts hold up the stylesheet; with `font-display: swap` the text shows at once anyway. Our own text uses no letter from the Latin Extended files (tested; a source's headline may, and then the browser loads that file). **Font budget:** the Latin files together at most **240 KB and 11 files** (`tests/test_speed.py`). Since #102: **4 files, 80 KB** (Manrope 24 KB, Plex Mono 14 KB, Plex Serif 19 KB and its italic 20 KB; was 11 files, 230 KB), tested to stay at most 4 files and 100 KB, because fewer font bytes on the slow phone connection bring the chart in sooner (`docs/site-speed.md`, part 3).
 
 ### 7.4 Layout
 
 **Wide screens (≥ 64rem): the "stage"**
 - The chart fills the first screen: height `clamp(36rem, 100vh − 5.5rem, 62rem)`. **Except on a day with nothing on the chart** (see "First screen" below).
-- **News panel floats over the chart's western side (open North Sea)**: `position:absolute; top/bottom/left: 1rem; width: 25rem`, background `rgba(21,19,17,.95)` (no backdrop blur — too slow), 1px rule border, big shadow.
-  - Panel head: kicker "MORNING BRIEF · NO. 003" (mono), weekday huge (Plex Sans 700, ~2.9rem), date below (mono), publication line.
-  - Panel items list (scrolls inside): numbered square + severity tag + headline (*no "affects" tag since #82*: the first of several tags read like a category). The selected item gets `--surface-2`, an ivory left bar, and **expands to show its 2-line summary** (or, for an item without one, the short card's grey line, #82).
+- **News panel floats over the chart's western side (open North Sea)**: `position:absolute; top/bottom/left: 1rem; width: 25rem`, background white at 97 % (no backdrop blur — too slow), 1px rule border, 14px corners, soft shadow. On phones the panel is white too, edge to edge.
+  - Panel head: kicker "MORNING BRIEF · NO. 003" (small capitals), weekday huge (Manrope 800, ~2.9rem), date below, publication line.
+  - When the list is longer than the panel, a soft shade at the edge that has more shows that it scrolls (#102).
+  - Panel items list (scrolls inside): numbered square + severity tag + headline (*no "affects" tag since #82*: the first of several tags read like a category). The selected item gets `--surface-2`, a harbour-blue left bar (an ivory one before #102), and **expands to show its 2-line summary** (or, for an item without one, the short card's grey line, #82).
   - Panel status: 2×2 mini grid (Weather, Rhine, Strike, Ships) with level icon + value. Severity words, status labels and kicker at 13 px (#82).
   - "↓ Full brief and port status" link.
 - Ship filter (All / Container / Tanker / Bulk with counts) top-left of the free chart area; focus box ("1 Terminal strike · 6 ships at this terminal | Overview") top-right; legend bottom-left of free area; controls bottom-right.
-- Vignette: `.chart-frame::after` with `box-shadow: inset 0 0 110px 16px rgba(0,0,0,.55)`, z-index 401 (above map, below panels).
+- Edge shade: `.chart-frame::after` with `box-shadow: inset 0 0 80px 0 rgba(15,34,49,.1)`, z-index 401 (above map, below panels). *(Was a dark vignette until #102.)*
 - **Below the stage**: two columns — "The brief" (full items) and "Port status" (detailed dials, sticky), then ship table, build notes, day navigation.
 
 **Phones/tablets (< 64rem)**: **panel first** (head, item list, mini status, link) → chart (62vh, 340–560px) → legend → full brief → status. *(Changed by #81, 2 Nov 2026: the chart used to come first and the panel's item list was hidden.)*
@@ -1090,18 +1091,21 @@ Principle: **fact vs interpretation in two typefaces** — the impact is the onl
 6. **The v2 note keeps its amber edge** (it is a real failure) but is smaller (13 px) and in the corner.
 7. **The brief's intro now says "Show on chart" moves the chart "above the brief"** (was "at the top of the page", no longer true on phones); when the sentence shows at all is #82 (S10).
 
-**Top bar**: signal-flag logo + "HAVEN DAILY" (mono) + "Thu 29 Oct · No. 003"; nav Today / Archive / Method (active = 3px underline). Sample-data note below in amber.
+**Top bar** *(#102)*: one white bar, 3.5rem: signal-flag logo + **"Haven Daily"** (Manrope 800, in words) + "Thu 29 Oct · No. 003" on day pages (from 48rem; on phones the panel just below shows the date); nav Today / Archive / How it works on the right (current page = 3px harbour-blue underline); on phones brand and nav share one row. **Right under it, outside the bar**: the one-liner and the sample-data note (a quiet pill, bold "Sample data."), on one line on a laptop.
+- **It slides away and comes back** (owner, 20 Nov 2026): visible when the page loads; slides away while scrolling down; comes back when scrolling up, when the cursor moves to the top 48 px of the window, or when it gets keyboard focus (CSS `:focus-within`, also before the script reacts). `static/site.js`, a passive scroll listener; nothing is stored. Without JavaScript it is an ordinary header that scrolls away. The chart, items and How it works sections stop below it when scrolled to (`scroll-margin-top: var(--topbar-h)`), and the sticky port status column sits below it. Checked in headless Edge on a phone (touch) and a laptop: 28 of 28 checks (design/style-pass/README.md).
 
 ### 7.5 Components
 
-- **Numbered square** (`.num`): same square in panel, full list, chart and archive strip → the chart works as the index of the brief. High = red with white number, medium = amber with dark number, low = slate, **unrated = outlined, no fill, grey `--nodata-ink` number** (§5.3).
+- **Numbered square** (`.num`, 7px corners since #102): same square in panel, full list, chart and archive strip → the chart works as the index of the brief. High = red with white number, medium = amber with dark number, low = slate, **unrated = outlined, no fill, grey `--nodata-ink` number** (§5.3). In the archive strip an **empty slot is a short dash**, so it no longer looks like an unrated item (#102).
 - On the chart the high-severity square has a soft "ping" ring animation (transform/opacity only).
-- **Severity tag**: mono uppercase, coloured ink; "UNRATED" in `--nodata-ink`.
-- **Status dial**: label with icon, big condensed value + unit, place, level (icon+word) **followed by its meaning** ("Watch: low-water surcharges on barge transport", #83) + change, note, "Read at 06:20 · Source ↗". River gauge = striped board with water level **and lines at the Watch and Alert thresholds, labelled in cm** (#83).
-- **Item card (full brief)**: num + severity + source · language · time; condensed headline (link); summary (sans, max 62ch); divider; impact label + serif impact text (max 62ch); Affects; actions: "Show on chart" (outlined button, needs JS; only for an item with a place, nothing in its stead without one, #82), "Read original (Dutch) ↗", "Read in English ↗".
+- **Severity tag**: Manrope 800 small capitals, coloured ink; "UNRATED" in `--nodata-ink`.
+- **Status dial** (a white card since #102, two side by side in a 28rem column; small text at least 13 px, the MeteoAlarm disclaimer 12 px, gauge marks 11 px): label with icon, big value + unit, place, level (icon+word) **followed by its meaning** ("Watch: low-water surcharges on barge transport", #83) + change, note, "Read at 06:20 · Source ↗". River gauge = striped board with water level **and lines at the Watch and Alert thresholds, labelled in cm** (#83).
+- **Item card (full brief)**, a white card with 14px corners (#102): num + severity + source · language · time; headline (Manrope 800, link); summary (max 62ch); impact label + serif impact text (max 62ch) on a faint plum wash; Affects; actions, three buttons of the shared set: "Show on chart" (needs JS; only for an item with a place, nothing in its stead without one, #82), "Read original (Dutch) ↗", "Read in English ↗". The selected card gets a harbour-blue left edge.
+- **Buttons: one set** (`.btn`, #102; the critique counted five styles): every button and button-like link has the same height (`--btn-h`: 36px, 44px on touch screens), 8px corners, a 1px `--edge` outline, Manrope 700 14px, white with a navy label; **pressed = harbour blue with a white label**. Used by "Show on chart", "Read original", "Read in English", the ship filter (a row of buttons), the focus box's "Overview", "Whole port", Leaflet's zoom buttons (named in the same CSS rule, since Leaflet makes them) and the popup's news button. Over the chart they get a small shadow. A button inside running text ("12 at anchor", a ship's name in the table) is styled exactly as a link. Tested: no button sets its own size, corners, border or type.
 - **Short card** (#82, below): an item with no summary shows the headline, one grey line saying why, the Affects line and the actions; no impact block.
 - **Permission note** (#107): next to every summary written under a publisher's written permission (`items[].permission`), on the card (`.item-permission`, under the summary) and in the panel when the entry opens (`.panel-permission`): *"AI summary, with RTV Rijnmond's permission. Haven Daily is independent; RTV Rijnmond is not responsible for it."* (`render.PERMISSION_NOTE`, the source's name filled in; the owner's short wording, PR #108 review, 19 Nov 2026). With `impact: false` the card has no impact block; the Affects line stays. How it works says it in full once per publisher (*"… Haven Daily is an independent project; RTV Rijnmond is not responsible for the AI-generated summaries."*, `render.permission_statement`) and lists the source under Summarised with its limits.
-- **Leaflet controls**: zoom = two separate ivory 32px squares with 6px gap and shadow; above them the **orange "whole port" button** (expand icon; on wide screens also the words **"Whole port"**, #82); scale bar and attribution in the same corner (bottom-right stack, bottom-up: attribution, scale, zoom, home).
+- **Leaflet controls**: zoom = two square buttons of the shared set with a 6px gap; above them the **"Whole port" button**, also of the shared set (expand icon; on wide screens also the words **"Whole port"**, #82; *no longer orange since #102*); scale bar and attribution in the same corner (bottom-right stack, bottom-up: attribution, scale, zoom, home).
+- **Labels on the chart** (#102): water names in Plex Serif italic, land names in small Manrope capitals, the city in bold capitals, all with a white halo; **each item's label ("Terminal strike") on a small white card**, so it stays readable over place names and lines. The land is drawn flat (no random grain).
 - **Ship list header**: a small ▸ before "All N ships in the snapshot" that turns down when the list is open (#82).
 
 **Cards and panel (built 3 Nov 2026, #82; design review S5, S10, S11, M3, §7.8).**
@@ -1124,7 +1128,7 @@ Principle: **fact vs interpretation in two typefaces** — the impact is the onl
 6. **"Whole port" shows from 64rem**, the width where the panel floats over the chart; 13 px bold; the button grows to the left. Phones keep the 32 px icon square; its spoken name stays "Show the whole port".
 7. **The ▸ is a small SVG triangle**, not a text character, so it looks the same whatever font loads; it turns 90° when the list is open.
 8. **All three panel sizes are 13 px** (0.8125rem), the lower end of the review's 13–14 px, so the panel keeps its rhythm; the status values (17 px) are unchanged.
-- **Popup** (ship): dark surface, ship name (condensed 700), "Container ship · 350 m · Liberia", facts (Status, Area, Destination + raw AIS text in mono). If linked to news: full-width **peach button** "AT THE TERMINAL IN ITEM 1" with the severity colour as a 4px left border.
+- **Popup** (ship): white card, ship name (Manrope 800), "Container ship · 350 m · Liberia", facts (Status, Area, Destination + raw AIS text in mono). If linked to news: a full-width **button of the shared set** "At the terminal in item 1" with the severity colour as a 4px left border (*was a peach button until #102*).
 - **Accessibility**: skip link, `aria-live` announcer for chart changes, everything on the chart also listed as text, `needs-map` / `no-map` classes so buttons only appear when the chart works, reduced-motion support, focus outlines, 44px touch targets.
 
 **Status meaning (built 3 Nov 2026, #83; design review S6, S7, §7.8).**
@@ -1187,7 +1191,7 @@ Prompts:
   5. **The alt text**, proposed by Claude: "A dark, stylised chart of a large seaport at dusk, with a few ships seen from above." (from the §7.7 prompt); change it in `config/site.toml` when the image is made. *(Replaced by #95: it now describes the drawn card.)*
   6. **"No hard-coded URLs in templates"** is read as the site's own addresses (base URL, LinkedIn, repository). Links to other sites (sources, OpenStreetMap, MeteoAlarm, the GitHub Privacy Statement, credits) stay in the templates as page content.
   7. **`og:type` is `website` on every page**, day pages included (not `article`).
-- **Built 3 Nov 2026 (#95): the image itself.** `static/social-preview.png` is drawn by `tools/make_social_preview.py` (Pillow), not generated, so it can be remade and contains nothing from anyone else (hard rule 13): no map data, no photos. It shows the page background (`--bg`), a short orange bar (`--accent`), **"Haven Daily"** large in ivory (`--ink`), the owner's one-liner (§7.8) below it in `--ink-2`, a thin rule (`--rule`) and **"Independent portfolio project"** small at the bottom. The script reads the texts from `SITE` in `haven/render.py`, the colours from the tokens at the top of `style.css` and the letters from the self-hosted Plex files in `static/fonts/`, so a change to any of them needs only a re-run. Since the file exists, every page has `og:image` and `twitter:card` = `summary_large_image` (#28). `social_image_alt` in `config/site.toml` describes the card: *"Dark card with a short orange line above "Haven Daily" in large ivory letters, under it the line "What affects … Updated every morning." and, small at the bottom, "Independent portfolio project"."* `tests/test_social_preview.py` checks: 1200 × 630; the committed file is pixel-identical to what the script makes now; texts, colours and fonts are the site's own; every pixel is a blend of the named tokens over the background; no text/metadata chunks in the PNG; the script reads nothing from the network; the alt text quotes the three texts and mentions no chart, map or ships. **Same pixels on every computer:** Pillow is pinned (`pillow==12.3.0`, in `requirements-dev.txt` only; the daily build doesn't need it, and `haven/config.py` still reads the PNG size from its header), and the script uses Pillow's basic text layout, because Pillow on Linux also has Raqm, which places letters differently, and CI (Linux) failed the pixel check until then. *Proposed by Claude, all four confirmed by the owner (3 Nov 2026, PR #96):*
+- **Built 3 Nov 2026 (#95): the image itself.** `static/social-preview.png` is drawn by `tools/make_social_preview.py` (Pillow), not generated, so it can be remade and contains nothing from anyone else (hard rule 13): no map data, no photos. It shows the page background (`--bg`), **"Haven Daily"** large in navy (`--ink`), the owner's one-liner (§7.8) below it in `--ink-2`, a thin rule (`--rule`) and **"Independent portfolio project"** small at the bottom. *Since #102 (Harbour Light) it is light, all in Manrope (800 / 400 / 800 capitals), and the short orange bar is gone: the accent now marks only what can be pressed.* The script reads the texts from `SITE` in `haven/render.py`, the colours from the tokens at the top of `style.css` and the letters from the self-hosted Manrope file in `static/fonts/`, so a change to any of them needs only a re-run. Since the file exists, every page has `og:image` and `twitter:card` = `summary_large_image` (#28). `social_image_alt` in `config/site.toml` describes the card: *"Light card with "Haven Daily" in large navy letters, under it the line "What affects … Updated every morning." and, small at the bottom, "Independent portfolio project"."* `tests/test_social_preview.py` checks: 1200 × 630; the committed file is pixel-identical to what the script makes now; texts, colours and fonts are the site's own; every pixel is a blend of the named tokens over the background; no text/metadata chunks in the PNG; the script reads nothing from the network; the alt text quotes the three texts and mentions no chart, map or ships. **Same pixels on every computer:** Pillow is pinned (`pillow==12.3.0`, in `requirements-dev.txt` only; the daily build doesn't need it, and `haven/config.py` still reads the PNG size from its header), and the script uses Pillow's basic text layout, because Pillow on Linux also has Raqm, which places letters differently, and CI (Linux) failed the pixel check until then. *Proposed by Claude, all four confirmed by the owner (3 Nov 2026, PR #96); 1 to 3 describe the card before #102, which redrew it in Manrope without the bar (above):*
   1. **Title in IBM Plex Sans Condensed 700, 148 px** (the headline role, §7.3), not Plex Mono like the brand row: it reads better as a big word at thumbnail size.
   2. **One-liner in Plex Sans 400, 38 px, on two lines** of about equal length; **footer label in Plex Mono 500, 21 px, uppercase with letter-spacing**, like the site's labels (§7.3).
   3. **Two small additions to what was asked:** the short orange bar above the title (the site's one accent) and a thin rule above the footer label. Both are in the alt text.
@@ -1253,7 +1257,7 @@ The review (`docs/design-review.md`) found why the site didn't feel user-friendl
 7. **Compact form** (#104): every point on a grid of 0.0001° (~10 m) counted from the south-west corner, each point as the step from the one before, each step written as letters in 5-bit groups (the "encoded polyline" scheme of web maps). Shapes are sorted by position (bands of 64 grid rows, west to east) and a shape's first point is the step from the first point of the shape before it, so steps stay small. Tanks: one text of (step from the tank before, radius) triples.
 8. Output `static/basemap.js`: `window.HAVEN_BASEMAP = {bbox, grid: 10000, land: [ring texts], detail: {major, minor, rail, jetty: [line texts], tanks: text}, labels}`. **About 158 KB raw, about 92 KB as sent** (gzip; 157,691 and 91,843 bytes on the live site, checked 20 Nov 2026), was 840 KB / 238 KB. Last run: 205 land polygons (260 rings), 2,078 major + 3,433 minor road lines, 2,977 rail, 773 jetty, 4,240 tanks. The 41 places were checked before/after (`tools/basemap_shots.mjs` + `tools/basemap_sheet.py`, sheets in `docs/site-speed-basemap/`; `tests/test_basemap.py`: no place moves between land and water, the shore near each moves 29 m at most).
 
-Place labels (water = italic serif; land = mono caps; city = condensed caps):
+Place labels (water = italic serif; land = small Manrope caps; city = bold Manrope caps; since #102):
 North Sea (51.99, 3.84) · Nieuwe Waterweg (51.951, 4.163, 37°) · Nieuwe Maas (51.9, 4.4) · Oude Maas (51.846, 4.36, 30°) · Waalhaven (51.879, 4.452) · Maasvlakte 2 (51.976, 3.975) · Maasvlakte (51.946, 4.035) · Europoort (51.933, 4.13) · Botlek (51.868, 4.29) · Pernis (51.882, 4.385) · Hoek van Holland (51.984, 4.135) · Rozenburg (51.906, 4.245) · Rotterdam (51.925, 4.48).
 
 ### 8.3 Painting the basemap in the browser (`static/map.js`)
@@ -1299,7 +1303,7 @@ bulk       M-1.7,-8h3.4v2.6h-3.4zM-1.7,-4.6h3.4v2.6h-3.4zM-1.7,-1.2h3.4v2.6h-3.4
 - Clicking a number on the chart scrolls the **panel** entry into view (or the full card on phones).
 - From the full brief, the chart scrolls back into view only if less than 60% of it is visible.
 - Panel entries are real links (`href="#item-N"`) → work without JavaScript; with JS, `preventDefault` and select. **Every entry, with or without a place** (#82): an item without a place opens in the panel and the chart doesn't move (§7.5 "Cards and panel").
-- Ship filter buttons; "N at anchor" / "N under way" fly to those ships; ship names in the table find the ship and open its popup; orange button / "Overview" return home.
+- Ship filter buttons; "N at anchor" / "N under way" fly to those ships; ship names in the table find the ship and open its popup; "Whole port" / "Overview" return home.
 - Hovering an item (panel or brief) enlarges its number on the chart.
 
 #### Pins that share a marker (#85, M4 option b, built 3 Nov 2026)
@@ -1354,7 +1358,7 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 - **Own daily AIS snapshot** (no embedded MarineTraffic/VesselFinder widget): the morning job listens to the free **aisstream.io** WebSocket for ~10–15 min on a bounding box around the port and saves vessels present.
 - **Seagoing cargo ships only** (container, tanker, bulk). No barges, tugs, pilot boats.
 - Each day's map stays in the archive.
-- Click a ship: name, type, flag, berth/terminal if known, declared AIS destination (cleaned + raw), and a **point-to-point estimated route** (now → next destination) drawn with `searoute`, labelled **"estimated"**; the map zooms out from Rotterdam to show the trip (the orange route line from the reference style fits here).
+- Click a ship: name, type, flag, berth/terminal if known, declared AIS destination (cleaned + raw), and a **point-to-point estimated route** (now → next destination) drawn with `searoute`, labelled **"estimated"**; the map zooms out from Rotterdam to show the trip (drawn as a dashed line).
 - Clean messy AIS destinations ("NL RTM", "ANTWERP>HAMBURG", blank) → show "Unknown" when unclear.
 - Highlight ships at terminals mentioned in today's news (already designed).
 - Optional "see it live" link to the ship on MarineTraffic (link only).
@@ -1431,4 +1435,4 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 
 ## 12. Credits
 
-Status data: weather warnings by KNMI via MeteoAlarm (shown: "KNMI", time of issue, link to www.meteoalarm.org, MeteoAlarm's exact disclaimer), Rhine Kaub by WSV / PEGELONLINE (DL-DE→Zero-2.0), Rhine Lobith by Rijkswaterstaat (CC0). Map data © OpenStreetMap contributors (ODbL). Leaflet 1.9.4 (BSD-2). Icons: Lucide (ISC). Fonts: IBM Plex Sans, Sans Condensed, Mono, Serif (SIL Open Font License). Shapely (BSD) for the basemap tool. Jinja2 (BSD). Beautiful Soup and soupsieve (MIT). Anthropic Python SDK (MIT).
+Status data: weather warnings by KNMI via MeteoAlarm (shown: "KNMI", time of issue, link to www.meteoalarm.org, MeteoAlarm's exact disclaimer), Rhine Kaub by WSV / PEGELONLINE (DL-DE→Zero-2.0), Rhine Lobith by Rijkswaterstaat (CC0). Map data © OpenStreetMap contributors (ODbL). Leaflet 1.9.4 (BSD-2). Icons: Lucide (ISC). Fonts: Manrope, IBM Plex Mono and IBM Plex Serif (SIL Open Font License). Shapely (BSD) for the basemap tool. Jinja2 (BSD). Beautiful Soup and soupsieve (MIT). Anthropic Python SDK (MIT).
