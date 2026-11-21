@@ -19,6 +19,7 @@ on:
       - haven/render.py
       - tools/measure_speed.mjs
       - tools/speed_compare.mjs
+      - tools/check_map_input.mjs
       - tools/build_basemap.py
       - .github/workflows/speed.yml
 
@@ -83,3 +84,8 @@ jobs:
         run: |
           node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" --profile phone | tee -a "$GITHUB_STEP_SUMMARY"
           node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" --profile laptop | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # How the chart takes the mouse, wheel, touchpad, keys and touch, before and after (#111).
+      - name: Map input
+        timeout-minutes: 15
+        run: node tools/check_map_input.mjs "$RUNNER_TEMP/before" "$RUNNER_TEMP/after" | tee -a "$GITHUB_STEP_SUMMARY"
