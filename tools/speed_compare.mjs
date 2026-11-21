@@ -9,8 +9,9 @@ const args = process.argv.slice(2);
 const [before, after] = args.slice(0, 2).map((f) => JSON.parse(fs.readFileSync(f, "utf8")));
 const profile = args.includes("--profile") ? args[args.indexOf("--profile") + 1] : "phone";
 
-// Targets on the throttled phone (owner, 18 Nov 2026).
-const TARGETS = { text: 1500, map: 2500, move: 1000 };
+// Targets on the throttled phone (owner, 18 Nov 2026); on the laptop, no task over 100 ms
+// per zoom step (owner, #111, 21 Nov 2026).
+const TARGETS = profile === "laptop" ? { zoom: 100 } : { text: 1500, map: 2500, move: 1000 };
 
 const kb = (bytes) => (bytes == null ? "–" : `${Math.round(bytes / 1024)} KB`);
 const ms = (value) => (value == null ? "–" : `${(value / 1000).toFixed(2)} s`);
@@ -19,6 +20,12 @@ const fontFiles = (entry) => entry.files.filter(([url]) => url.includes("fonts/"
 // A map move: the longest the page froze while dragging or zooming the chart.
 const move = (entry) => entry.interactions
   ? Math.max(entry.interactions["drag the map"]?.longestTask ?? 0, entry.interactions["zoom in (button)"]?.longestTask ?? 0)
+  : null;
+
+// A zoom: the longest task of any zoom step, by button or by flying to an item (#111).
+const ZOOMS = ["zoom in (button)", "zoom in again (button)", "zoom out (button)", "select an item (chart flies)"];
+const zoom = (entry) => entry.interactions
+  ? Math.max(...ZOOMS.map((name) => entry.interactions[name]?.longestTask ?? 0))
   : null;
 
 const ROWS = [
@@ -32,6 +39,7 @@ const ROWS = [
   ["Blocked (TBT)", (e) => e.timing.tbt, ms],
   ["Longest task while loading", (e) => e.timing.longest, ms],
   ["Map move: longest freeze", move, ms, TARGETS.move],
+  ["Zoom step: longest task", zoom, ms, TARGETS.zoom],
 ];
 
 const out = [];

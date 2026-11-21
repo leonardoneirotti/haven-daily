@@ -12,7 +12,7 @@
 //   Lighthouse, CPU slowed 4x). Weight per file as sent (compressed) and as stored;
 //   first paint, largest paint, load event, main-thread busy time, long tasks, and the
 //   JavaScript functions that took the most time.
-// - On pages with a chart: drag the map, zoom in, select an item (the chart flies to it)
+// - On pages with a chart: drag the map, zoom in twice and out once, select an item (the chart flies to it)
 //   and scroll the page, while counting frames and long tasks.
 //
 // Nothing leaves this computer: the server listens on 127.0.0.1 and the pages load
@@ -416,6 +416,13 @@ async function interact(tab, profileName, diag) {
   }, 2500);
   await phase("zoom in (button)", async () => {
     await evaluate(s, `document.querySelector(".leaflet-control-zoom-in").click(); 1`);
+  }, 2500);
+  // Two more zoom steps (#111): every new zoom level used to work out the water lines again.
+  await phase("zoom in again (button)", async () => {
+    await evaluate(s, `document.querySelector(".leaflet-control-zoom-in").click(); 1`);
+  }, 2500);
+  await phase("zoom out (button)", async () => {
+    await evaluate(s, `document.querySelector(".leaflet-control-zoom-out").click(); 1`);
   }, 2500);
   await phase("select an item (chart flies)", async () => {
     await evaluate(s, `(() => { const b = document.querySelector('.callout-item[data-action="show-item"]') ||
