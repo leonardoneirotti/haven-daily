@@ -1112,6 +1112,39 @@ html.js .topbar {
   display: none;
 }
 
+/* "Use Ctrl + scroll to zoom the chart": shown for a moment when the wheel scrolls the page over
+   the chart (map.js, #111). Over the chart, above the canvas and below the panel and buttons;
+   never in the way of a click. On wide screens centred right of the panel, like the note above. */
+.chart-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 455;
+  margin: 0;
+  padding: 0.55rem 0.95rem;
+  background: var(--ink);
+  color: var(--surface);
+  border-radius: var(--btn-radius);
+  box-shadow: 0 6px 20px rgba(15, 34, 49, 0.18);
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.chart-hint.is-shown {
+  opacity: 1;
+}
+
+@media (min-width: 64rem) {
+  .chart-hint {
+    left: calc(50% + var(--panel-width) / 2);
+  }
+}
+
 @media (min-width: 64rem) {
   .chart-loading {
     padding-left: var(--panel-width);
@@ -1150,6 +1183,21 @@ html.js .topbar {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+/* How to move and zoom the chart (#111): the mouse and touchpad line, or the touch screen one. */
+.how-touch {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .how-fine {
+    display: none;
+  }
+
+  .how-touch {
+    display: inline;
+  }
 }
 
 /* Plain grey notes in the legend: why the chart is empty, ships not collected yet (v1) */
