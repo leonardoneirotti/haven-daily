@@ -22,6 +22,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 BASEMAP_JS = (ROOT / "static" / "basemap.js").read_text(encoding="utf-8")
 MAP_JS = (ROOT / "static" / "map.js").read_text(encoding="utf-8")
+WATER_JS = (ROOT / "static" / "water.js").read_text(encoding="utf-8") if (ROOT / "static" / "water.js").exists() else ""
 PLACES = tomllib.loads((ROOT / "config" / "places.toml").read_text(encoding="utf-8"))["place"]
 # The finer land, kept by tools/build_basemap.py as the reference (not sent to browsers).
 REFERENCE_LAND = json.loads((ROOT / "data" / "basemap" / "land.geojson").read_text(encoding="utf-8"))
@@ -176,7 +177,9 @@ def test_map_js_reads_the_compact_form():
 
 
 def test_water_lines_come_from_a_distance_map_not_wide_strokes():
-    assert "function distanceMap(" in MAP_JS
+    # Since #111 the distance map is worked out in a background worker (static/water.js,
+    # tests/test_water.py).
+    assert "function distanceMap(" in WATER_JS
     # No more strokes as wide as twice the distance from the shore.
     assert not re.search(r"lineWidth\s*=\s*2\s*\*\s*distance", MAP_JS)
 
@@ -185,7 +188,7 @@ def test_the_water_is_worked_out_once_per_zoom_and_reused_while_moving():
     paint = MAP_JS[MAP_JS.index("function paint(ctx)"):]
     paint = paint[:paint.index("\n  }\n")]
     assert re.search(r"water\.zoom === zoom", paint)
-    assert "paintWater(" in paint and "if (!inside)" in paint
+    assert "wantWater(" in paint and "if (!inside)" in paint
 
 
 def test_canvas_paths_use_small_numbers():
