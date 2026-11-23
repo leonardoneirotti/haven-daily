@@ -31,6 +31,7 @@
       <li><a href="#copyright">Copyright and article text</a></li>
       <li><a href="#privacy">Privacy</a></li>
       <li><a href="#chart">The chart</a></li>
+      <li><a href="#flags">The signal flags</a></li>
       <li><a href="#credits">Credits</a></li>
     </ol>
   </nav>
@@ -197,6 +198,28 @@
         {% else %}
         <li>Ship positions are not collected yet. They will come from a short AIS snapshot of the port area each morning: seagoing cargo ships only, where they were at that moment, not live.</li>
         {% endif %}
+      </ul>
+    </section>
+
+    {# The flag key (#117, spec §7.6): the flags on the site, their letters and their meanings,
+       quoted from the International Code of Signals (haven/flags.py). #}
+    <section aria-labelledby="flags">
+      <h2 id="flags">The signal flags</h2>
+      <p>The logo is two maritime signal flags, H over D, for Haven Daily. The browser tab shows flag P, and a page that can't be found shows flag D. Each flag stands for a letter and, flown alone, has its own meaning in the {{ flag_source.title }} ({{ flag_source.publication }}, {{ flag_source.edition }}), quoted below. The flags are drawn in the Code's colours, which the site uses for nothing else.</p>
+      <ul class="signal-key">
+        {% for letter, used in [("H", "The logo, on top."), ("D", "The logo, under H; and the page-not-found page."), ("P", "The icon in the browser tab and on a phone's home screen: the “Blue Peter”, flown before a ship sails, for a fresh edition every morning.")] %}
+        {% set flag = signal_flags[letter] %}
+        <li>
+          {{ m.signal_flag(letter) }}
+          <div>
+            <p class="signal-name"><span class="signal-letter">{{ letter }}</span> {{ flag.name }}</p>
+            {% for context, meaning in flag.meanings %}
+            <p class="signal-meaning">{% if context %}{{ context }}: {% endif %}<q>{{ meaning }}</q></p>
+            {% endfor %}
+            <p class="signal-used">{{ used }}</p>
+          </div>
+        </li>
+        {% endfor %}
       </ul>
     </section>
 

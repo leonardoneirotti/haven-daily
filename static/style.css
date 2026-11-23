@@ -441,24 +441,148 @@ html.js .topbar {
 }
 
 .brand {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.55rem;
   min-height: 44px;
   text-decoration: none;
 }
 
-.flags {
-  width: 2.25rem;
-  height: 1.06rem;
+/* The logo (#117): flags H over D on a halyard, 3 px apart. Each flag about 18 CSS px on a laptop,
+   16 on a phone. */
+.hoist {
+  width: auto;
+  height: 2.75rem;
   flex: none;
+  overflow: visible;
+}
+
+.halyard,
+.clip line,
+.clip circle {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+/* What the flags say, on hover and keyboard focus (#117) */
+.brand-hint {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 1;
+  padding: 0.3rem 0.55rem;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s ease, visibility 0.15s;
+}
+
+.brand:hover .brand-hint,
+.brand:focus-visible .brand-hint {
+  opacity: 1;
+  visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-hint { transition: none; }
+}
+
+/* One flag on its own: the 404 page and the flag key on How it works (#117) */
+.signal-flag {
+  display: block;
+  flex: none;
+}
+
+.page-not-found .not-found {
+  display: flex;
+  align-items: flex-start;
+  gap: 2rem;
+  max-width: 46rem;
+  padding-block: 2.5rem 4rem;
+}
+
+.not-found .signal-flag {
+  width: 7rem;
+  height: 7rem;
+}
+
+.not-found-text h1 {
+  margin: 0.25rem 0 0.75rem;
+}
+
+.not-found-text p + p {
+  margin-top: 0.75rem;
+}
+
+.not-found-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 40rem) {
+  .page-not-found .not-found {
+    flex-direction: column;
+    gap: 1.25rem;
+    padding-block: 1.5rem 3rem;
+  }
+
+  .not-found .signal-flag {
+    width: 5rem;
+    height: 5rem;
+  }
+}
+
+/* The flag key on How it works */
+.signal-key {
+  display: grid;
+  gap: 1.25rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.signal-key li {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.signal-key .signal-flag {
+  width: 3rem;
+  height: 3rem;
+}
+
+.signal-name {
+  font-weight: 800;
+}
+
+.signal-letter {
+  display: inline-block;
+  min-width: 1.4em;
+}
+
+.signal-used {
+  color: var(--ink-2);
+  font-size: 0.875rem;
 }
 
 .flag-white { fill: var(--flag-white); }
 .flag-red { fill: var(--flag-red); }
 .flag-yellow { fill: var(--flag-yellow); }
 .flag-blue { fill: var(--flag-blue); }
-.flag-edge { fill: none; stroke: var(--flag-edge); stroke-width: 1; }
+.flag-edge { fill: none; stroke: var(--flag-edge); stroke-width: 1; vector-effect: non-scaling-stroke; } /* 1 px at any size */
 
 /* The name in words, not a code in spaced capitals */
 .brand-name {
@@ -526,9 +650,8 @@ html.js .topbar {
     gap: 0.45rem;
   }
 
-  .flags {
-    width: 1.9rem;
-    height: 0.9rem;
+  .hoist {
+    height: 2.5rem;
   }
 
   .brand-name {

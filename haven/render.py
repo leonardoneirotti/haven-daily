@@ -17,7 +17,7 @@ import shutil
 from datetime import date, datetime, timedelta
 from itertools import groupby
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
@@ -28,6 +28,7 @@ from haven.clock import AMSTERDAM
 from haven.config import (CONFIG_DIR, RhineMeanings, RhineThresholds, SiteConfig, Source, load_rhine,
                           load_rhine_meanings, load_site, load_sources, preview_image_size)
 from haven.feeds import LEAD_PARAGRAPH_FEEDS
+from haven.flags import FLAGS, SOURCE as FLAG_SOURCE
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = PROJECT_DIR / "templates"
@@ -828,6 +829,8 @@ def make_environment() -> Environment:
         max_items=MAX_ITEMS,
         ais_snapshot_built=AIS_SNAPSHOT_BUILT,
         meteoalarm_disclaimer=METEOALARM_DISCLAIMER,
+        signal_flags=FLAGS,  # the logo, the 404 page and the flag key (#117)
+        flag_source=FLAG_SOURCE,
     )
     return env
 
@@ -875,6 +878,10 @@ def render_site(briefs_dir: Path, out_dir: Path, rhine_path: Path | None = None)
     write_page(env, "about.html", out_dir / "about.html", root="", active="method", sample=sample,
                method=method_page(load_sources(), load_rhine(rhine_path)),
                preview=site_preview("about.html", "How it works"))
+    # GitHub Pages serves 404.html at whatever address was missing (#117), so its links start from
+    # the site's own path ("/haven-daily/"), not from where the page happens to be.
+    write_page(env, "404.html", out_dir / "404.html", root=urlparse(load_site().base_url).path, active=None,
+               sample=sample, preview=site_preview("404.html", "Page not found"))
     return len(briefs)
 
 

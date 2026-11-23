@@ -8,13 +8,29 @@
 {%- endmacro %}
 
 {# Logo: the letters H and D in the International Code of Signals. #}
-{% macro flags() -%}
-<svg class="flags" viewBox="0 0 51 24" aria-hidden="true" focusable="false">
-  <rect class="flag-white" x="0.5" y="0.5" width="23" height="23"/>
-  <rect class="flag-red" x="12" y="0.5" width="11.5" height="23"/>
-  <rect class="flag-edge" x="0.5" y="0.5" width="23" height="23"/>
-  <rect class="flag-yellow" x="27.5" y="0.5" width="23" height="23"/>
-  <rect class="flag-blue" x="27.5" y="6.25" width="23" height="11.5"/>
+{# Maritime signal flags (#117, spec §7.6): one flag's parts on a 24 x 24 grid, from haven/flags.py,
+   with a thin outline so the white of H shows on a white header. The flag colours are used only
+   here, never as UI colours (spec §7.2). #}
+{% macro flag_parts(letter, at=none) -%}
+<g class="flag-{{ letter | lower }}"{% if at %} transform="translate({{ at }})"{% endif %}>
+  {%- for colour, x, y, w, h in signal_flags[letter].parts %}<rect class="flag-{{ colour }}" x="{{ x }}" y="{{ y }}" width="{{ w }}" height="{{ h }}"/>{% endfor -%}
+  <rect class="flag-edge" x="0.5" y="0.5" width="23" height="23"/></g>
+{%- endmacro %}
+
+{# One flag on its own: the 404 page and the flag key. Named for screen readers when `label` is given. #}
+{% macro signal_flag(letter, label=none) -%}
+<svg class="signal-flag" viewBox="0 0 24 24" {% if label %}role="img" aria-label="{{ label }}"{% else %}aria-hidden="true"{% endif %} focusable="false">{{ flag_parts(letter) }}</svg>
+{%- endmacro %}
+
+{# The logo (#117): H over D (Haven Daily) on a thin halyard, clipped on at the top of H and the
+   bottom of D, as in the owner's reference (design/logo/references/hoist.png). #}
+{% macro hoist() -%}
+<svg class="hoist" viewBox="0 0 31 58" aria-hidden="true" focusable="false">
+  <line class="halyard" x1="2.5" y1="0.5" x2="2.5" y2="57.5"/>
+  <g class="clip"><circle cx="2.5" cy="3.5" r="1.5"/><line x1="4" y1="3.5" x2="6" y2="3.5"/></g>
+  <g class="clip"><circle cx="2.5" cy="54.5" r="1.5"/><line x1="4" y1="54.5" x2="6" y2="54.5"/></g>
+  {{ flag_parts("H", "6 3") }}
+  {{ flag_parts("D", "6 31") }}
 </svg>
 {%- endmacro %}
 

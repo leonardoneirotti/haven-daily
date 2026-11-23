@@ -80,7 +80,7 @@ def test_the_meanings_are_quoted_from_the_code():
     assert flags.FLAGS["P"].name == "Papa"
     assert flags.FLAGS["P"].meanings == (
         ("In harbor", "All persons should report on board as the vessel is about to proceed to sea."),
-        ("At sea", "It may be used by fishing vessels to mean: “My nets have come fast upon an obstruction”."),
+        ("At sea", "It may be used by fishing vessels to mean: ‘My nets have come fast upon an obstruction’."),
     )
 
 
