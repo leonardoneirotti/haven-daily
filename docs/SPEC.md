@@ -309,13 +309,13 @@ static/
   basemap.js           generated: land, detail, labels (window.HAVEN_BASEMAP)
   site.js              adds the "js" class to <html>
   favicon.svg, favicon-16.png, favicon-32.png, apple-touch-icon.png
-                       generated: flag P on a light-blue tile (§7.6, #117)
+                       generated: flags H over D on a light-blue tile (§7.6, #117, PR #120)
   social-preview.png   generated: the 1200 × 630 social preview card (§7.7)
   fonts/               IBM Plex woff2 files + OFL.txt, self-hosted (§7.3, #27)
   vendor/leaflet/      Leaflet 1.9.4, self-hosted
 tools/build_basemap.py builds basemap.js from OpenStreetMap (run once)
 tools/make_social_preview.py  draws static/social-preview.png, the og:image card (§7.7, #95)
-tools/make_icons.py    draws the favicon and app icon, flag P (§7.6, #117)
+tools/make_icons.py    draws the favicon and app icon, H over D (§7.6, #117, PR #120)
 data/basemap/          land.geojson + raw Overpass caches (caches git-ignored)
 data/sample/briefs/    4 sample briefs (fake, marked as sample; 26 Oct is a reduced brief)
 data/briefs/           real briefs, one per day (what the renderer reads)
@@ -1181,10 +1181,11 @@ Principle: **fact vs interpretation in two typefaces** — the impact is the onl
 
 | Where | What |
 |---|---|
-| **Header, every page** | `m.hoist()`: the halyard, a clip at the top of H and the bottom of D, H above D with a gap; 2.75rem high on a laptop and 2.5rem on a phone (each flag about 18 and 16 CSS px). On hover and keyboard focus a small navy label: **"H·D in maritime signal flags"** (`.brand-hint`, `aria-describedby` on the link). |
-| **Favicon and app icon** | **Flag P, the "Blue Peter"** (the vessel is about to proceed to sea: a fresh morning edition) on a light-blue rounded tile, the chart's water `--water`. `static/favicon.svg` plus PNGs drawn on whole pixels at their own size: `favicon-16.png` (flag 12 px, square 4 px), `favicon-32.png` (flag 24 px, square 8 px) and `apple-touch-icon.png` (180 px, flag 132 px, square corners: the phone rounds them). Made by `tools/make_icons.py`; the committed files must be what it makes. |
+| **Header, every page** | `m.hoist()`: the halyard, a clip at the top of H and the bottom of D, H above D with a gap; 2.75rem high on a laptop and 2.5rem on a phone (each flag about 18 and 16 CSS px). **The letters H and D beside their flags** (`.hoist-letters`, Manrope 800, 11 px, each centred on its flag, on every screen; *owner's pick, PR #120: the hover label alone didn't explain the flags and does nothing on a phone*). On hover and keyboard focus a small navy label: **"H·D in maritime signal flags"** (`.brand-hint`, `aria-describedby` on the link). |
+| **Favicon and app icon** | *(Owner's pick, PR #120: option B of three mockups, everywhere.)* **The logo's flags H over D on a light-blue rounded tile**, the chart's water `--water`. `static/favicon.svg` plus PNGs **drawn pixel by pixel at their own size, the flags as large as the tile allows** (`tools/make_icons.py`, `LAYOUTS`): `favicon-16.png` two 8 px flags filling the height, H with a 1 px navy outline (white 3 \| red 3), D without one so its bands stay exact (2 / 4 / 2); `favicon-32.png` two 14 px flags, 1 px outlines, 2 px apart; `apple-touch-icon.png` (180 px) two 70 px flags, 3 px outlines, 8 px apart, square-cornered (the phone rounds them). The committed files must be what the script makes. *(Was: flag P, the "Blue Peter", #117; it looked bad and meant nothing at small size, launch review 23 Nov 2026.)* |
 | **404 page** (`404.html`, §2.3) | **Flag D**, "Page not found", its meaning quoted and a friendly line, then **Back to Today** and the archive. |
-| **How it works** | **"The signal flags"**: H, D and P with their letters, names, meanings quoted from the Code and where each is used; names the Code as the source. |
+| **How it works** | **"The signal flags"**: H, D and P with their letters, names, meanings quoted from the Code and where each is used; names the Code as the source. **Flag P, the "Blue Peter", appears only here** ("Shown here only"), for its meaning. |
+| **Today, "About this project"** | *(Owner's pick, PR #120.)* One sentence: **"Our logo spells H·D, Haven Daily, in maritime signal flags."**, the last words linking to the flag key (`about.html#flags`). |
 | **Social card** (§7.7) | The hoist on the right, above the one-liner. |
 
 **Checked against the International Code of Signals.** Source: ***International Code of Signals*, Pub. 102, United States Edition, 1969 (Revised 2003)**, National Imagery and Mapping Agency (read 23 Nov 2026 from the Internet Archive copy, archive.org/details/pub-102; the US Coast Guard's PDF refuses automated access).
