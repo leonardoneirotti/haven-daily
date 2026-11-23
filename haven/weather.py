@@ -1,16 +1,26 @@
-"""Weather status: KNMI's warnings for Zuid-Holland, read via MeteoAlarm (spec §2.2, §4; issue #18).
+"""Weather status: KNMI's warnings for the Port of Rotterdam area, read via MeteoAlarm (spec §2.2, §4,
+§5.11; issues #18 and #121).
 
 One request a morning to MeteoAlarm's Netherlands feed (JSON, no key; robots.txt allows
-bots). It republishes KNMI's own warnings: one entry per warning *version*, per province
-and per hazard, including KNMI's daily "green" (no warning) entries.
+bots). It republishes KNMI's own warnings. **Since November 2026** (found at launch, #26) it
+holds a few regional warnings, one entry per warning *version*, each area as free text ("South
+Holland and Utrecht and parts of: …") **plus a CAP polygon** ("lat,lon lat,lon …"), no geocode,
+and **no entry at all for an area without a warning**. (Before, one entry per province, with
+KNMI's daily green entries.)
 
 The reading:
-- **Which warnings count:** Zuid-Holland (EMMA_ID `NL009`), real messages only
-  (`status` Actual), the newest version of each warning only (a version named in another
-  message's `references` has been replaced by an Update or withdrawn by a Cancel), and only
-  those **valid at some moment from when the feed was read until midnight** (Amsterdam
+- **Which warnings count** (owner, 23 Nov 2026, #121): those whose **polygon contains any of the 41
+  places** in config/places.toml (a small point-in-polygon check, no library), never by the
+  free-text name. Places at sea count too, so coastal-water warnings over the anchorages count.
+  Real messages only (`status` Actual), the newest version of each warning only (a version named
+  in another message's `references` has been replaced by an Update or withdrawn by a Cancel), and
+  only those **valid at some moment from when the feed was read until midnight** (Amsterdam
   date). A warning that already expired this morning, or starts tomorrow, doesn't count
   (owner's decision, 2 Nov 2026).
+- **Nothing for the port area = No warnings**, but only when the feed loaded, parsed in the
+  expected shape (every counted entry's area has a readable polygon) and is **fresh**: the
+  server's `Date` within 15 minutes of when we read it, and no cache `Age` over 15 minutes.
+  Otherwise No data. Never Normal on doubt (owner, 23 Nov 2026).
 - **Level:** the highest one decides: green → Normal (`green`), yellow → Watch (`amber`),
   orange/red → Alert (`red`).
 - **What is kept** for the display MeteoAlarm requires: "KNMI" as the source, the time of
@@ -19,9 +29,9 @@ The reading:
   With no warnings there is no time of issue, only the read time (owner, 2 Nov 2026).
 
 Any doubt is "No data", never a guess (spec §2.2): the feed down or blocked, not JSON, not
-the warnings feed, no Zuid-Holland entry for today at all (an empty answer could hide a
-renamed area), or an unreadable level, hazard or time in a Zuid-Holland warning. Then the
-reading has `value`/`level` `null` and one failure line goes to build.failures.
+the warnings feed, not fresh, an entry without a readable polygon (we couldn't tell whether it
+covers the port), or an unreadable level, hazard or time in a warning for the port area. Then
+the reading has `value`/`level` `null` and one failure line goes to build.failures.
 
 `python -m haven.weather` reads the live feed once and prints the reading; it writes nothing.
 """
@@ -32,16 +42,18 @@ import json
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta
+from email.utils import parsedate_to_datetime
 
 from haven.clock import AMSTERDAM
+from haven.config import Place, load_places
 from haven.fetch import Fetcher, FetchError
 
 FEED_URL = "https://feeds.meteoalarm.org/api/v1/warnings/feeds-netherlands"
 SITE_URL = "https://www.meteoalarm.org"
 FAILURE_SOURCE = "Weather warnings (MeteoAlarm)"
 
-AREA_CODE = "NL009"  # EMMA_ID of the province; the area MeteoAlarm calls "Zuid-Holland"
-AREA_NAME = "Zuid-Holland"
+AREA_NAME = "Port of Rotterdam area"  # any of the 41 places in config/places.toml (#121)
+FRESH_WITHIN = timedelta(minutes=15)  # the server's answer must be this recent (#121)
 
 COLOURS = ("green", "yellow", "orange", "red")  # lowest to highest
 STATUS_LEVEL = {"green": "green", "yellow": "amber", "orange": "red", "red": "red"}
@@ -70,9 +82,13 @@ class WeatherResult:
 # --- reading the feed -----------------------------------------------------------------
 
 
-def reading_from_feed(data, read_at: datetime) -> dict:
-    """The status reading for the moment `read_at`. Raises WeatherFeedError on any doubt."""
+def reading_from_feed(data, read_at: datetime, places: tuple[Place, ...] | None = None) -> dict:
+    """The status reading for the moment `read_at`. Raises WeatherFeedError on any doubt.
+
+    Freshness is checked by read_weather, from the HTTP answer; this reads the feed's content.
+    """
     read_at = _amsterdam(read_at)
+    points = [(p.lat, p.lon) for p in (load_places() if places is None else places)]
     entries = _alerts(data)
     replaced = {ref for alert in entries if alert.get("status") == "Actual" for ref in _references(alert)}
     end_of_today = datetime.combine(read_at.date() + timedelta(days=1), time(0), AMSTERDAM)
@@ -83,17 +99,15 @@ def reading_from_feed(data, read_at: datetime) -> dict:
             continue
         if alert.get("identifier") in replaced:
             continue
-        info = _zuid_holland_info(alert)
+        info = _port_info(alert, points)
         if info is None:
             continue
         found = _warning(alert, info)
         if found.onset < end_of_today and (found.expires is None or found.expires > read_at):
             valid.append(found)
 
-    if not valid:
-        raise WeatherFeedError(f"no {AREA_NAME} entry for today in the feed (area renamed or feed changed?)")
-
-    top = max(COLOURS.index(w.colour) for w in valid)
+    # Nothing for the port area: No warnings (read_weather has checked the answer is fresh).
+    top = max((COLOURS.index(w.colour) for w in valid), default=0)
     colour = COLOURS[top]
     raised = sorted((w for w in valid if w.colour != "green"), key=lambda w: (-COLOURS.index(w.colour), w.onset))
     at_top = [w for w in raised if w.colour == colour]
@@ -141,6 +155,7 @@ def read_weather(fetcher: Fetcher, read_at: datetime) -> WeatherResult:
     read_at = _amsterdam(read_at)
     try:
         response = fetcher.fetch(FEED_URL)
+        _check_fresh(response.headers, read_at)
         try:
             data = json.loads(response.text())
         except ValueError:
@@ -207,25 +222,81 @@ def _references(alert: dict) -> set[str]:
     return {parts[1] for parts in (ref.split(",") for ref in refs.split()) if len(parts) >= 2}
 
 
-def _zuid_holland_info(alert: dict) -> dict | None:
-    """The info block (English first) whose area is Zuid-Holland, or None."""
-    matches = [info for info in alert["info"] if isinstance(info, dict) and _is_zuid_holland(info)]
+def _check_fresh(headers: dict, read_at: datetime) -> None:
+    """The answer must be the server's own and recent: its Date within FRESH_WITHIN of read_at, and
+    no cache Age over FRESH_WITHIN (#121). The feed has no time of its own, and in calm weather no
+    entries at all, so the HTTP answer is what can tell."""
+    try:
+        served = parsedate_to_datetime(headers["date"])
+    except (KeyError, TypeError, ValueError):
+        raise WeatherFeedError("no Date in the answer: can't tell whether the feed is fresh") from None
+    if served.tzinfo is None:
+        raise WeatherFeedError("no Date in the answer: can't tell whether the feed is fresh")
+    if abs(served - read_at) > FRESH_WITHIN:
+        raise WeatherFeedError(f"not fresh: the answer is dated {_iso(served)}, read at {_iso(read_at)}")
+    age = headers.get("age")
+    if age is not None and (not age.strip().isdigit() or int(age) > FRESH_WITHIN.total_seconds()):
+        raise WeatherFeedError(f"not fresh: a cache's copy, {age} s old")
+
+
+def _port_info(alert: dict, points: list[tuple[float, float]]) -> dict | None:
+    """The info block (English first) whose area covers any of our places, or None.
+
+    Every area of every info block must have a readable polygon: without one we couldn't tell
+    whether the warning covers the port (WeatherFeedError, so No data)."""
+    matches = [info for info in alert["info"] if isinstance(info, dict) and _covers(info, points)]
     if not matches:
         return None
     english = [info for info in matches if str(info.get("language", "")).startswith("en")]
     return (english or matches)[0]
 
 
-def _is_zuid_holland(info: dict) -> bool:
-    for area in info.get("area") or []:
-        if not isinstance(area, dict):
-            continue
-        if area.get("areaDesc") == AREA_NAME:
-            return True
-        for code in area.get("geocode") or []:
-            if isinstance(code, dict) and code.get("value") == AREA_CODE:
-                return True
-    return False
+def _covers(info: dict, points: list[tuple[float, float]]) -> bool:
+    areas = info.get("area")
+    if not isinstance(areas, list) or not areas or not all(isinstance(a, dict) for a in areas):
+        raise WeatherFeedError("an entry's area is not a list of areas")
+    covered = False
+    for area in areas:
+        polygons = area.get("polygon")
+        if not isinstance(polygons, list) or not polygons:
+            raise WeatherFeedError("an entry's area has no polygon (feed shape changed?)")
+        for polygon in polygons:
+            ring = parse_polygon(polygon)
+            covered = covered or any(contains(ring, lat, lon) for lat, lon in points)
+    return covered
+
+
+def parse_polygon(text) -> list[tuple[float, float]]:
+    """A CAP polygon, "lat,lon lat,lon …", as (lat, lon) points. WeatherFeedError if unreadable."""
+    if not isinstance(text, str):
+        raise WeatherFeedError("unreadable polygon (not text)")
+    points = []
+    for pair in text.split():
+        parts = pair.split(",")
+        try:
+            lat, lon = (float(part) for part in parts) if len(parts) == 2 else (None, None)
+        except ValueError:
+            lat = lon = None
+        if lat is None or not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            raise WeatherFeedError("unreadable polygon (a point is not 'lat,lon')")
+        points.append((lat, lon))
+    if len(set(points)) < 3:
+        raise WeatherFeedError("unreadable polygon (fewer than 3 points)")
+    return points
+
+
+def contains(ring: list[tuple[float, float]], lat: float, lon: float) -> bool:
+    """Whether the point lies inside the polygon (ray casting; the ring may be open or closed)."""
+    inside = False
+    j = len(ring) - 1
+    for i in range(len(ring)):
+        (lat_i, lon_i), (lat_j, lon_j) = ring[i], ring[j]
+        if (lat_i > lat) != (lat_j > lat):
+            crossing = lon_i + (lat - lat_i) * (lon_j - lon_i) / (lat_j - lat_i)
+            if lon < crossing:
+                inside = not inside
+        j = i
+    return inside
 
 
 def _warning(alert: dict, info: dict) -> _Warning:
@@ -235,11 +306,11 @@ def _warning(alert: dict, info: dict) -> _Warning:
     colour = _part(parameters.get("awareness_level"), 1)
     colour = colour.lower() if colour else None
     if colour not in COLOURS:
-        raise WeatherFeedError(f"unreadable awareness level in a {AREA_NAME} warning")
+        raise WeatherFeedError("unreadable awareness level in a warning for the port area")
     hazard = _part(parameters.get("awareness_type"), 1)
     hazard = hazard[:1].upper() + hazard[1:] if hazard else None
     if hazard is None and colour != "green":
-        raise WeatherFeedError(f"unreadable hazard in a {AREA_NAME} warning")
+        raise WeatherFeedError("unreadable hazard in a warning for the port area")
     issued = _time(alert.get("sent"))
     onset = _time(info.get("onset") or info.get("effective") or alert.get("sent"))
     expires = _time(info["expires"]) if info.get("expires") is not None else None
@@ -258,9 +329,9 @@ def _time(value) -> datetime:
     try:
         moment = datetime.fromisoformat(value)
     except (TypeError, ValueError):
-        raise WeatherFeedError(f"unreadable time in a {AREA_NAME} warning") from None
+        raise WeatherFeedError("unreadable time in a warning for the port area") from None
     if moment.tzinfo is None or moment.utcoffset() is None:
-        raise WeatherFeedError(f"unreadable time in a {AREA_NAME} warning (no timezone)")
+        raise WeatherFeedError("unreadable time in a warning for the port area (no timezone)")
     return moment
 
 

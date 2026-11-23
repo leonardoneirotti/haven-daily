@@ -133,7 +133,7 @@ LEVELS = {
 # Wording confirmed by the owner 3 Nov 2026 (PR #89), Normal texts changed by the owner.
 STATUS_MEANINGS = {
     "weather": {
-        "green": "no KNMI warning for Zuid-Holland for the rest of today",
+        "green": "no KNMI warning for the port area for the rest of today",
         "amber": "weather may slow port operations and road transport today",
         "red": "weather likely to disrupt port operations and road transport today",
     },
