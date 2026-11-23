@@ -205,9 +205,9 @@
        quoted from the International Code of Signals (haven/flags.py). #}
     <section aria-labelledby="flags">
       <h2 id="flags">The signal flags</h2>
-      <p>The logo is two maritime signal flags, H over D, for Haven Daily. The browser tab shows flag P, and a page that can't be found shows flag D. Each flag stands for a letter and, flown alone, has its own meaning in the {{ flag_source.title }} ({{ flag_source.publication }}, {{ flag_source.edition }}), quoted below. The flags are drawn in the Code's colours, which the site uses for nothing else.</p>
+      <p>The logo is two maritime signal flags, H over D, for Haven Daily; the same two flags, on a light-blue tile, are the icon in the browser tab and on a phone's home screen. A page that can't be found shows flag D. Each flag stands for a letter and, flown alone, has its own meaning in the {{ flag_source.title }} ({{ flag_source.publication }}, {{ flag_source.edition }}), quoted below. The flags are drawn in the Code's colours, which the site uses for nothing else.</p>
       <ul class="signal-key">
-        {% for letter, used in [("H", "The logo, on top."), ("D", "The logo, under H; and the page-not-found page."), ("P", "The icon in the browser tab and on a phone's home screen: the “Blue Peter”, flown before a ship sails, for a fresh edition every morning.")] %}
+        {% for letter, used in [("H", "The logo and the icon, on top."), ("D", "The logo and the icon, under H; and the page-not-found page.")] %}
         {% set flag = signal_flags[letter] %}
         <li>
           {{ m.signal_flag(letter) }}

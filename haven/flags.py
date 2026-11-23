@@ -1,19 +1,17 @@
 """The maritime signal flags on the site (issue #117, spec §7.6): one source for all of them.
 
-The logo is H over D (Haven Daily), the favicon and app icon are P (the "Blue Peter": the vessel
-is about to proceed to sea, a fresh morning edition), and the 404 page shows D. The header
-(templates/_macros.html), the icons (tools/make_icons.py), the social card
+The site uses two flags only (owner, PR #120): H over D (Haven Daily) is the logo, the favicon
+and the app icon, and the 404 page shows D. The header (templates/_macros.html), the icons (tools/make_icons.py), the social card
 (tools/make_social_preview.py), the 404 page and the flag key on How it works all draw from here.
 
 Checked against the International Code of Signals (SOURCE):
 - **Meanings** are quoted from its single-letter signals (Chapter 1, Section 10, page 22); its
-  spelling is American ("harbor", "maneuvering").
+  spelling is American ("maneuvering").
 - **Patterns, colours and proportions** follow Flags of the World (FOTW_SOURCE, checked by the
   owner 23 Nov 2026), since the Code's text gives no shades or proportions (it shows the flags only
   in a colour plate, in five colours: red, blue, yellow, black, white): all signal code flags are
   square; H vertically divided, white at the hoist and red at the fly; D horizontally divided
-  yellow-blue-yellow, 1 : 2 : 1; P a blue field with a small white square centred on it (here a
-  third of the flag, on the 24-unit grid).
+  yellow-blue-yellow, 1 : 2 : 1.
 - **Colours** are the five Code colours, as the tokens --flag-white, --flag-red, --flag-yellow and
   --flag-blue in static/style.css. They are used only inside flags, never as UI colours, so they
   can't be confused with the severity colours (spec §7.2).
@@ -49,7 +47,7 @@ class Flag:
     parts: tuple[tuple[str, int, int, int, int], ...]  # (Code colour, x, y, width, height), drawn in order
 
 
-_HALF, _QUARTER, _THIRD = GRID // 2, GRID // 4, GRID // 3
+_HALF, _QUARTER = GRID // 2, GRID // 4
 
 FLAGS = {
     "H": Flag("H", "Hotel", ((None, "I have a pilot on board."),),
@@ -57,9 +55,4 @@ FLAGS = {
     "D": Flag("D", "Delta", ((None, "Keep clear of me; I am maneuvering with difficulty."),),
               (("yellow", 0, 0, GRID, _QUARTER), ("blue", 0, _QUARTER, GRID, 2 * _QUARTER),
                ("yellow", 0, 3 * _QUARTER, GRID, _QUARTER))),
-    "P": Flag("P", "Papa",
-              (("In harbor", "All persons should report on board as the vessel is about to proceed to sea."),
-               ("At sea", "It may be used by fishing vessels to mean: ‘My nets have come fast upon an "
-                          "obstruction’.")),
-              (("blue", 0, 0, GRID, GRID), ("white", _THIRD, _THIRD, _THIRD, _THIRD))),
 }

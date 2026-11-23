@@ -49,6 +49,7 @@ PAGES = {  # name -> path in the built site
     "how-it-works": "about.html",
     "not-found": "404.html",  # since #117
     "flag-key": "about.html#flags",  # How it works, scrolled to the flag key (#117)
+    "about-block": "index.html#about-title",  # Today, scrolled to "About this project"
 }
 DEVICES = {  # name -> (width, height, scale for the first screen, scale for the whole page)
     "laptop": (1440, 900, 1, 0.5),

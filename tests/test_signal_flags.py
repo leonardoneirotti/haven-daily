@@ -2,10 +2,12 @@
 
 - The logo: flags H over D (Haven Daily) on a thin halyard with small clips, with "Haven Daily" in
   Manrope next to it; on hover and focus "H·D in maritime signal flags".
-- Favicon and app icon: flag P, the "Blue Peter", in a light-blue rounded tile (16, 32, 180 px).
+- Favicon and app icon: the same flags, H over D, on a light-blue rounded tile (16, 32, 180 px;
+  owner's pick, PR #120).
 - A 404 page with flag D and a link back to Today.
-- A flag key on How it works: H, D and P with their letters and their meanings in the
-  International Code of Signals.
+- A flag key on How it works: H and D with their letters and their meanings in the
+  International Code of Signals. The site uses only H and D (owner, PR #120: the Blue Peter, flag P,
+  is gone).
 
 Every flag comes from one place, haven/flags.py: its letter, name, meaning (quoted from the Code)
 and pattern. The real flag colours are used only inside flags, never as UI colours, so they
@@ -77,18 +79,13 @@ def test_the_meanings_are_quoted_from_the_code():
     assert flags.FLAGS["H"].meanings == ((None, "I have a pilot on board."),)
     assert flags.FLAGS["D"].name == "Delta"
     assert flags.FLAGS["D"].meanings == ((None, "Keep clear of me; I am maneuvering with difficulty."),)
-    assert flags.FLAGS["P"].name == "Papa"
-    assert flags.FLAGS["P"].meanings == (
-        ("In harbor", "All persons should report on board as the vessel is about to proceed to sea."),
-        ("At sea", "It may be used by fishing vessels to mean: ‘My nets have come fast upon an obstruction’."),
-    )
 
 
 def area(parts):
     return sum(w * h for _, _, _, w, h in parts)
 
 
-@pytest.mark.parametrize("letter", ["H", "D", "P"])
+@pytest.mark.parametrize("letter", ["H", "D"])
 def test_each_pattern_fills_the_flag_with_code_colours_only(letter):
     parts = flags.FLAGS[letter].parts
     g = flags.GRID
@@ -110,12 +107,6 @@ def test_d_is_yellow_blue_yellow_in_horizontal_bands_one_two_one():
     assert flags.FLAGS["D"].parts == (("yellow", 0, 0, g, q), ("blue", 0, q, g, 2 * q), ("yellow", 0, 3 * q, g, q))
 
 
-def test_p_is_blue_with_a_white_square_in_the_centre():
-    g = flags.GRID
-    t = g // 3
-    assert flags.FLAGS["P"].parts == (("blue", 0, 0, g, g), ("white", t, t, t, t))
-
-
 def test_every_flag_is_drawn_square(site):
     """All signal code flags are square (Flags of the World, read by the owner 23 Nov 2026)."""
     page = soup(site / "about.html")
@@ -125,7 +116,7 @@ def test_every_flag_is_drawn_square(site):
     for edge in soup(site / "index.html").select("header svg.hoist .flag-edge"):  # the logo
         assert edge["width"] == edge["height"], edge
     from tools import make_icons, make_social_preview as card
-    assert all(flag_px > 0 for flag_px, _ in make_icons.LAYOUTS.values())  # one size for both sides
+    assert all(isinstance(lay.flag, int) and lay.flag > 0 for lay in make_icons.LAYOUTS.values())  # one size, both sides
     with Image.open(STATIC_DIR / "social-preview.png") as image:  # the card: outline FLAG x FLAG
         px = image.convert("RGB")
         ink = card.COLOURS["ink"]
@@ -204,7 +195,39 @@ def test_the_name_is_manrope_not_spaced_capitals():
     assert "--font-mono" not in body and "uppercase" not in body and "letter-spacing: 0." not in body
 
 
-# --- favicon and app icon: flag P --------------------------------------------------------------------
+def test_every_header_names_the_flags_with_their_letters(site):
+    """Owner's pick (a), PR #120: the letters next to the flags, on every page, phone included."""
+    for page in ("index.html", "archive.html", "about.html", "404.html"):
+        brand = soup(site / page).select_one("header .brand")
+        letters = brand.select_one(".hoist-letters")
+        assert letters is not None and letters.get("aria-hidden") == "true", page
+        assert [text_of(s) for s in letters.find_all("span")] == ["H", "D"], page
+        assert letters.find_previous_sibling("svg", class_="hoist") is not None, page
+
+
+def test_the_letters_stay_beside_the_flags_on_every_screen():
+    assert sorted(css_rem(".hoist-letters", "height")) == sorted(css_rem(".hoist", "height"))
+    for selector, body in rules():
+        if ".hoist-letters" in selector:
+            assert "display: none" not in body and "display:none" not in body, selector
+
+
+def test_today_says_what_the_logo_spells_and_links_to_the_flag_key(site):
+    """Owner's pick (b), PR #120: one sentence in "About this project" on Today."""
+    about = soup(site / "index.html").select_one("section.about")
+    line = about.select_one("p.about-flags")
+    assert re.sub(r"\s+", " ", line.get_text()).strip() == "Our logo spells H·D, Haven Daily, in maritime signal flags."
+    assert [a["href"] for a in line.select("a")] == ["about.html#flags"]
+    assert soup(site / "about.html").select_one("#flags") is not None  # the key it links to
+
+
+def test_the_key_tells_where_each_flag_is_used(site):
+    section = soup(site / "about.html").select_one("section[aria-labelledby=flags]")
+    intro = text_of(section.select_one("p"))
+    assert "H over D" in intro and "browser tab" in intro and "home screen" in intro and "flag P" not in intro
+
+
+# --- favicon and app icon: H over D on the light-blue tile (owner's pick, PR #120) ----------------
 
 ICONS = {"favicon-16.png": 16, "favicon-32.png": 32, "apple-touch-icon.png": 180}
 
@@ -244,25 +267,42 @@ def test_the_committed_icons_are_what_the_script_makes(remade_icons, name):
         assert ImageChops.difference(new.convert("RGBA"), old.convert("RGBA")).getbbox() is None
 
 
+# The flags as large as the tile allows: together they fill at least this share of the height.
+FILL = {16: 1.0, 32: 30 / 32, 180: 148 / 180}
+
+
 @pytest.mark.parametrize("name, size", ICONS.items())
-def test_the_icon_is_flag_p_on_the_light_blue_tile(name, size):
+def test_the_icon_is_h_over_d_on_the_light_blue_tile(name, size):
+    from tools import make_icons
     tokens = css_tokens()
-    tile, blue, white = rgb(tokens["water"]), rgb(tokens["flag-blue"]), rgb(tokens["flag-white"])
+    colour = {k: rgb(tokens[k]) for k in ("water", "flag-white", "flag-red", "flag-yellow", "flag-blue")}
+    lay = make_icons.LAYOUTS[size]
+    assert 2 * lay.flag + lay.gap >= FILL[size] * size  # as large as possible
     with Image.open(STATIC_DIR / name) as image:
         px = image.convert("RGBA")
-        c = size // 2
-        assert px.getpixel((c, c))[:3] == white                    # the white square in the centre
-        assert px.getpixel((c, size * 7 // 32))[:3] == blue        # the blue field above it
-        assert px.getpixel((c, 0))[:3] == tile                     # the tile's edge, top middle
+        at = lambda x, y: px.getpixel((x, y))[:3]  # noqa: E731
+        # H: white at the hoist (left), red at the fly (right), inside its outline
+        inner, edge = lay.flag - 2 * lay.line, lay.line
+        hx, hy = lay.left + edge, lay.top + edge
+        assert at(hx + inner // 4, hy + inner // 2) == colour["flag-white"]
+        assert at(hx + 3 * inner // 4, hy + inner // 2) == colour["flag-red"]
+        # D: yellow, blue, yellow, 1 : 2 : 1
+        d_edge = lay.line if lay.outline_d else 0
+        d_inner = lay.flag - 2 * d_edge
+        dx, dy = lay.left + d_edge, lay.top + lay.flag + lay.gap + d_edge
+        assert at(dx + d_inner // 2, dy + d_inner // 8) == colour["flag-yellow"]
+        assert at(dx + d_inner // 2, dy + d_inner // 2) == colour["flag-blue"]
+        assert at(dx + d_inner // 2, dy + d_inner - 1 - d_inner // 8) == colour["flag-yellow"]
+        assert at(1, size // 2) == colour["water"]  # the tile beside the flags
         corner = px.getpixel((0, 0))
-        assert corner[3] == 255 if size == 180 else corner[3] < 128  # rounded tile; iOS rounds the 180 itself
+        assert corner[3] == 255 if size == 180 else corner[3] < 128  # rounded tile; phones round the 180 themselves
 
 
 @pytest.mark.parametrize("name, size", [("favicon-16.png", 16), ("favicon-32.png", 32)])
 def test_small_icons_are_sharp(name, size):
-    """Inside the rounded corners every pixel is exactly a token colour: no blurred flag edges."""
+    """Drawn pixel by pixel: outside the rounded corners every pixel is exactly a token colour."""
     tokens = css_tokens()
-    allowed = {rgb(tokens[t]) for t in ("water", "flag-blue", "flag-white")}
+    allowed = {rgb(tokens[t]) for t in ("water", "ink", "flag-white", "flag-red", "flag-yellow", "flag-blue")}
     r = size // 4
     with Image.open(STATIC_DIR / name) as image:
         px = image.convert("RGBA")
@@ -273,12 +313,24 @@ def test_small_icons_are_sharp(name, size):
                     assert px.getpixel((x, y))[:3] in allowed and px.getpixel((x, y))[3] == 255, (x, y)
 
 
-def test_the_svg_icon_draws_the_same_flag_on_the_tile():
+def test_the_svg_icon_draws_h_over_d_on_the_tile():
     svg = (STATIC_DIR / "favicon.svg").read_text(encoding="utf-8")
     tokens = css_tokens()
     assert re.search(rf'<rect[^>]*rx="\d+"[^>]*fill="{tokens["water"]}"', svg)
-    assert tokens["flag-blue"] in svg and tokens["flag-white"] in svg
-    assert "Signal flag P" in svg
+    for name in ("flag-white", "flag-red", "flag-yellow", "flag-blue", "ink"):
+        assert tokens[name] in svg, name
+    assert "H over D" in svg and "Blue Peter" not in svg
+
+
+def test_the_site_uses_only_h_and_d(site):
+    """The owner removed the Blue Peter (flag P) completely, PR #120."""
+    assert set(flags.FLAGS) == {"H", "D"}
+    for page in ("index.html", "archive.html", "about.html", "404.html"):
+        built = (site / page).read_text(encoding="utf-8")
+        assert not soup(site / page).select("g.flag-p") and "Blue Peter" not in built, page
+    for path in ("haven/flags.py", "tools/make_icons.py", "templates/about.html", "docs/SPEC.md"):
+        text = (PROJECT_DIR / path).read_text(encoding="utf-8")
+        assert "Blue Peter" not in text and "Papa" not in text, path
 
 
 # --- the 404 page: flag D ----------------------------------------------------------------------------
@@ -319,12 +371,12 @@ def test_the_404_page_keeps_the_footer(site):
 # --- the flag key on How it works ----------------------------------------------------------------------
 
 
-def test_how_it_works_has_a_key_to_the_three_flags(site):
+def test_how_it_works_has_a_key_to_the_two_flags(site):
     section = soup(site / "about.html").select_one("section[aria-labelledby=flags]")
     assert section is not None
     rows = section.select(".signal-key li")
-    assert [text_of(r.select_one(".signal-letter")) for r in rows] == ["H", "D", "P"]
-    for row, letter in zip(rows, "HDP"):
+    assert [text_of(r.select_one(".signal-letter")) for r in rows] == ["H", "D"]
+    for row, letter in zip(rows, "HD"):
         flag = flags.FLAGS[letter]
         assert row.select_one(f"svg.signal-flag g.flag-{letter.lower()}") is not None
         text = text_of(row)
