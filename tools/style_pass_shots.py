@@ -26,10 +26,12 @@ from __future__ import annotations
 import argparse
 import functools
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import threading
+from urllib.parse import quote
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -46,6 +48,7 @@ PAGES = {  # name -> path in the built site
     "archive": "archive.html",
     "how-it-works": "about.html",
     "not-found": "404.html",  # since #117
+    "flag-key": "about.html#flags",  # How it works, scrolled to the flag key (#117)
 }
 DEVICES = {  # name -> (width, height, scale for the first screen, scale for the whole page)
     "laptop": (1440, 900, 1, 0.5),
@@ -55,6 +58,7 @@ FULL_MAX_HEIGHT = 3000  # CSS pixels of a whole page kept in the "full" picture
 EDGE_MIN_WIDTH = 600    # Edge's headless window is never narrower than ~500 px
 SETTLE_MS = 2500        # fonts, the basemap and the map's first view
 JPEG_QUALITY = 72
+SITE_PATH = "haven-daily"  # the site's path on GitHub Pages (config/site.toml base_url)
 
 HARNESS = """<!doctype html>
 <html><head><meta charset="utf-8"><title>shot</title>
@@ -105,7 +109,7 @@ def edge(args: list[str], profile: Path) -> str:
 def shoot(base: str, src: str, device: str, full: bool, out: Path, work: Path) -> None:
     width, height, first_scale, full_scale = DEVICES[device]
     scale = 1 if full else first_scale
-    url = f"{base}/harness.html?src={src}&w={width}&h={height}&full={int(full)}"
+    url = f"{base}/harness.html?src={quote(src, safe='/')}&w={width}&h={height}&full={int(full)}"
     window_width = max(width, EDGE_MIN_WIDTH)
     page_height = height
     if full:  # first pass: how tall is the page (up to FULL_MAX_HEIGHT)?
@@ -143,6 +147,8 @@ def build(work: Path, ref: str | None) -> None:
                            cwd=tree, check=True)
         finally:
             subprocess.run(["git", "worktree", "remove", "--force", str(tree)], cwd=PROJECT_DIR, check=True)
+    # The 404 page links from the site's own path (/haven-daily/, #117): serve a copy there too.
+    shutil.copytree(out, work / SITE_PATH)
     (work / "harness.html").write_text(HARNESS, encoding="utf-8")
 
 
@@ -170,7 +176,8 @@ def main() -> None:
                 for device in DEVICES:
                     for full in (False, True):
                         out = out_dir / args.name / f"{page}-{device}-{'full' if full else 'first'}.jpg"
-                        shoot(base, f"site/{PAGES[page]}", device, full, out, work)
+                        folder = SITE_PATH if page == "not-found" else "site"
+                        shoot(base, f"{folder}/{PAGES[page]}", device, full, out, work)
         finally:
             server.shutdown()
 
