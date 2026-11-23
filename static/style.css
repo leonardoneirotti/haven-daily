@@ -467,6 +467,21 @@ html.js .topbar {
   stroke-linecap: round;
 }
 
+/* The flags' letters beside them, on every screen (owner's pick, PR #120): each centred on its flag.
+   The hoist is 58 units high; H's centre is at 15 of them, D's at 43. */
+.hoist-letters {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 2.75rem;
+  padding-block: 0.37rem;
+  margin-left: -0.3rem;
+  color: var(--ink-2);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 /* What the flags say, on hover and keyboard focus (#117) */
 .brand-hint {
   position: absolute;
@@ -652,6 +667,11 @@ html.js .topbar {
 
   .hoist {
     height: 2.5rem;
+  }
+
+  .hoist-letters {
+    height: 2.5rem;
+    padding-block: 0.3rem;
   }
 
   .brand-name {

@@ -225,7 +225,7 @@ def test_today_says_what_the_logo_spells_and_links_to_the_flag_key(site):
     """Owner's pick (b), PR #120: one sentence in "About this project" on Today."""
     about = soup(site / "index.html").select_one("section.about")
     line = about.select_one("p.about-flags")
-    assert text_of(line) == "Our logo spells H·D, Haven Daily, in maritime signal flags."
+    assert re.sub(r"\s+", " ", line.get_text()).strip() == "Our logo spells H·D, Haven Daily, in maritime signal flags."
     assert [a["href"] for a in line.select("a")] == ["about.html#flags"]
     assert soup(site / "about.html").select_one("#flags") is not None  # the key it links to
 
