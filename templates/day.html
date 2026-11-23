@@ -74,6 +74,9 @@
         <script type="application/json" id="map-data">{{ brief.map | tojson }}</script>
         {# Until the chart is drawn; aria-hidden: the chart's own label already describes it. #}
         <p class="chart-loading needs-map" id="chart-loading" aria-hidden="true">Loading chart…</p>
+        {# Shown for a moment when the wheel scrolls the page over the chart (#111); for the mouse
+           only: the keyboard zooms with + and -. map.js names the key (Ctrl, or ⌘ on a Mac). #}
+        <p class="chart-hint needs-map" id="chart-hint" aria-hidden="true">Use <span data-zoom-key>Ctrl</span> + scroll to zoom the chart</p>
         {% if ships %}
         <div class="chart-filter needs-map" role="group" aria-label="Show ships">
           <button type="button" class="btn" data-ship-filter="all" aria-pressed="true">All <span>{{ ships.count }}</span></button>
@@ -101,6 +104,8 @@
         {% endif %}
         {% if ships and ships.linked %}<span>{{ m.ship_symbol("container", "moored", true) }}At a terminal in the news</span>{% endif %}
         {% if brief.map.callouts %}<span><span class="legend-num" aria-hidden="true">1</span>Item</span>{% endif %}
+        {# How to move and zoom (#111): a mouse or touchpad, or a touch screen (style.css picks one). #}
+        <span class="legend-how needs-map"><span class="how-fine">Drag to move · <span data-zoom-key>Ctrl</span> + scroll or pinch to zoom</span><span class="how-touch">Drag to move · pinch to zoom</span></span>
         {% if brief.chart_empty %}<span class="legend-note">No item has a place on the chart {% if is_latest %}today{% else %}on this day{% endif %}.</span>{% endif %}
         {# v1: ships are not built yet (#31), so this is expected, not a failure: grey text, no box. #}
         {% if not ships and not ais_snapshot_built %}<span class="legend-note">Ship positions are not collected yet.</span>{% endif %}

@@ -255,3 +255,48 @@ Measured on a GitHub runner with no graphics chip, main ("before") against this 
 - **This PR's first speed run** gave 0.13 s per laptop zoom step: when a new water picture arrived, the whole basemap was repainted. The water then became a layer of its own, which brought it to 0.00 s (this run).
 - **Today's map move on main (part 3's "to watch"):** 0.28 s in this run, so the 0.62 s didn't come back.
 - **Archive, phone:** load event 0.42 → 0.70 s. This PR doesn't change the archive, and How it works was 0.70 s before and after: variation between loads.
+
+## Results, part 5 (#111: how the chart is moved and zoomed)
+
+The chart's input changed (spec §8.1, §8.5): Ctrl + scroll and touchpad pinch zoom the chart, a plain scroll scrolls the page and shows a short hint, the edges give a little, zoom steps are 1, drags that start on a number move the chart, and the header stays away from the chart. This adds about 2–3 KB as sent (7 KB raw) to a day page: `map.js`, two lines of HTML and the hint and legend styles in `style.css`.
+
+Measured on a GitHub runner with no graphics chip, main (with part 4's worker) as "before" against this branch as "after", in the same run
+([run 45169513761](https://github.com/leonardoneirotti/haven-daily/actions/runs/45169513761)):
+
+**Throttled phone profile**
+
+| | Today before | Today after | Day with ships before | Day with ships after | Target |
+|---|---|---|---|---|---|
+| Sent | 257 KB | 259 KB | 233 KB | 236 KB | |
+| News and status visible | 0.72 s | 0.66 s | 0.66 s | 0.64 s | 1.5 s ✅ |
+| Map visible | 2.18 s | **2.14 s** | 1.86 s | **1.88 s** | 2.5 s ✅ |
+| Map move, longest freeze | 0.38 s | 0.46 s | 0.46 s | 0.47 s | 1 s ✅ |
+| Zoom step, longest task | 0.38 s | 0.00 s | 0.40 s | 0.35 s | |
+
+**Laptop profile**
+
+| | Today before | Today after | Day with ships before | Day with ships after | Target |
+|---|---|---|---|---|---|
+| Map visible | 0.45 s | 0.44 s | 0.42 s | 0.43 s | |
+| Zoom step, longest task | 0.00 s | **0.00 s** | 0.00 s | **0.00 s** | 0.1 s ✅ |
+| Map move, longest freeze | 0.00 s | **0.15 s** | 0.00 s | **0.15 s** | |
+
+**Map input**, Today, same run (`tools/check_map_input.mjs`):
+
+| Input | Before | After |
+|---|---|---|
+| Laptop: mouse wheel over the chart | page scrolls 300 px, no hint | page scrolls 300 px, hint shown |
+| Laptop: touchpad pinch (Ctrl + wheel) | chart doesn't zoom; the browser zooms the page (10 of 10 events) | chart zoom +0.4; page zoom stopped |
+| Laptop: drag at the opening view, 300 px east / 200 px south | moves 20 / 0 px | moves 76 / 40 px while dragging, springs back to 20 / 0 px |
+| Laptop: double-click, zoom button, `+` key | +0.5 | +1.0 |
+| Laptop: drag starting on item 1's number | chart doesn't move | chart moves 150 px; item not picked |
+| Laptop: click on item 1's number | item picked | item picked |
+| Laptop: cursor at the window's top, over the chart | header comes back over the chart | header stays away |
+| Phone: vertical swipe on the chart at the opening view | nothing moves | page scrolls 338 px |
+| Phone: sideways drag, pinch, swipe once zoomed in | chart moves / zooms | unchanged |
+
+- **An earlier run of this branch missed the phone map target** (Today 2.54 s, [run 44889610039](https://github.com/leonardoneirotti/haven-daily/actions/runs/44889610039)). That run was before part 4: the branch didn't have the worker yet. On top of the worker, the map comes at 2.14 s.
+- **The laptop map move went 0.00 → 0.15 s.** At the opening view the drag now really moves the chart (76 px instead of 20) and springs back at the edge, so the basemap redraws its land, roads and tanks after the drag; that redraw is the 0.15 s task. There is no target for it (the phone's 1 s move target is met), but it is over the 100 ms we hold zoom steps to. To look at if a drag at the opening view feels slow.
+- **Phone zoom steps** vary from load to load (0.00–0.40 s, before and after alike); the water work left them in part 4.
+- **First text on the phone** came 0.02–0.06 s *sooner* despite the larger stylesheet: variation between loads.
+- **The archive and How it works** are unchanged apart from about 1 KB more stylesheet.

@@ -3,7 +3,8 @@
    1. Marks the page as having JavaScript, so controls that need it (class "needs-js") are
       shown only when they will work.
    2. The header bar (#102): visible when the page loads; slides away while you scroll down, and
-      comes back when you scroll up, move the cursor to the top of the screen, or tab into it.
+      comes back when you scroll up, move the cursor to the top of the screen (not over the chart,
+      #111), or tab into it.
       The same on a phone (touch scrolling) and a laptop. Nothing is stored: no cookies, no
       browser storage. Without JavaScript the bar simply scrolls away with the page (style.css). */
 document.documentElement.classList.add("js");
@@ -39,8 +40,10 @@ document.addEventListener("DOMContentLoaded", function () {
     last = y;
   }, { passive: true });
 
+  // Not while the cursor is over the chart: there the top of the window is the chart's own top
+  // edge, with the ship filter (owner, 21 Nov 2026, #111).
   document.addEventListener("mousemove", function (event) {
-    if (hidden && event.clientY <= NEAR_TOP) hide(false);
+    if (hidden && event.clientY <= NEAR_TOP && !(event.target.closest && event.target.closest(".chart"))) hide(false);
   }, { passive: true });
 
   bar.addEventListener("focusin", function () { hide(false); });

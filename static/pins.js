@@ -1,4 +1,4 @@
-/* Haven Daily: where a numbered marker sits on the chart (#85).
+/* Haven Daily: where a numbered marker sits on the chart (#85), and who takes a swipe (#111).
    Pure geometry in screen pixels: no Leaflet and no page access, so tests/test_pins_geometry.py
    can run it in Node. map.js measures the markers and uses these to place, merge and nudge them. */
 (function (root) {
@@ -38,5 +38,16 @@
     };
   }
 
-  root.HavenPins = { boxAt: boxAt, overlaps: overlaps, onChart: onChart, nudgeInside: nudgeInside };
+  // Who takes a one-finger swipe that starts on the chart (#111): "map", "page", or null while it
+  // is too short to tell (under `threshold` pixels both ways). A mostly vertical swipe goes to the
+  // page whenever the chart can't move that way, so the page never gets stuck on the chart; any
+  // other swipe moves the chart (one-finger drag, P1). room: how many pixels the chart can still
+  // move to show more of the north and of the south. A finger moving down shows more of the north.
+  function swipeTaker(dx, dy, room, threshold) {
+    if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return null;
+    if (Math.abs(dy) <= Math.abs(dx)) return "map";
+    return (dy > 0 ? room.north : room.south) > 1 ? "map" : "page";
+  }
+
+  root.HavenPins = { boxAt: boxAt, overlaps: overlaps, onChart: onChart, nudgeInside: nudgeInside, swipeTaker: swipeTaker };
 })(typeof window !== "undefined" ? window : globalThis);
