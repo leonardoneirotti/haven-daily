@@ -1,0 +1,382 @@
+{
+  "build": {
+    "ai_unavailable": false,
+    "ai_usage": {
+      "relevance_check": {
+        "calls": 32,
+        "input_tokens": 29737,
+        "output_tokens": 1648
+      },
+      "summariser": {
+        "batch_input_tokens": 45542,
+        "batch_output_tokens": 923,
+        "calls": 0,
+        "input_tokens": 45542,
+        "output_tokens": 923
+      }
+    },
+    "duplicates": 0,
+    "failures": [
+      {
+        "error": "couldn't check whether any notices were missed since the last run: there is no earlier run in the last 14 days",
+        "source": "PIN notices to shipping"
+      },
+      {
+        "error": "https://nltimes.nl/tags/port-rotterdam: HTTP 403",
+        "source": "NL Times"
+      },
+      {
+        "error": "https://www.nt.nl/havens/feed/: HTTP 403",
+        "source": "Nieuwsblad Transport"
+      },
+      {
+        "error": "https://www.nt.nl/tag/rotterdam/feed/: HTTP 403",
+        "source": "Nieuwsblad Transport"
+      },
+      {
+        "error": "https://feeds.meteoalarm.org/api/v1/warnings/feeds-netherlands: no Zuid-Holland entry for today in the feed (area renamed or feed changed?)",
+        "source": "Weather warnings (MeteoAlarm)"
+      }
+    ],
+    "feeds_read_at": "2026-11-23T19:45:18+01:00",
+    "items_collected": 108,
+    "items_kept": 12,
+    "sources_checked": 10,
+    "summaries": {
+      "batch": 12,
+      "fallback": 0
+    }
+  },
+  "built_at": "2026-11-23T19:48:44+01:00",
+  "corrections": [],
+  "date": "2026-11-23",
+  "items": [
+    {
+      "access": "full",
+      "affects": [
+        "Barge",
+        "Containers",
+        "IT systems"
+      ],
+      "headline": "Nextlogic wins the 2026 Dutch Logistics Award",
+      "impact": "No operational change for planners. It confirms that barge container handling in Rotterdam already runs mostly on shared planning, so barge bookings are likely to go through Nextlogic.",
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": "2026-11-23T09:24:08+01:00",
+      "severity": "low",
+      "source": "Port of Rotterdam Authority news & press releases",
+      "strike": null,
+      "summary": "Nextlogic has won the 2026 Dutch Logistics Award from VLM for its shared planning system for inland container shipping in Rotterdam. The system brings barge operators, terminals and depots together in a single planning process.",
+      "url": "https://www.portofrotterdam.com/en/news-and-press-releases/nextlogic-wins-2026-dutch-logistics-award",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "headline-only",
+      "affects": [
+        "Dry bulk",
+        "Hinterland"
+      ],
+      "headline": "Port of Rotterdam consortium passes EU evaluation for critical raw materials stockpiling pilot",
+      "impact": null,
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": "2026-11-23T11:58:31+01:00",
+      "severity": "low",
+      "source": "PortsEurope",
+      "strike": null,
+      "summary": null,
+      "url": "https://www.portseurope.com/port-of-rotterdam-consortium-passes-eu-evaluation-for-critical-raw-materials-stockpiling-pilot/",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "headline-only",
+      "affects": [
+        "Rail"
+      ],
+      "headline": "UP & NS CEOs: a year of listening reinforces the need for a simpler, more competitive rail network",
+      "impact": null,
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": "2026-11-23T17:21:14+01:00",
+      "severity": "low",
+      "source": "The Loadstar",
+      "strike": null,
+      "summary": null,
+      "url": "https://theloadstar.com/up-ns-ceos-a-year-of-listening-reinforces-the-need-for-a-simpler-more-competitive-rail-network/",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "headline-only",
+      "affects": [
+        "Labour",
+        "Hinterland"
+      ],
+      "headline": "Air traffic strike disrupts Liège and Brussels cargo ahead of Black Friday",
+      "impact": null,
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": "2026-11-23T13:55:27+01:00",
+      "severity": "medium",
+      "source": "The Loadstar",
+      "strike": {
+        "affects_rotterdam": false,
+        "end": null,
+        "location": "Liège and Brussels airports, Belgium",
+        "match": "new",
+        "start": null,
+        "state": "ongoing",
+        "strike_id": "strike-2026-11-23-1"
+      },
+      "summary": null,
+      "url": "https://theloadstar.com/air-traffic-strike-disrupts-liege-and-brussels-cargo-ahead-of-black-friday/",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "headline-only",
+      "affects": [],
+      "headline": "Shipping faces more red tape and higher costs if MEPC 85 fails to deliver",
+      "impact": null,
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": "2026-11-23T13:20:08+01:00",
+      "severity": "low",
+      "source": "The Loadstar",
+      "strike": null,
+      "summary": null,
+      "url": "https://theloadstar.com/shipping-faces-more-red-tape-and-higher-costs-if-mepc-85-fails-to-deliver/",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "headline-only",
+      "affects": [
+        "Containers",
+        "Customs"
+      ],
+      "headline": "EU cap on Chinese hybrid imports will be a blow to FVL players",
+      "impact": null,
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": "2026-11-23T13:00:28+01:00",
+      "severity": "low",
+      "source": "The Loadstar",
+      "strike": null,
+      "summary": null,
+      "url": "https://theloadstar.com/eu-cap-on-chinese-hybrid-imports-will-be-a-blow-to-fvl-players/",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "headline-only",
+      "affects": [
+        "Containers",
+        "Labour"
+      ],
+      "headline": "OceanX radar: Zim outperforms; west coast strike averted; war at sea",
+      "impact": null,
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": "2026-11-23T12:56:04+01:00",
+      "severity": "low",
+      "source": "The Loadstar",
+      "strike": {
+        "affects_rotterdam": false,
+        "end": null,
+        "location": "west coast (unspecified)",
+        "match": "new",
+        "start": null,
+        "state": "cancelled",
+        "strike_id": "strike-2026-11-23-2"
+      },
+      "summary": null,
+      "url": "https://theloadstar.com/oceanx-radar-zim-outperforms-west-coast-strike-averted-war-at-sea/",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "headline-only",
+      "affects": [
+        "Containers",
+        "Hinterland"
+      ],
+      "headline": "Final-mile costs rising faster than revenue, say hard-pressed carriers",
+      "impact": null,
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": "2026-11-23T12:45:03+01:00",
+      "severity": "low",
+      "source": "The Loadstar",
+      "strike": null,
+      "summary": null,
+      "url": "https://theloadstar.com/final-mile-costs-rising-faster-than-revenue-say-hard-pressed-carriers/",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "headline-only",
+      "affects": [
+        "Containers"
+      ],
+      "headline": "News in Brief Podcast | Week 46 | Routes, rates, and One Record readiness",
+      "impact": null,
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": "2026-11-22T18:00:38+01:00",
+      "severity": "low",
+      "source": "The Loadstar",
+      "strike": null,
+      "summary": null,
+      "url": "https://theloadstar.com/news-in-brief-podcast-week-46-routes-rates-and-one-record-readiness/",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "full",
+      "affects": [
+        "Truck pickups",
+        "Hinterland"
+      ],
+      "headline": "Let op! Meerdere wegen gaan deze week dicht voor werkzaamheden",
+      "impact": "Truck traffic to and from the port on the A15 and A20 may face closures and diversions this week, which could cause delays. Planners may want to allow extra time for pickups and deliveries.",
+      "language": "nl",
+      "map": null,
+      "permission": {
+        "granted": "2026-11-19",
+        "impact": true,
+        "max_sentences": 2
+      },
+      "published": "2026-11-23T17:27:27+01:00",
+      "severity": "medium",
+      "source": "RTV Rijnmond",
+      "strike": null,
+      "summary": "Road works in the Rijnmond region this week mean closures and diversions on the A15, A20 and N59. Drivers should expect disruption.",
+      "url": "https://www.rijnmond.nl/nieuws/2286664/let-op-meerdere-wegen-gaan-deze-week-dicht-voor-werkzaamheden",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "full",
+      "affects": [
+        "Truck pickups"
+      ],
+      "headline": "Rioolslib zorgt voor vertraging op A16 bij Moerdijkbrug, rechterrijstrook dicht",
+      "impact": "Trucks heading to Rotterdam via the A16 could face delays, so planners may want to allow extra time for pickups and deliveries. The text does not say when the road reopens.",
+      "language": "nl",
+      "map": null,
+      "permission": {
+        "granted": "2026-11-19",
+        "impact": true,
+        "max_sentences": 2
+      },
+      "published": "2026-11-23T14:19:29+01:00",
+      "severity": "low",
+      "source": "RTV Rijnmond",
+      "strike": null,
+      "summary": "A truck lost part of its load of sewage sludge on the A16 just before the Moerdijkbrug on Monday afternoon. The road was closed, causing delays towards Rotterdam and a bad smell.",
+      "url": "https://www.rijnmond.nl/nieuws/2286787/rioolslib-zorgt-voor-vertraging-op-a16-bij-moerdijkbrug-rechterrijstrook-dicht",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "headline-only",
+      "affects": [],
+      "headline": "Port operational updates from around the world (11 Nov - 17 Nov 2026)",
+      "impact": null,
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": null,
+      "severity": "low",
+      "source": "Kuehne+Nagel SeaNews",
+      "strike": null,
+      "summary": null,
+      "url": "https://mykn.kuehne-nagel.com/news/article/port-operational-updates-from-17-11-2026",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    }
+  ],
+  "sample": false,
+  "ships": null,
+  "status": [
+    {
+      "hazards": [],
+      "icon": "wind",
+      "issued_at": null,
+      "key": "weather",
+      "knmi_level": null,
+      "label": "Weather warnings",
+      "level": null,
+      "note": null,
+      "observed_at": "2026-11-23T19:46:57+01:00",
+      "place": "Zuid-Holland",
+      "source_name": "KNMI via MeteoAlarm",
+      "source_url": "https://www.meteoalarm.org",
+      "value": null,
+      "warnings": []
+    },
+    {
+      "gauge_max": 700,
+      "icon": "waves",
+      "key": "rhine",
+      "label": "Rhine water level",
+      "level": "green",
+      "note": null,
+      "observed_at": "2026-11-23T19:45:00+01:00",
+      "place": "Kaub gauge",
+      "source_name": "WSV via PEGELONLINE",
+      "source_url": "https://pegelonline.wsv.de/gast/stammdaten?pegelnr=25700100",
+      "unit": "cm",
+      "value": 222
+    },
+    {
+      "icon": "megaphone",
+      "items": [],
+      "key": "strike",
+      "label": "Strike flag",
+      "level": "green",
+      "note": null,
+      "observed_at": "2026-11-23T19:45:18+01:00",
+      "place": "From the news of the last 14 days",
+      "source_name": "Haven Daily's news sources",
+      "source_url": null,
+      "value": "No active strike"
+    }
+  ]
+}

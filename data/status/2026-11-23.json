@@ -1,0 +1,57 @@
+[
+  {
+    "hazards": [],
+    "icon": "wind",
+    "issued_at": null,
+    "key": "weather",
+    "knmi_level": null,
+    "label": "Weather warnings",
+    "level": null,
+    "note": null,
+    "observed_at": "2026-11-23T19:46:57+01:00",
+    "place": "Zuid-Holland",
+    "source_name": "KNMI via MeteoAlarm",
+    "source_url": "https://www.meteoalarm.org",
+    "value": null,
+    "warnings": []
+  },
+  {
+    "gauge_max": 700,
+    "icon": "waves",
+    "key": "rhine",
+    "label": "Rhine water level",
+    "level": "green",
+    "note": null,
+    "observed_at": "2026-11-23T19:45:00+01:00",
+    "place": "Kaub gauge",
+    "source_name": "WSV via PEGELONLINE",
+    "source_url": "https://pegelonline.wsv.de/gast/stammdaten?pegelnr=25700100",
+    "unit": "cm",
+    "value": 222
+  },
+  {
+    "icon": "waves",
+    "key": "rhine-lobith",
+    "label": "Rhine water level, Lobith",
+    "note": null,
+    "observed_at": "2026-11-23T19:20:00+01:00",
+    "place": "Lobith gauge (Tolkamer)",
+    "source_name": "Rijkswaterstaat",
+    "source_url": "https://rijkswaterstaatdata.nl/waterdata/",
+    "unit": "cm NAP",
+    "value": 942
+  },
+  {
+    "icon": "megaphone",
+    "items": [],
+    "key": "strike",
+    "label": "Strike flag",
+    "level": "green",
+    "note": null,
+    "observed_at": "2026-11-23T19:45:18+01:00",
+    "place": "From the news of the last 14 days",
+    "source_name": "Haven Daily's news sources",
+    "source_url": null,
+    "value": "No active strike"
+  }
+]
