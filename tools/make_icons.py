@@ -18,8 +18,7 @@ pixels, with the flags as large as the tile allows, so no edge is blurred:
   a square tile: iOS and Android round a home-screen icon's corners themselves, and a transparent
   corner would show black there.
 
-Only the tile's rounded corners are smoothed (drawn at 4x and reduced). The Blue Peter (flag P),
-the icon before PR #120, is now only in the flag key on How it works.
+Only the tile's rounded corners are smoothed (drawn at 4x and reduced).
 """
 
 from __future__ import annotations
