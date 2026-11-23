@@ -32,6 +32,8 @@ def test_samples_and_real_briefs_are_never_mixed(tmp_path):
     assert render.default_briefs_dir(tmp_path) == tmp_path / "briefs"
 
 
-def test_the_repo_default_today_is_the_samples():
-    # No real brief is committed yet (the first comes from the morning job).
-    assert render.default_briefs_dir() == render.PROJECT_DIR / "data" / "sample" / "briefs"
+def test_the_repo_default_today_follows_the_committed_briefs():
+    # The samples until the first real brief is committed (23 Nov 2026, #26); the real briefs since.
+    real = render.PROJECT_DIR / "data" / "briefs"
+    expected = real if any(real.glob("*.json")) else render.PROJECT_DIR / "data" / "sample" / "briefs"
+    assert render.default_briefs_dir() == expected
