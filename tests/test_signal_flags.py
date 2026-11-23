@@ -2,10 +2,12 @@
 
 - The logo: flags H over D (Haven Daily) on a thin halyard with small clips, with "Haven Daily" in
   Manrope next to it; on hover and focus "H·D in maritime signal flags".
-- Favicon and app icon: flag P, the "Blue Peter", in a light-blue rounded tile (16, 32, 180 px).
+- Favicon and app icon: the same flags, H over D, on a light-blue rounded tile (16, 32, 180 px;
+  owner's pick, PR #120).
 - A 404 page with flag D and a link back to Today.
-- A flag key on How it works: H, D and P with their letters and their meanings in the
-  International Code of Signals.
+- A flag key on How it works: H and D with their letters and their meanings in the
+  International Code of Signals. The site uses only H and D (owner, PR #120: the Blue Peter, flag P,
+  is gone).
 
 Every flag comes from one place, haven/flags.py: its letter, name, meaning (quoted from the Code)
 and pattern. The real flag colours are used only inside flags, never as UI colours, so they
@@ -77,18 +79,13 @@ def test_the_meanings_are_quoted_from_the_code():
     assert flags.FLAGS["H"].meanings == ((None, "I have a pilot on board."),)
     assert flags.FLAGS["D"].name == "Delta"
     assert flags.FLAGS["D"].meanings == ((None, "Keep clear of me; I am maneuvering with difficulty."),)
-    assert flags.FLAGS["P"].name == "Papa"
-    assert flags.FLAGS["P"].meanings == (
-        ("In harbor", "All persons should report on board as the vessel is about to proceed to sea."),
-        ("At sea", "It may be used by fishing vessels to mean: ‘My nets have come fast upon an obstruction’."),
-    )
 
 
 def area(parts):
     return sum(w * h for _, _, _, w, h in parts)
 
 
-@pytest.mark.parametrize("letter", ["H", "D", "P"])
+@pytest.mark.parametrize("letter", ["H", "D"])
 def test_each_pattern_fills_the_flag_with_code_colours_only(letter):
     parts = flags.FLAGS[letter].parts
     g = flags.GRID
@@ -108,12 +105,6 @@ def test_d_is_yellow_blue_yellow_in_horizontal_bands_one_two_one():
     g = flags.GRID
     q = g // 4
     assert flags.FLAGS["D"].parts == (("yellow", 0, 0, g, q), ("blue", 0, q, g, 2 * q), ("yellow", 0, 3 * q, g, q))
-
-
-def test_p_is_blue_with_a_white_square_in_the_centre():
-    g = flags.GRID
-    t = g // 3
-    assert flags.FLAGS["P"].parts == (("blue", 0, 0, g, g), ("white", t, t, t, t))
 
 
 def test_every_flag_is_drawn_square(site):
@@ -233,9 +224,7 @@ def test_today_says_what_the_logo_spells_and_links_to_the_flag_key(site):
 def test_the_key_tells_where_each_flag_is_used(site):
     section = soup(site / "about.html").select_one("section[aria-labelledby=flags]")
     intro = text_of(section.select_one("p"))
-    assert "H over D" in intro and "browser tab" in intro and "flag P" not in intro
-    p_row = [r for r in section.select(".signal-key li") if text_of(r.select_one(".signal-letter")) == "P"][0]
-    assert "browser tab" not in text_of(p_row) and "home screen" not in text_of(p_row)
+    assert "H over D" in intro and "browser tab" in intro and "home screen" in intro and "flag P" not in intro
 
 
 # --- favicon and app icon: H over D on the light-blue tile (owner's pick, PR #120) ----------------
@@ -333,11 +322,15 @@ def test_the_svg_icon_draws_h_over_d_on_the_tile():
     assert "H over D" in svg and "Blue Peter" not in svg
 
 
-def test_the_blue_peter_is_only_in_the_flag_key(site):
-    assert 'FLAGS["P"]' not in (PROJECT_DIR / "tools" / "make_icons.py").read_text(encoding="utf-8")
+def test_the_site_uses_only_h_and_d(site):
+    """The owner removed the Blue Peter (flag P) completely, PR #120."""
+    assert set(flags.FLAGS) == {"H", "D"}
     for page in ("index.html", "archive.html", "about.html", "404.html"):
-        for p_flag in soup(site / page).select("g.flag-p"):
-            assert page == "about.html" and p_flag.find_parent(class_="signal-key"), page
+        built = (site / page).read_text(encoding="utf-8")
+        assert not soup(site / page).select("g.flag-p") and "Blue Peter" not in built, page
+    for path in ("haven/flags.py", "tools/make_icons.py", "templates/about.html", "docs/SPEC.md"):
+        text = (PROJECT_DIR / path).read_text(encoding="utf-8")
+        assert "Blue Peter" not in text and "Papa" not in text, path
 
 
 # --- the 404 page: flag D ----------------------------------------------------------------------------
@@ -378,12 +371,12 @@ def test_the_404_page_keeps_the_footer(site):
 # --- the flag key on How it works ----------------------------------------------------------------------
 
 
-def test_how_it_works_has_a_key_to_the_three_flags(site):
+def test_how_it_works_has_a_key_to_the_two_flags(site):
     section = soup(site / "about.html").select_one("section[aria-labelledby=flags]")
     assert section is not None
     rows = section.select(".signal-key li")
-    assert [text_of(r.select_one(".signal-letter")) for r in rows] == ["H", "D", "P"]
-    for row, letter in zip(rows, "HDP"):
+    assert [text_of(r.select_one(".signal-letter")) for r in rows] == ["H", "D"]
+    for row, letter in zip(rows, "HD"):
         flag = flags.FLAGS[letter]
         assert row.select_one(f"svg.signal-flag g.flag-{letter.lower()}") is not None
         text = text_of(row)
