@@ -37,7 +37,7 @@ RHINE_MEANINGS = {
     "alert_high": "high water: shipping stops",
 }
 WEATHER_MEANINGS = {
-    "green": "no KNMI warning for Zuid-Holland for the rest of today",
+    "green": "no KNMI warning for the port area for the rest of today",
     "amber": "weather may slow port operations and road transport today",
     "red": "weather likely to disrupt port operations and road transport today",
 }
