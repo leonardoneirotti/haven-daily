@@ -116,6 +116,26 @@ def test_p_is_blue_with_a_white_square_in_the_centre():
     assert flags.FLAGS["P"].parts == (("blue", 0, 0, g, g), ("white", t, t, t, t))
 
 
+def test_every_flag_is_drawn_square(site):
+    """All signal code flags are square (Flags of the World, read by the owner 23 Nov 2026)."""
+    page = soup(site / "about.html")
+    for svg in page.select("svg.signal-flag"):  # the flag key: one flag per svg
+        _, _, w, h = svg["viewbox"].split()  # html.parser lowercases attribute names
+        assert w == h, svg["viewbox"]
+    for edge in soup(site / "index.html").select("header svg.hoist .flag-edge"):  # the logo
+        assert edge["width"] == edge["height"], edge
+    from tools import make_icons, make_social_preview as card
+    assert all(flag_px > 0 for flag_px, _ in make_icons.LAYOUTS.values())  # one size for both sides
+    with Image.open(STATIC_DIR / "social-preview.png") as image:  # the card: outline FLAG x FLAG
+        px = image.convert("RGB")
+        ink = card.COLOURS["ink"]
+        left = card.WIDTH - card.MARGIN - card.FLAG
+        for top in (card.HOIST_TOP, card.HOIST_TOP + card.FLAG + 8):
+            corners = [(left, top), (left + card.FLAG - 1, top), (left, top + card.FLAG - 1),
+                       (left + card.FLAG - 1, top + card.FLAG - 1)]
+            assert all(px.getpixel(c) == ink for c in corners), top
+
+
 # --- flag colours stay inside flags ---------------------------------------------------------------
 
 
@@ -343,3 +363,13 @@ def test_the_spec_names_the_source():
     spec = (PROJECT_DIR / "docs" / "SPEC.md").read_text(encoding="utf-8")
     logo = spec[spec.index("### 7.6 Logo"):spec.index("### 7.7")]
     assert "Pub. 102" in logo and "Revised 2003" in logo
+    assert "crwflags.com/fotw/flags/xf-ics.html" in logo  # colours and proportions (owner, 23 Nov 2026)
+    assert "Still to check" not in logo and "to be checked" not in logo
+
+
+def test_no_open_note_on_the_flags_remains():
+    assert "to be checked" not in Path(flags.__file__).read_text(encoding="utf-8")
+
+
+def test_the_reference_picture_is_small():
+    assert (PROJECT_DIR / "design" / "logo" / "references" / "hoist.png").stat().st_size < 200_000

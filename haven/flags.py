@@ -8,12 +8,12 @@ is about to proceed to sea, a fresh morning edition), and the 404 page shows D. 
 Checked against the International Code of Signals (SOURCE):
 - **Meanings** are quoted from its single-letter signals (Chapter 1, Section 10, page 22); its
   spelling is American ("harbor", "maneuvering").
-- **Patterns** follow the Code's flags: H white at the hoist and red at the fly, in vertical
-  halves; D yellow, blue, yellow in horizontal bands; P blue with a white square in the centre.
-  The Code's text gives no exact shades or proportions: the flags are shown in its colour plate,
-  in five colours only (red, blue, yellow, black, white). Our proportions (D's bands 1 : 2 : 1, P's
-  square a third of the flag, square flags) are the usual drawing of these flags, to be checked
-  against the plate (spec §7.6).
+- **Patterns, colours and proportions** follow Flags of the World (FOTW_SOURCE, checked by the
+  owner 23 Nov 2026), since the Code's text gives no shades or proportions (it shows the flags only
+  in a colour plate, in five colours: red, blue, yellow, black, white): all signal code flags are
+  square; H vertically divided, white at the hoist and red at the fly; D horizontally divided
+  yellow-blue-yellow, 1 : 2 : 1; P a blue field with a small white square centred on it (here a
+  third of the flag, on the 24-unit grid).
 - **Colours** are the five Code colours, as the tokens --flag-white, --flag-red, --flag-yellow and
   --flag-blue in static/style.css. They are used only inside flags, never as UI colours, so they
   can't be confused with the severity colours (spec §7.2).
@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-__all__ = ["CODE_COLOURS", "FLAGS", "GRID", "SOURCE", "Flag"]
+__all__ = ["CODE_COLOURS", "FLAGS", "FOTW_SOURCE", "GRID", "SOURCE", "Flag"]
 
 SOURCE = {
     "title": "International Code of Signals",
@@ -33,6 +33,9 @@ SOURCE = {
     "where": "Chapter 1, Section 10, single-letter signals, page 22",
     "read": "https://archive.org/details/pub-102",  # the copy read on 23 Nov 2026
 }
+
+# Colours and proportions, which the Code's text doesn't give (owner, 23 Nov 2026).
+FOTW_SOURCE = "https://crwflags.com/fotw/flags/xf-ics.html"  # Flags of the World, "International Code of Signals"
 
 CODE_COLOURS = frozenset({"red", "blue", "yellow", "black", "white"})
 GRID = 24  # a flag is GRID x GRID units; every part sits on whole units, so small sizes stay sharp
