@@ -19,6 +19,8 @@
   var focusBox = document.getElementById("chart-focus");
   var focusText = document.getElementById("chart-focus-text");
   var announcer = document.getElementById("chart-announcer");
+  // This file's folder: the worker for the water lines (water.js) sits next to it (#111).
+  var folder = document.currentScript ? document.currentScript.src.replace(/[^/]*$/, "") : "static/";
 
   // Colours come from the tokens in style.css.
   function token(name) {
@@ -233,121 +235,106 @@
   }
   var worldPerMetre = 256 / (2 * Math.PI * 6378137 * Math.cos((sheet.getCenter().lat * Math.PI) / 180));
 
-  var COAST_LINE_GAP = 6; // minimum pixels between two lines in the water
-  var COAST_LINE_REACH = 120; // how far from the shore the lines go, in pixels
-  var COAST_LINE_WIDTH = 0.8;
   var WATER_MARGIN = 0.25; // worked out for the view plus this much of its size on each side
 
   // ---------- The water and its lines ----------
-  // Each line follows the shore at a fixed distance. They come from a map of distances: the
-  // land is filled in white on a small canvas, then every pixel of water gets its exact
-  // distance to the nearest land pixel (a Euclidean distance transform: two quick passes,
-  // one down the columns and one along the rows). A pixel is part of a line where that
-  // distance is 25, 50, 100... metres. The work depends only on the number of pixels, not on
-  // the coastline or the number of lines: a browser that draws without a graphics chip takes a
-  // fraction of a second, where the old wide strokes of the whole coastline took 4 to 12 s
-  // (#104). One pixel per screen point (fine lines on dark water still look sharp), worked
-  // out once per zoom level for the view plus a margin, and reused while the chart is moved.
-  var water = null; // { zoom, x, y (world pixels at that zoom), canvas }
-  var maskCanvas = document.createElement("canvas");
-  var maskCtx = maskCanvas.getContext("2d", { willReadFrequently: true });
+  // Each line follows the shore at a fixed distance, from a map of distances to the land
+  // (static/water.js). That takes a second or more for a laptop-sized chart, so a background
+  // worker does it (#111): it gets the land once, then one picture per zoom level for the view
+  // plus a margin, reused while the chart is moved. If the worker can't start (or fails), the
+  // chart shows plain water: the lines are decoration.
+  // The picture is a layer of its own, under the basemap's canvas: a <canvas> handed the finished
+  // picture (no drawing on the page's thread), placed and scaled with a CSS transform. Until a new
+  // picture arrives the previous one is shown scaled, and when it arrives nothing else is
+  // repainted: repainting the whole basemap for it froze the page on a computer without a
+  // graphics chip (measured, #111).
+  var water = null; // the picture shown: { zoom, x, y, w, h (world pixels at that zoom) }
+  var waterJob = null; // the picture being worked out
+  map.createPane("water").style.zIndex = 240; // just under the basemap (250)
+  var waterEl = L.DomUtil.create("canvas", "chart-water leaflet-zoom-animated", map.getPane("water"));
+  var waterShow = null; // hands a picture to waterEl: "bitmaprenderer", or 2D where there is none
+  var waterWorker = null;
+  try {
+    waterWorker = new Worker(folder + "water.js");
+    waterWorker.onmessage = takeWater;
+    waterWorker.onerror = function () { waterWorker = null; waterJob = null; };
+    waterWorker.postMessage({ land: landRings });
+  } catch (e) {
+    waterWorker = null; // the chart works without the lines
+  }
 
-  // Squared distance to the nearest zero along one row or column (Felzenszwalb and
-  // Huttenlocher's lower envelope of parabolas). f: input, d: output, v and z: work space.
-  function distances1d(f, n, d, v, z) {
-    var k = 0;
-    v[0] = 0;
-    z[0] = -Infinity;
-    z[1] = Infinity;
-    for (var q = 1; q < n; q++) {
-      var s = (f[q] + q * q - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
-      while (s <= z[k]) {
-        k--;
-        s = (f[q] + q * q - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
-      }
-      k++;
-      v[k] = q;
-      z[k] = s;
-      z[k + 1] = Infinity;
-    }
-    k = 0;
-    for (var p = 0; p < n; p++) {
-      while (z[k + 1] < p) k++;
-      d[p] = (p - v[k]) * (p - v[k]) + f[v[k]];
-    }
-  }
-  function distanceMap(cells, w, h) {
-    var n = Math.max(w, h), f = new Float64Array(n), d = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1);
-    var x, y;
-    for (x = 0; x < w; x++) {
-      for (y = 0; y < h; y++) f[y] = cells[y * w + x];
-      distances1d(f, h, d, v, z);
-      for (y = 0; y < h; y++) cells[y * w + x] = d[y];
-    }
-    for (y = 0; y < h; y++) {
-      for (x = 0; x < w; x++) f[x] = cells[y * w + x];
-      distances1d(f, w, d, v, z);
-      for (x = 0; x < w; x++) cells[y * w + x] = d[x];
-    }
-  }
   // A colour token as red, green, blue (0-255), through the canvas's own colour parser.
+  var colourCtx = document.createElement("canvas").getContext("2d");
   function rgb(colour) {
-    maskCtx.fillStyle = "#000";
-    maskCtx.fillStyle = colour;
-    var hex = /^#([0-9a-f]{6})$/i.exec(maskCtx.fillStyle);
+    colourCtx.fillStyle = "#000";
+    colourCtx.fillStyle = colour;
+    var hex = /^#([0-9a-f]{6})$/i.exec(colourCtx.fillStyle);
     if (hex) return [0, 2, 4].map(function (i) { return parseInt(hex[1].substr(i, 2), 16); });
-    return maskCtx.fillStyle.match(/[\d.]+/g).slice(0, 3).map(Number);
+    return colourCtx.fillStyle.match(/[\d.]+/g).slice(0, 3).map(Number);
   }
 
-  // The water picture for a box of world pixels at this zoom (x, y: top left; w, h: size).
-  function paintWater(zoom, s, x, y, w, h, colours) {
-    // Lines every 25, 50, 100, 200... metres: the closest spacing still COAST_LINE_GAP apart.
-    // Zooming in by one step halves the spacing, so the lines already drawn stay where they are.
-    var perMetre = worldPerMetre * s, step = 25;
-    while (step * perMetre < COAST_LINE_GAP) step *= 2;
-    var gap = step * perMetre, count = Math.floor(COAST_LINE_REACH / gap);
-    // Land up to the furthest line outside the box counts too.
-    var edge = Math.ceil(count * gap) + 2, mw = w + 2 * edge, mh = h + 2 * edge;
-    maskCanvas.width = mw;
-    maskCanvas.height = mh;
-    maskCtx.fillStyle = "#000";
-    maskCtx.fillRect(0, 0, mw, mh);
-    maskCtx.fillStyle = "#fff";
-    var box = { minX: x - edge, minY: y - edge, maxX: x + w + edge, maxY: y + h + edge };
-    maskCtx.fill(outline(landRings, s, box, 0.75, true, { x: x - edge, y: y - edge }), "evenodd");
-    var mask = maskCtx.getImageData(0, 0, mw, mh).data;
-    var cells = new Float32Array(mw * mh);
-    for (var i = 0; i < cells.length; i++) cells[i] = mask[4 * i] >= 128 ? 0 : 1e20;
-    distanceMap(cells, mw, mh);
+  // Ask the worker for the picture of this view (world pixels at this zoom) plus the margin.
+  // One picture at a time: when it arrives the chart is painted again, and asks again then if
+  // it has moved on meanwhile.
+  function wantWater(zoom, s, view, colours) {
+    if (!waterWorker || waterJob) return;
+    var mx = Math.ceil((view.maxX - view.minX) * WATER_MARGIN), my = Math.ceil((view.maxY - view.minY) * WATER_MARGIN);
+    var x0 = Math.floor(view.minX) - mx, y0 = Math.floor(view.minY) - my;
+    waterJob = { zoom: zoom, s: s, x: x0, y: y0, w: Math.ceil(view.maxX) + mx - x0, h: Math.ceil(view.maxY) + my - y0,
+      worldPerMetre: worldPerMetre, sea: rgb(colours.water), line: rgb(colours.waterLine) };
+    waterWorker.postMessage(waterJob);
+  }
 
-    var picture = water && water.canvas.width === w && water.canvas.height === h ? water.canvas : document.createElement("canvas");
-    picture.width = w;
-    picture.height = h;
-    var pictureCtx = picture.getContext("2d");
-    var image = pictureCtx.createImageData(w, h), out = image.data;
-    var sea = rgb(colours.water), line = rgb(colours.waterLine);
-    // How strong each line is: strongest near the shore, fading outwards (as before #104).
-    var strength = [0];
-    for (var k = 1; k <= count; k++) strength.push(0.06 + 0.5 * Math.pow(1 - (k - 1) / count, 1.8));
-    var half = COAST_LINE_WIDTH / 2;
-    for (var py = 0; py < h; py++) {
-      for (var px = 0, o = 4 * py * w, c = (py + edge) * mw + edge; px < w; px++, o += 4, c++) {
-        // Distance from the shore: to the nearest land pixel's centre, less half a pixel.
-        var dist = Math.sqrt(cells[c]) - 0.5, nearest = Math.round(dist / gap), a = 0;
-        if (nearest >= 1 && nearest <= count) {
-          // How much of this pixel the 0.8 px line covers, times the line's strength.
-          var centre = nearest * gap;
-          a = Math.max(0, Math.min(dist + 0.5, centre + half) - Math.max(dist - 0.5, centre - half)) * strength[nearest];
-        }
-        out[o] = sea[0] + (line[0] - sea[0]) * a;
-        out[o + 1] = sea[1] + (line[1] - sea[1]) * a;
-        out[o + 2] = sea[2] + (line[2] - sea[2]) * a;
-        out[o + 3] = 255;
-      }
+  // A picture from the worker: handed to the water layer as it is (an ImageBitmap, made off the
+  // page's thread), or copied in where the browser has no "bitmaprenderer". Then placed, and asked
+  // for again if the chart has moved on meanwhile.
+  function takeWater(event) {
+    var done = event.data, image = new ImageData(done.pixels, done.w, done.h);
+    function show(picture) {
+      waterEl.width = done.w;
+      waterEl.height = done.h;
+      waterEl.style.width = done.w + "px";
+      waterEl.style.height = done.h + "px";
+      if (picture) waterShow.transferFromImageBitmap(picture);
+      else waterShow.putImageData(image, 0, 0);
+      water = { zoom: done.zoom, x: done.x, y: done.y, w: done.w, h: done.h };
+      waterJob = null;
+      placeWater(map.getZoom(), map.getPixelOrigin());
+      checkWater();
     }
-    pictureCtx.putImageData(image, 0, 0);
-    maskCanvas.width = maskCanvas.height = 1; // the mask's memory back
-    return { zoom: zoom, x: x, y: y, canvas: picture };
+    if (!waterShow) waterShow = (window.createImageBitmap && waterEl.getContext("bitmaprenderer")) || waterEl.getContext("2d");
+    if (waterShow.transferFromImageBitmap) createImageBitmap(image).then(show, function () { waterJob = null; });
+    else show(null);
+  }
+
+  // The picture on the chart at `zoom`, for a view whose top left is `origin` (world pixels at that
+  // zoom: Leaflet's pixel origin). Moved and scaled by the browser, like Leaflet's own layers.
+  function placeWater(zoom, origin) {
+    if (!water) return;
+    var k = map.getZoomScale(zoom, water.zoom);
+    L.DomUtil.setTransform(waterEl, L.point(water.x * k - origin.x, water.y * k - origin.y), k);
+  }
+  // A zoom by button, double-click or wheel is animated: the picture moves and scales with the
+  // chart, towards the view Leaflet is zooming to (worked out as Leaflet does, from public parts).
+  map.on("zoomanim", function (event) {
+    var pane = L.DomUtil.getPosition(map.getPane("mapPane")) || L.point(0, 0);
+    placeWater(event.zoom, map.project(event.center, event.zoom).subtract(map.getSize().divideBy(2)).add(pane).round());
+  });
+  // Flying and pinching move the view frame by frame; a reset at once.
+  map.on("zoom viewreset zoomend", function () { placeWater(map.getZoom(), map.getPixelOrigin()); });
+
+  // The view in world pixels at the current zoom, with the basemap canvas's margin.
+  function viewBox() {
+    var origin = map.getPixelOrigin(), size = map.getSize(), pad = size.multiplyBy(base.options.padding);
+    var min = map.containerPointToLayerPoint(pad.multiplyBy(-1)), max = map.containerPointToLayerPoint(size.add(pad));
+    return { minX: min.x + origin.x, minY: min.y + origin.y, maxX: max.x + origin.x, maxY: max.y + origin.y };
+  }
+  // A new picture is asked for only for a new zoom, or when the view has left the picture.
+  function checkWater() {
+    var zoom = map.getZoom(), view = viewBox();
+    var inside = water && water.zoom === zoom && view.minX >= water.x && view.minY >= water.y &&
+      view.maxX <= water.x + water.w && view.maxY <= water.y + water.h;
+    if (!inside) wantWater(zoom, map.getZoomScale(zoom, 0), view, chartColours());
   }
 
   // Outline of a set of shapes at scale s: only shapes that reach into `box` (world pixels at
@@ -396,19 +383,13 @@
     // The canvas in world pixels at this zoom (= the chart's coordinates plus the pixel origin).
     var view = { minX: min.x + origin.x, minY: min.y + origin.y, maxX: max.x + origin.x, maxY: max.y + origin.y };
 
-    // The water picture: worked out again only for a new zoom or when the view has left it.
-    var inside = water && water.zoom === zoom && view.minX >= water.x && view.minY >= water.y &&
-      view.maxX <= water.x + water.canvas.width && view.maxY <= water.y + water.canvas.height;
-    if (!inside) {
-      var mx = Math.ceil((view.maxX - view.minX) * WATER_MARGIN), my = Math.ceil((view.maxY - view.minY) * WATER_MARGIN);
-      var x0 = Math.floor(view.minX) - mx, y0 = Math.floor(view.minY) - my;
-      water = paintWater(zoom, s, x0, y0, Math.ceil(view.maxX) + mx - x0, Math.ceil(view.maxY) + my - y0, colours);
-    }
+    // The water and its lines are a layer of their own, under this canvas ("The water and its
+    // lines", above); this canvas draws the land on a clear background.
+    checkWater();
 
     ctx.save();
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
-    ctx.drawImage(water.canvas, water.x - origin.x, water.y - origin.y);
 
     // Land, lifted off the water by a shadow (a dark copy shifted down, much cheaper
     // than a blurred shadow), and a fine coastline. Flat, like a drawn chart: the random grain

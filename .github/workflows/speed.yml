@@ -1,7 +1,8 @@
 # Site speed, before and after (issue #104): the sample site built from main ("before") and
 # from this branch ("after"), measured one after the other on the same GitHub runner with
-# tools/measure_speed.mjs, on the throttled phone profile. A runner has more memory than the
-# owner's laptop and no graphics chip, so it also shows how the chart behaves without one.
+# tools/measure_speed.mjs, on the throttled phone profile and the laptop profile (#111). A runner
+# has more memory than the owner's laptop and no graphics chip, so it also shows how the chart
+# behaves without one.
 #
 # Measures the sample site only. Changes nothing, publishes nothing, uses no secrets.
 # The local server listens on 127.0.0.1 and the pages load nothing from other sites.
@@ -11,7 +12,7 @@ name: Speed
 on:
   workflow_dispatch:
   push:
-    branches: ["issue-104-*", "issue-102-*"] # the speed work (#104) and the style pass (#102)
+    branches: ["issue-104-*", "issue-102-*", "issue-111-*"] # the speed work (#104), the style pass (#102), map interaction (#111)
     paths:
       - static/**
       - templates/**
@@ -32,7 +33,7 @@ concurrency:
 jobs:
   measure:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       HAVEN_BROWSER: google-chrome
       # Chrome's sandbox can't start on Ubuntu runners (AppArmor); the browser only ever
@@ -71,13 +72,14 @@ jobs:
 
       # The same measuring script (this branch's) for both sites.
       - name: Measure before
-        timeout-minutes: 20
-        run: node tools/measure_speed.mjs "$RUNNER_TEMP/before" --runs 3 --profiles phone --pages "$PAGES" --json "$RUNNER_TEMP/before.json"
+        timeout-minutes: 35
+        run: node tools/measure_speed.mjs "$RUNNER_TEMP/before" --runs 3 --profiles phone,laptop --pages "$PAGES" --json "$RUNNER_TEMP/before.json"
 
       - name: Measure after
-        timeout-minutes: 20
-        run: node tools/measure_speed.mjs "$RUNNER_TEMP/after" --runs 3 --profiles phone --pages "$PAGES" --json "$RUNNER_TEMP/after.json"
+        timeout-minutes: 35
+        run: node tools/measure_speed.mjs "$RUNNER_TEMP/after" --runs 3 --profiles phone,laptop --pages "$PAGES" --json "$RUNNER_TEMP/after.json"
 
       - name: Compare
         run: |
-          node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" --profile phone | tee -a "$GITHUB_STEP_SUMMARY"
+          node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" --profile laptop | tee -a "$GITHUB_STEP_SUMMARY"

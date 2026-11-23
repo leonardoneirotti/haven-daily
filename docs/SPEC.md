@@ -1260,7 +1260,7 @@ The review (`docs/design-review.md`) found why the site didn't feel user-friendl
 Place labels (water = italic serif; land = small Manrope caps; city = bold Manrope caps; since #102):
 North Sea (51.99, 3.84) · Nieuwe Waterweg (51.951, 4.163, 37°) · Nieuwe Maas (51.9, 4.4) · Oude Maas (51.846, 4.36, 30°) · Waalhaven (51.879, 4.452) · Maasvlakte 2 (51.976, 3.975) · Maasvlakte (51.946, 4.035) · Europoort (51.933, 4.13) · Botlek (51.868, 4.29) · Pernis (51.882, 4.385) · Hoek van Holland (51.984, 4.135) · Rozenburg (51.906, 4.245) · Rotterdam (51.925, 4.48).
 
-### 8.3 Painting the basemap in the browser (`static/map.js`)
+### 8.3 Painting the basemap in the browser (`static/map.js`, water lines in `static/water.js`)
 
 A custom Leaflet vector layer (`L.Path.extend`) on its own `L.canvas` renderer in a pane at z-index 250 (under labels and ships). Leaflet handles canvas size, retina, smooth CSS scaling during zoom, and asks for a repaint when the map stops moving.
 
@@ -1270,12 +1270,13 @@ Everything is converted once to **"world pixels"** (Web Mercator at zoom 0): `x 
 
 Paint order:
 1. **Water + coast lines** (#104: from a distance map, not wide strokes).
-   - **How:** the land is filled in white on a small canvas (one pixel per screen point); every water pixel gets its exact distance to the nearest land pixel (Euclidean distance transform, Felzenszwalb–Huttenlocher: one pass down the columns, one along the rows); a pixel belongs to a line where that distance is a line's distance, with the line's 0.8 px width as coverage. The work depends only on the number of pixels, not on the coastline or the number of lines. (Before #104: each line was a wide stroke of the whole coastline, `2d + 0.8 px` in the line colour then `2d − 0.8 px` in the water colour; 4–12 s per repaint in a browser without a graphics chip.)
+   - **How:** the land is filled in as a mask (one pixel per screen point; a pixel is land when its centre is inside, `evenodd`); every water pixel gets its exact distance to the nearest land pixel (Euclidean distance transform, Felzenszwalb–Huttenlocher: one pass down the columns, one along the rows); a pixel belongs to a line where that distance is a line's distance, with the line's 0.8 px width as coverage. The work depends only on the number of pixels, not on the coastline or the number of lines. (Before #104: each line was a wide stroke of the whole coastline, `2d + 0.8 px` in the line colour then `2d − 0.8 px` in the water colour; 4–12 s per repaint in a browser without a graphics chip.)
    - **Worked out once per zoom level** for the view plus 25 % of its size on each side, and reused while the chart is moved at that zoom; worked out again only for a new zoom or when the view leaves that area.
+   - **In a background worker** (#111): `map.js` starts a worker from `static/water.js`, sends it the land once, then asks for one picture at a time. The water is **a layer of its own** under the basemap's canvas (pane `water`, z-index 240): a `<canvas>` handed the finished picture with `bitmaprenderer` (no drawing on the page's thread), placed and scaled by a CSS transform worked out from Leaflet's public API (`getPixelOrigin`, `project`, `DomUtil.getPosition/setTransform`), following animated zooms, flying and pinching. The basemap's canvas draws the land on a clear background. Until the new picture arrives, the previous one is shown **scaled** to the new zoom (lines a little soft for a moment); when it arrives, nothing else is repainted, and it is asked for again if the chart has moved on meanwhile. (A first version repainted the whole basemap when a picture arrived: that repaint was itself a 0.13 s task on the runner's laptop profile, measured in this PR.) Before, the same work ran on the page's thread and froze the page 1.3–1.8 s after every zoom step on a laptop (#106 had made it a distance map; diagnosis in #111). If the worker can't start or fails, the chart shows plain water: the lines are decoration. `water.js` is pure JavaScript (no page, canvas or Leaflet), so `tests/test_water.py` runs it in Node; it loads nothing (hard rule 14).
    - Spacing: 25, 50, 100, 200… metres — the smallest that stays ≥ 6 px apart at the current zoom; lines out to 120 px. Zooming in one step halves the spacing, so existing lines stay put and new ones appear between. All lines kept: with the distance map their number doesn't cost time.
    - Opacity fades with distance: `0.06 + 0.5·(1 − (i−1)/count)^1.8`.
    - **They are decoration, not depth contours** (stated on the Method page).
-2. **Land**: dark copy shifted 2.5 px down (cheap shadow), land fill (`evenodd`), a 128×128 random speckle pattern (grain), 0.8 px light coastline.
+2. **Land**: dark copy shifted 2.5 px down (cheap shadow), flat land fill (`evenodd`; the random grain was removed in the style pass, #102), 0.8 px coastline.
 3. **Detail**: minor roads, major roads, rail in darker "cut" colours; jetties in land colour. Widths scale with zoom: `max(0.35, min(base·1.55^(z−11), base·4))`.
 4. **Storage tanks** at real size (min 0.6 px), each with a small offset shadow.
 
@@ -1333,8 +1334,8 @@ Measured on a 2× screen: canvas was **13 Mpx**, repaint ~190 ms, setup ~180 ms.
 - **Text first, chart after:** Leaflet and `pins.js` are deferred; `static/map-loader.js` adds `basemap.js` and `map.js` once the page has painted, with a quiet "Loading chart…" note in the chart frame until then. If either fails to load, the page falls back to its plain-text stand-ins.
 - The High marker's ping plays **3 times**, then stays still (also when markers are rebuilt); none with reduced motion.
 - Per move: the scale bar updates when a move ends (`updateWhenIdle`), the chart colours are read once, the callouts are measured again only on `document.fonts.ready`.
-- **Lighter basemap** (about 92 KB as sent, about 158 KB raw; was 238 KB / 840 KB; §8.2) and **water lines from a distance map**, worked out once per zoom and reused while moving (§8.3). Canvas paths stay in screen coordinates (the canvas keeps ~7 digits; world pixels reach millions at zoom 15).
-- Measured before/after on a GitHub runner (`.github/workflows/speed.yml`, `tools/measure_speed.mjs`, `tools/speed_compare.mjs`), never on the owner's laptop (8 GB, often short of memory).
+- **Lighter basemap** (about 92 KB as sent, about 158 KB raw; was 238 KB / 840 KB; §8.2) and **water lines from a distance map**, worked out once per zoom and reused while moving (§8.3), **in a background worker since #111** so a zoom step never freezes the page (target, owner 21 Nov 2026: no task over 100 ms per zoom step on a laptop without a graphics chip). Canvas paths stay in screen coordinates (the canvas keeps ~7 digits; world pixels reach millions at zoom 15).
+- Measured before/after on a GitHub runner (`.github/workflows/speed.yml`, `tools/measure_speed.mjs`, `tools/speed_compare.mjs`), never on the owner's laptop (8 GB, often short of memory). Since #111 on the **laptop profile too** (the zoom freeze of #106 only showed on a laptop-sized chart), with three zoom steps per page.
 
 ### 8.7 Testing without the Chrome extension
 

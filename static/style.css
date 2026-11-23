@@ -1177,6 +1177,11 @@ html.js .topbar {
 
 /* ---------- Leaflet, restyled for the chart ---------- */
 
+/* The water and its lines: a picture under the basemap's canvas (map.js, #111). Never in the way. */
+.chart-water {
+  pointer-events: none;
+}
+
 .leaflet-container {
   background: var(--water);
   font-family: var(--font-sans);

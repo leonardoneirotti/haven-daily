@@ -219,3 +219,39 @@ Measured on a GitHub runner with no graphics chip, throttled phone profile, main
 - **First text:** 0.04 s later (0.60 → 0.64 s, 0.56 → 0.60 s), within its 1.5 s target. The stylesheet is about the same size; the small difference is within what varies between runs.
 - **Archive and How it works** send less than half (95 → 43 KB, 124 → 49 KB): one font file each instead of three or four.
 - **Today's map move**, 0.30 → 0.62 s, still within its target. This is one drag in one profiled load. The longest *frame* (what a visitor sees) went 0.67 → 0.62 s; only the longest *task* grew (0.27 → 0.62 s), and zoom (0.30 → 0.28 s) and the day with ships (0.28 → 0.27 s) didn't change. To watch in the next speed run, not a change the style pass is known to cause.
+
+## Results, part 4 (#111: the water lines in a background worker)
+
+Before #111 the page froze 1.3–1.8 s after every zoom step on the owner's laptop: since #106 the water lines were worked out on the page's own thread at every new zoom level (diagnosis in #111). They are now worked out in a background worker (`static/water.js`) and shown as a layer of their own (spec §8.3). The speed run now measures the **laptop profile too**, with three zoom steps per page, so a laptop regression can't go unseen again.
+
+**Target** (owner, 21 Nov 2026): no task over **100 ms per zoom step** on the laptop profile, without a graphics chip.
+
+Measured on a GitHub runner with no graphics chip, main ("before") against this branch ("after") in the same run
+([run 44889583124](https://github.com/leonardoneirotti/haven-daily/actions/runs/44889583124)):
+
+**Laptop profile**
+
+| | Today before | Today after | Day with ships before | Day with ships after | Target |
+|---|---|---|---|---|---|
+| Map visible | 0.66 s | 0.40 s | 0.63 s | 0.38 s | |
+| Blocked while loading (TBT) | 0.37 s | 0.10 s | 0.36 s | 0.10 s | |
+| Map move, longest freeze | 0.23 s | **0.00 s** | 0.22 s | **0.00 s** | |
+| Zoom step, longest task | 0.26 s | **0.00 s** | 0.24 s | **0.00 s** | 0.1 s ✅ |
+
+**Throttled phone profile**
+
+| | Today before | Today after | Day with ships before | Day with ships after | Target |
+|---|---|---|---|---|---|
+| News and status visible | 0.66 s | 0.67 s | 0.62 s | 0.62 s | 1.5 s ✅ |
+| Map visible | 2.35 s | **2.09 s** | 2.07 s | **1.78 s** | 2.5 s ✅ |
+| Blocked while loading (TBT) | 0.50 s | 0.23 s | 0.45 s | 0.18 s | |
+| Map move, longest freeze | 0.28 s | 0.00 s | 0.35 s | 0.33 s | 1 s ✅ |
+| Zoom step, longest task | 0.35 s | 0.34 s | 0.35 s | 0.34 s | |
+
+- **Laptop zoom steps:** no long task in any of the three steps, on both pages. The longest *frame* in a zoom step is still 67–117 ms (was 317–367 ms); in the trace that time is the browser's own compositing ("Commit"), not the page's JavaScript.
+- **The map comes sooner on both profiles** (0.26–0.29 s on the phone): the first water picture is worked out in the worker too, so it no longer holds up the first paint of the chart.
+- **Phone zoom steps are unchanged** (0.27–0.34 s, inside the 1 s move target, no target of their own). The water work is gone from them; what is left was not looked into in this PR. To look at if zooming on a phone feels slow.
+- **The runner is faster at this work than the owner's laptop:** main's zoom step was 0.24–0.26 s here, 1.3–1.8 s on the laptop in Edge. The fix still has to be tried on the laptop itself.
+- **This PR's first speed run** gave 0.13 s per laptop zoom step: when a new water picture arrived, the whole basemap was repainted. The water then became a layer of its own, which brought it to 0.00 s (this run).
+- **Today's map move on main (part 3's "to watch"):** 0.28 s in this run, so the 0.62 s didn't come back.
+- **Archive, phone:** load event 0.42 → 0.70 s. This PR doesn't change the archive, and How it works was 0.70 s before and after: variation between loads.
