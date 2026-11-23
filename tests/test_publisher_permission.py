@@ -9,8 +9,11 @@ for AI-generated summaries of one or two sentences, on conditions. What these te
   again (withdrawal, condition 6);
 - the summary is written from the lead paragraph in the RSS feed only (owner, 19 Nov 2026): no
   article page is opened;
-- the summary is at most two sentences, checked in code (condition 1), and there is no impact
-  line until RTV Rijnmond confirms it;
+- the summary is at most two sentences, checked in code (condition 1);
+- the impact line, allowed since 23 Nov 2026 (docs/permissions/2026-11-23-rtv-rijnmond.md, #115),
+  is labelled as Haven Daily's interpretation, not RTV Rijnmond's; the prompt asks for consequences
+  as possible ("could", "may"), never confirmed, from the lead paragraph's facts only; and a code
+  check rejects confirmed-sounding wording (one retry, then no impact line);
 - next to every such summary (short note, owner's wording, PR #108 review) and on How it works
   (full wording): Haven Daily is independent and RTV Rijnmond is not responsible for the
   AI-generated summaries.
@@ -55,7 +58,10 @@ ROBOTS_WITH_AI_BLOCK = ("User-agent: *\nAllow: /\nDisallow: /content/\n\n"
 LEAD = ("Invented lead paragraph. Dock workers at an invented Waalhaven terminal stopped work this "
         "morning after a dispute about night shifts, the union said.")
 
+# A permission without an impact line (RTV Rijnmond's from 19 to 23 Nov 2026): still the generic case.
 PERMISSION = Permission(file=PERMISSION_FILE, granted=date(2026, 11, 19), max_sentences=2, impact=False)
+# RTV Rijnmond's since 23 Nov 2026 (#115): the impact line is allowed too, on its conditions.
+WITH_IMPACT = Permission(file=PERMISSION_FILE, granted=date(2026, 11, 19), max_sentences=2, impact=True)
 
 
 def rijnmond(permission=PERMISSION) -> Source:
@@ -142,7 +148,7 @@ def test_a_bad_permission_line_stops_the_run_with_a_clear_message(tmp_path, line
 def test_rijnmond_has_written_permission_in_the_real_config():
     source = real("rtv-rijnmond")
     assert source.verdict == "headline-only"  # its own robots.txt AI block and terms
-    assert source.permission == PERMISSION
+    assert source.permission == WITH_IMPACT
     assert source.effective_verdict == "use"
     assert (ROOT / source.permission.file).is_file()
 
@@ -162,7 +168,8 @@ def test_withdrawal_is_deleting_one_line(tmp_path):
     assert "terms" in source.why.lower() and "ai crawlers" in source.why.lower()  # still true then
 
 
-@pytest.mark.parametrize("name", ["2026-11-18-rtv-rijnmond.md", "2026-11-19-rtv-rijnmond.md"])
+@pytest.mark.parametrize("name", ["2026-11-18-rtv-rijnmond.md", "2026-11-19-rtv-rijnmond.md",
+                                  "2026-11-23-rtv-rijnmond.md"])
 def test_the_saved_replies_name_name_role_and_date_but_no_email_address(name):
     text = (ROOT / "docs" / "permissions" / name).read_text(encoding="utf-8")
     assert "Daan Verberne" in text and "Sales, Marketing and Communications Manager" in text
@@ -245,6 +252,9 @@ def rijnmond_item(**changes) -> Item:
 
 
 TWO = "Staff at a Waalhaven terminal walked out this morning. The row is about night shifts."
+# Impacts as the prompt asks for them (consequences as possible), and as it doesn't (confirmed).
+HEDGED = "Container pickups at the terminal could be delayed today. Planners may want to check slots."
+CONFIRMED = "Container pickups at the terminal will be delayed today. Planners should rebook slots."
 THREE = TWO + " Talks are planned."
 
 
@@ -293,9 +303,10 @@ def test_a_two_sentence_summary_is_accepted_with_no_impact():
 
 
 def test_the_real_config_applies_rijnmonds_limits():
-    result, client = run([rijnmond_item()], rijnmond_answer())
-    assert "impact" not in client.messages.calls[0]["output_config"]["format"]["schema"]["properties"]
-    assert result.items[0].ai["summary"] == TWO
+    result, client = run([rijnmond_item()], rijnmond_answer(impact=HEDGED))
+    assert "impact" in client.messages.calls[0]["output_config"]["format"]["schema"]["properties"]
+    assert "Haven Daily's own interpretation" in client.messages.calls[0]["messages"][0]["content"]
+    assert result.items[0].ai["summary"] == TWO and result.items[0].ai["impact"] == HEDGED
 
 
 def test_three_sentences_get_one_retry_then_the_shorter_answer_is_used():
@@ -399,8 +410,10 @@ def test_how_it_works_lists_rijnmond_under_use_with_its_limits():
     groups = method_groups(page)
     assert "RTV Rijnmond" in groups["use"] and "RTV Rijnmond" not in groups["headline-only"]
     line = text_of(groups["use"][groups["use"].index("RTV Rijnmond"):])
-    for words in ("written permission", "lead paragraph", "at most two sentences", "no impact for planners"):
+    for words in ("written permission", "lead paragraph", "at most two sentences",
+                  "impact for planners is Haven Daily's own interpretation", "written as possible"):
         assert words in line
+    assert "no impact for planners" not in line
 
 
 def test_how_it_works_says_haven_daily_is_independent_and_rijnmond_not_responsible():
@@ -414,3 +427,175 @@ def test_after_withdrawal_how_it_works_lists_it_as_headline_only_again():
     page = render_method(sources=sources)
     assert "RTV Rijnmond" in method_groups(page)["headline-only"]
     assert "not responsible for the AI-generated summaries" not in text_of(page)
+
+
+# --- the impact line, allowed since 23 Nov 2026 (#115) -------------------------------------------
+# RTV Rijnmond's conditions (Daan Verberne, 23 Nov 2026; docs/permissions/2026-11-23-rtv-rijnmond.md):
+# the line is clearly Haven Daily's own interpretation, not a statement or conclusion from RTV
+# Rijnmond; any impact rests on the facts in the article; possible consequences are not presented
+# as confirmed facts.
+
+IMPACT_REPLY = "docs/permissions/2026-11-23-rtv-rijnmond.md"
+
+
+def test_the_reply_of_23_november_records_the_three_conditions():
+    text = (ROOT / IMPACT_REPLY).read_text(encoding="utf-8")
+    assert "23 November 2026" in text
+    for words in ("Haven Daily's own interpretation", "based on the facts in the article",
+                  "not presented as confirmed facts"):
+        assert words in text
+
+
+def test_the_request_asks_for_a_hedged_impact_from_the_lead_paragraph_only():
+    request = summarise._request(rijnmond_item(), summarise.SUMMARY_MODEL, "invented system prompt", [],
+                                 TODAY, READ_AT, permission=WITH_IMPACT)
+    assert "impact" in request["output_config"]["format"]["schema"]["properties"]
+    content = request["messages"][0]["content"]
+    assert "at most 2 sentences" in content
+    assert "Haven Daily's own interpretation" in content
+    assert "only on the facts in the text above" in content
+    assert '"could" or "may"' in content and "never as certain or confirmed" in content
+
+
+@pytest.mark.parametrize("impact", [
+    HEDGED,
+    "Barge slots might be tight on Thursday.",
+    "Possibly fewer pickups at Waalhaven today.",
+    "Trucks may face longer waits. Planners should check their bookings.",  # advice needs no hedge
+    "May cause delays at the gate.",
+])
+def test_impacts_written_as_possible_pass_the_check(impact):
+    assert summarise.sounds_confirmed(impact) is None
+
+
+@pytest.mark.parametrize("impact, word", [
+    (CONFIRMED, "will"),
+    ("Pickups could slip and won't recover today.", "won't"),
+    ("Slots could be tight; carriers are going to reroute.", "going to"),
+    ("Delays may follow, and the closure is confirmed.", "confirmed"),
+    ("Barges could wait. Delays are certain.", "certain"),
+    ("Pickups could definitely slip.", "definitely"),
+    ("Pickups WILL slip but may recover.", "will"),
+    ("Terminals could close and they'll reroute.", "'ll"),
+])
+def test_confirmed_sounding_words_fail_the_check(impact, word):
+    assert summarise.sounds_confirmed(impact) == f'states a consequence as certain ("{word}")'
+
+
+@pytest.mark.parametrize("impact", [
+    "Container pickups at the terminal are delayed today.",
+    "Barges wait until 5 May.",  # a month is not a hedge
+    "Expect delays from May 5.",
+])
+def test_an_impact_with_no_could_may_or_might_fails_the_check(impact):
+    assert summarise.sounds_confirmed(impact) == 'states consequences as certain (no "could", "may" or "might")'
+
+
+def test_a_hedged_impact_is_kept():
+    result, client = run([rijnmond_item()], rijnmond_answer(impact=HEDGED), sources=(rijnmond(WITH_IMPACT),))
+    assert result.items[0].ai["impact"] == HEDGED
+    assert result.failures == [] and len(client.messages.calls) == 1
+
+
+def test_a_confirmed_sounding_impact_gets_one_retry_then_the_hedged_answer_is_used():
+    result, client = run([rijnmond_item()], rijnmond_answer(impact=CONFIRMED), rijnmond_answer(impact=HEDGED),
+                         sources=(rijnmond(WITH_IMPACT),))
+    assert result.items[0].ai["impact"] == HEDGED and result.failures == []
+    retry = client.messages.calls[1]["messages"][-1]["content"]
+    assert 'impact states a consequence as certain ("will")' in retry
+    assert 'write each consequence as possible, with "could" or "may"' in retry
+
+
+def test_confirmed_twice_leaves_out_the_impact_line_and_keeps_the_rest():
+    result, client = run([rijnmond_item()], rijnmond_answer(impact=CONFIRMED), rijnmond_answer(impact=CONFIRMED),
+                         sources=(rijnmond(WITH_IMPACT),))
+    [done] = result.items
+    assert len(client.messages.calls) == 2  # one retry, no more
+    assert done.ai["summary"] == TWO and done.ai["severity"] == "high"  # still rated
+    assert done.ai["impact"] is None and done.ai["impact_left_out"] is True
+    assert result.failures == [{"source": summarise.SUMMARISER, "error": f"{ARTICLE_URL}: impact left out: "
+                                'impact states a consequence as certain ("will") (after a retry)'}]
+    stored = summarise.brief_item(done, (rijnmond(WITH_IMPACT),))
+    assert stored["impact"] is None
+    assert stored["permission"] == {"granted": "2026-11-19", "max_sentences": 2, "impact": True,
+                                    "impact_left_out": True}
+
+
+def test_the_one_retry_is_shared_with_the_other_checks():
+    """A retry already spent on a three-sentence summary leaves no second one for the impact."""
+    result, client = run([rijnmond_item()], rijnmond_answer(THREE, impact=HEDGED),
+                         rijnmond_answer(impact=CONFIRMED), sources=(rijnmond(WITH_IMPACT),))
+    assert len(client.messages.calls) == 2
+    assert result.items[0].ai["summary"] == TWO and result.items[0].ai["impact"] is None
+
+
+def test_not_enough_information_stays_possible():
+    result, _ = run([rijnmond_item()], rijnmond_answer(impact=None), sources=(rijnmond(WITH_IMPACT),))
+    assert result.items[0].ai["impact"] is None and "impact_left_out" not in result.items[0].ai
+    assert summarise.brief_item(result.items[0], (rijnmond(WITH_IMPACT),))["permission"] == {
+        "granted": "2026-11-19", "max_sentences": 2, "impact": True}
+
+
+def test_the_wording_check_is_for_permission_sources_only():
+    data = {"summary": "Invented summary.", "impact": CONFIRMED, "severity": "low", "place": "none",
+            "tags": [], "strike": None}
+    result, client = run([ect_item()], answer(json.dumps(data)), sources=(rijnmond(WITH_IMPACT),))
+    assert result.items[0].ai["impact"] == CONFIRMED and len(client.messages.calls) == 1
+
+
+def test_the_batch_route_gets_the_same_retry_and_leaves_the_impact_out():
+    """A batch answer that sounds confirmed is retried once through the standard API, like a long one."""
+    from tests.test_summarise_batch import BatchClient, Clock, FakeBatches, succeeded
+
+    clock = Clock()
+    batches = FakeBatches(clock, results={0: succeeded(rijnmond_answer(impact=CONFIRMED))})
+    client = BatchClient(batches, rijnmond_answer(impact=CONFIRMED))
+    result = summarise.summarise_batch([rijnmond_item()], client, known=[], today=TODAY, read_at=READ_AT,
+                                       clock=clock, sleep=clock.sleep, sources=(rijnmond(WITH_IMPACT),))
+    [done] = result.items
+    assert len(client.messages.calls) == 1  # the one retry, through the standard API
+    assert done.ai["summary"] == TWO and done.ai["impact"] is None and done.ai["impact_left_out"] is True
+
+
+# The page: the label says whose interpretation it is.
+LABEL = "Impact for planners Haven Daily's interpretation, not RTV Rijnmond's"
+
+
+def rijnmond_news_with_impact(**fields):
+    fields.setdefault("impact", HEDGED)
+    return rijnmond_news(permission={"granted": "2026-11-19", "max_sentences": 2, "impact": True}, **fields)
+
+
+def test_the_card_labels_the_impact_as_haven_dailys_interpretation(tmp_path):
+    text = text_of(card_of(tmp_path, rijnmond_news_with_impact()))
+    assert LABEL in text and HEDGED in text and NOTE in text
+
+
+def test_other_cards_keep_the_plain_interpretation_label(tmp_path):
+    text = text_of(card_of(tmp_path, news("high", impact="Invented impact.")))
+    assert "Impact for planners interpretation" in text and "Haven Daily's interpretation" not in text
+
+
+def test_an_impact_left_out_shows_no_impact_block(tmp_path):
+    item = rijnmond_news(impact=None, permission={"granted": "2026-11-19", "max_sentences": 2, "impact": True,
+                                                  "impact_left_out": True})
+    text = text_of(card_of(tmp_path, item))
+    assert "Impact for planners" not in text and "Not enough information" not in text
+    assert TWO in text and "Affects Labour" in text
+
+
+def test_not_enough_information_is_also_labelled_as_haven_dailys(tmp_path):
+    text = text_of(card_of(tmp_path, rijnmond_news_with_impact(impact=None)))
+    assert LABEL in text and "Not enough information" in text
+
+
+def test_how_it_works_says_the_impact_is_haven_dailys_not_rijnmonds():
+    text = text_of(render_method(sources=load_sources()))
+    assert "The impact for planners on its items is Haven Daily's own interpretation, not RTV Rijnmond's." in text
+
+
+def test_the_spec_records_the_impact_permission():
+    spec = (ROOT / "docs" / "SPEC.md").read_text(encoding="utf-8")
+    section_11 = spec[spec.index("## 11. Open items"):spec.index("## 12. Credits")]
+    assert IMPACT_REPLY in section_11
+    assert "Open: the impact line for Rijnmond items" not in section_11
