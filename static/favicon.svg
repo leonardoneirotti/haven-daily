@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <title>Signal flag P, the Blue Peter: about to sail (Haven Daily)</title>
+  <title>Haven Daily: signal flags H over D</title>
   <rect width="32" height="32" rx="7" fill="#dbe7ed"/>
-  <rect x="4" y="4" width="24" height="24" fill="#1c4fa0"/><rect x="12" y="12" width="8" height="8" fill="#ffffff"/>
+  <g shape-rendering="crispEdges"><rect x="9" y="1" width="14" height="14" fill="#0f2231"/><rect x="10" y="2" width="6" height="12" fill="#ffffff"/><rect x="16" y="2" width="6" height="12" fill="#d7262e"/><rect x="9" y="17" width="14" height="14" fill="#0f2231"/><rect x="10" y="18" width="12" height="3" fill="#f5c400"/><rect x="10" y="21" width="12" height="6" fill="#1c4fa0"/><rect x="10" y="27" width="12" height="3" fill="#f5c400"/></g>
 </svg>
