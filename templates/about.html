@@ -90,11 +90,11 @@
           </thead>
           <tbody>
             <tr id="threshold-weather">
-              <th scope="row">Weather warnings, Zuid-Holland</th>
+              <th scope="row">Weather warnings, port area</th>
               <td>No warning (green) for the rest of today</td>
               <td>Code yellow at any time in the rest of today</td>
               <td>Code orange or red at any time in the rest of today</td>
-              <td>KNMI's warnings for the province of Zuid-Holland, via <a href="https://www.meteoalarm.org">MeteoAlarm</a></td>
+              <td>KNMI's warnings covering any of the chart's places in the Port of Rotterdam area (land or sea), via <a href="https://www.meteoalarm.org">MeteoAlarm</a></td>
             </tr>
             <tr id="threshold-rhine">
               <th scope="row">Rhine water level, Kaub</th>
@@ -119,7 +119,7 @@
 
     <section aria-labelledby="weather">
       <h2 id="weather">Weather warnings</h2>
-      <p>Weather warnings are issued by <strong>KNMI</strong>, the Dutch national weather service, and read once a day, at around 06:45 Amsterdam time, from <a href="https://www.meteoalarm.org">www.meteoalarm.org</a>. What Haven Daily shows is a morning snapshot, not a live warning service: the weather dial says "Warnings at 06:45 · not live". MeteoAlarm agreed on 23 November 2026 to this once-a-day snapshot. Haven Daily is an independent project, not a MeteoAlarm or KNMI service: for anything that matters, always check <a href="https://www.meteoalarm.org">the latest warnings on www.meteoalarm.org</a>. Each reading shows KNMI's own level and hazard next to the level it maps to (for example "KNMI: Code yellow · Wind → Watch") and the time of issue of the warning. Only the level and the hazard are shown, never the warning text.</p>
+      <p>Weather warnings are issued by <strong>KNMI</strong>, the Dutch national weather service, and read once a day, at around 06:45 Amsterdam time, from <a href="https://www.meteoalarm.org">www.meteoalarm.org</a>. A warning counts when the area KNMI draws for it covers any of the places on the chart, out at sea included; when none does, the dial says No warnings, but only if the feed answered just now and in the form we expect, otherwise No data. What Haven Daily shows is a morning snapshot, not a live warning service: the weather dial says "Warnings at 06:45 · not live". MeteoAlarm agreed on 23 November 2026 to this once-a-day snapshot. Haven Daily is an independent project, not a MeteoAlarm or KNMI service: for anything that matters, always check <a href="https://www.meteoalarm.org">the latest warnings on www.meteoalarm.org</a>. Each reading shows KNMI's own level and hazard next to the level it maps to (for example "KNMI: Code yellow · Wind → Watch") and the time of issue of the warning. Only the level and the hazard are shown, never the warning text.</p>
       <p class="disclaimer">{{ meteoalarm_disclaimer }}</p>
     </section>
 
