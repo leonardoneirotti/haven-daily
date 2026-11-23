@@ -93,7 +93,12 @@
     <span>{{ ind.source_name }}</span>
     {% endif %}
   </p>
-  {% if ind.is_weather %}<p class="dial-disclaimer">{{ meteoalarm_disclaimer }}</p>{% endif %}
+  {# MeteoAlarm's conditions for the daily snapshot (23 Nov 2026, #115): a morning snapshot, not a live
+     warning service; not a MeteoAlarm or KNMI service; a clear link for the latest warnings. #}
+  {% if ind.is_weather %}
+  <p class="dial-snapshot">Morning snapshot, not a live warning service. Haven Daily is not a MeteoAlarm or KNMI service. <a href="https://www.meteoalarm.org">Latest warnings on meteoalarm.org{{ icon("external") }}</a></p>
+  <p class="dial-disclaimer">{{ meteoalarm_disclaimer }}</p>
+  {% endif %}
 </li>
 {%- endmacro %}
 
@@ -121,7 +126,7 @@
     {% if item.permission_note %}<p class="item-permission">{{ item.permission_note }}</p>{% endif %}
     {% if item.shows_impact %}
     <div class="item-impact">
-      <p class="impact-label">Impact for planners <em>interpretation</em></p>
+      <p class="impact-label">Impact for planners <em>{{ item.impact_whose }}</em></p>
       {% if item.impact %}
       <p class="impact-text">{{ item.impact }}</p>
       {% else %}
@@ -130,7 +135,7 @@
       {% if item.affects %}<p class="affects"><strong>Affects</strong> {{ item.affects | join(" · ") }}</p>{% endif %}
     </div>
     {% else %}
-    {# The permission covers no impact (#107): no impact block, the tags stay. #}
+    {# The permission covers no impact (#107), or the impact was left out (#115): no impact block, the tags stay. #}
     {% if item.affects %}<p class="affects"><strong>Affects</strong> {{ item.affects | join(" · ") }}</p>{% endif %}
     {% endif %}
     {% endif %}

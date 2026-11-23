@@ -505,6 +505,8 @@ def headline_note(item: dict) -> str | None:
 PERMISSION_NOTE = ("AI summary, with {source}'s permission. Haven Daily is independent; "
                    "{source} is not responsible for it.")
 SENTENCE_WORDS = {1: "one sentence", 2: "two sentences", 3: "three sentences"}
+# The impact label's second part for an item under a publisher's permission (#115); "interpretation" otherwise.
+IMPACT_WHOSE = "Haven Daily's interpretation, not {source}'s"
 
 
 def permission_note(item: dict) -> str | None:
@@ -523,8 +525,12 @@ def prepare_item(item: dict, brief_date: str) -> None:
     item.setdefault("map", None)  # {"lat", "lon", "label"} when the item has a place on the map
     item.setdefault("permission", None)  # {"granted", "max_sentences", "impact"}: written permission (#107)
     item["permission_note"] = permission_note(item)
-    # No impact block when the publisher's permission doesn't cover one (#107): not "Not enough information".
-    item["shows_impact"] = not item["permission"] or bool(item["permission"].get("impact"))
+    # No impact block when the publisher's permission doesn't cover one (#107), or when the impact was
+    # left out because it sounded confirmed twice (#115): not "Not enough information".
+    permission = item["permission"]
+    item["shows_impact"] = not permission or (bool(permission.get("impact")) and not permission.get("impact_left_out"))
+    # Under a publisher's permission the label says whose interpretation it is (RTV Rijnmond's condition, #115).
+    item["impact_whose"] = IMPACT_WHOSE.format(source=item["source"]) if permission else "interpretation"
     item["severity_key"] = severity_key(item["severity"])
     item["language_name"] = LANGUAGE_NAMES.get(item["language"], item["language"])
     item["published_label"] = published_label(item["published"], brief_date)
@@ -699,9 +705,12 @@ def source_use(source: Source) -> str:
         permission = source.permission
         text = "the lead paragraph in its feed" if source.id in LEAD_PARAGRAPH_FEEDS else "the article"
         length = SENTENCE_WORDS.get(permission.max_sentences, f"{permission.max_sentences} sentences")
-        limits = f"at most {length}" + ("" if permission.impact else ", with no impact for planners")
-        return (f"With {source.name}'s written permission: new items go through the AI relevance check, "
-                f"and kept ones are summarised from {text}, in {limits}.")
+        line = (f"With {source.name}'s written permission: new items go through the AI relevance check, "
+                f"and kept ones are summarised from {text}, in at most {length}")
+        if not permission.impact:
+            return line + ", with no impact for planners."
+        return line + (". The impact for planners is Haven Daily's own interpretation, written as possible "
+                       "and checked for wording that sounds confirmed.")
     if source.verdict == "use" and source.auto_keep:
         return ("Rotterdam-specific, so its new items skip the AI relevance check. Each is summarised "
                 "from the article.")
@@ -715,9 +724,13 @@ def source_use(source: Source) -> str:
 def permission_statement(source: Source) -> str:
     """How it works: who gave written permission, when, and that they aren't responsible (#107)."""
     granted = source.permission.granted
-    return (f"{source.name} gave Haven Daily written permission on {granted.day} {granted:%B %Y} for short "
-            f"AI-generated summaries of its articles. Haven Daily is an independent project; "
-            f"{source.name} is not responsible for the AI-generated summaries.")
+    statement = (f"{source.name} gave Haven Daily written permission on {granted.day} {granted:%B %Y} for short "
+                 f"AI-generated summaries of its articles. Haven Daily is an independent project; "
+                 f"{source.name} is not responsible for the AI-generated summaries.")
+    if source.permission.impact:  # #115
+        statement += (f" The impact for planners on its items is Haven Daily's own interpretation, "
+                      f"not {source.name}'s.")
+    return statement
 
 
 def method_page(sources: tuple[Source, ...], rhine: RhineThresholds) -> dict:

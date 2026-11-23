@@ -115,7 +115,8 @@ class Item:
     # they keep or drop; the AI check (#13) for the rest.
     filter: dict | None = None
     # The summariser's output (haven/summarise.py, #15): severity, summary, impact, affects, map,
-    # strike, written_by, and unlisted when something was discarded (spec §5.10). None until the
+    # strike, written_by, and unlisted when something was discarded (spec §5.10), impact_left_out
+    # when an impact under a publisher's permission sounded confirmed twice (#115). None until the
     # summariser has run; for an unrated item the fields are there with null values.
     ai: dict | None = None
 

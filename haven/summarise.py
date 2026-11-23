@@ -39,7 +39,12 @@ A source summarised under a publisher's **written permission** (`Source.permissi
 since 19 Nov 2026, #107) has that permission's limits, for its items only: the summary may have
 at most `max_sentences` sentences, **counted by the code** (more = the same one retry as too long,
 then unrated), and with `impact = false` the request has no impact field at all, so the item has
-no impact (and the page shows no impact block, not "Not enough information").
+no impact (and the page shows no impact block, not "Not enough information"). With `impact = true`
+(RTV Rijnmond since 23 Nov 2026, #115, on its conditions) the request asks for Haven Daily's own
+interpretation, resting only on the facts in the text, with every consequence written as possible
+("could", "may"); **the code checks the wording** (`sounds_confirmed`): an impact that sounds
+confirmed gets the same one retry, and if the retry still does, the item keeps its summary and
+rating but has **no impact line** (`impact_left_out`, a failure line says why).
 
 Strike dates (owner's decisions, 2 Nov 2026): the AI **copies the words** that say when a strike
 starts and ends ("on Thursday", "5 November", "tomorrow"), and **the code works out the date**
@@ -83,7 +88,7 @@ from haven.places import pick
 
 __all__ = ["BATCH_WAIT", "BREAKER", "CANCEL_WAIT", "FALLBACK_MODEL", "SUMMARY_MODEL", "BatchRun", "SummaryResult",
            "brief_item", "finish_batch", "known_strikes", "phrase_in", "published_day", "resolve_phrase",
-           "sentence_count", "start_batch", "summarise", "summarise_batch", "unrated"]
+           "sentence_count", "sounds_confirmed", "start_batch", "summarise", "summarise_batch", "unrated"]
 
 SUMMARY_MODEL = "claude-sonnet-5-5"  # spec §5.5: chosen by the owner after the side-by-side test (#17, 2 Nov 2026)
 FALLBACK_MODEL = "claude-haiku-5-5"  # items the batch didn't answer, whatever the batch model (§5.5 step 3)
@@ -273,6 +278,9 @@ _RETRY_NOTE = (
     "and the impact in your own words: never more than a few words in a row from the article. The "
     "summary at most 45 words, the impact at most 50 words."
 )
+# Added for a publisher whose permission covers an impact on conditions (RTV Rijnmond, #115).
+_RETRY_POSSIBLE = ("For the impact, write each consequence as possible, with \"could\" or \"may\", never as "
+                   "certain or confirmed.")
 
 
 def _impact_allowed(permission: Permission | None) -> bool:
@@ -280,10 +288,14 @@ def _impact_allowed(permission: Permission | None) -> bool:
 
 
 def _permission_line(permission: Permission) -> str:
-    """The publisher's conditions, in the item's own message (#107). Our words, never the source's."""
+    """The publisher's conditions, in the item's own message (#107, #115). Our words, never the source's."""
     line = (f"This source is summarised with the publisher's written permission: the summary is at most "
             f"{permission.max_sentences} sentences")
-    return line + ("." if permission.impact else ", and there is no impact: answer without one.")
+    if not permission.impact:
+        return line + ", and there is no impact: answer without one."
+    return line + (". The impact is Haven Daily's own interpretation, not the publisher's: base it only on the "
+                   "facts in the text above. Write every consequence as possible, with \"could\" or \"may\", "
+                   "never as certain or confirmed (no \"will\").")
 
 
 def _request(item: Item, model: str, system: str, known: list[dict], today: date, read_at: datetime,
@@ -303,7 +315,10 @@ def _request(item: Item, model: str, system: str, known: list[dict], today: date
             parts.append(_permission_line(permission))
     parts.append(_known_block(known))
     if retry_reason is not None:  # our own words, never the AI's or the article's
-        parts.append(_RETRY_NOTE.format(reason=retry_reason))
+        note = _RETRY_NOTE.format(reason=retry_reason)
+        if not headline_only and permission is not None and permission.impact:  # #115
+            note += " " + _RETRY_POSSIBLE
+        parts.append(note)
     return {
         "model": model,
         "max_tokens": SUMMARY_MAX_TOKENS,
@@ -392,7 +407,7 @@ class _Run:
         notes: list[str] = []  # problems that leave the item rated (a date left out)
         try:
             ai = _checked(_answer(response), item, self.known_ids, self.today, self.places, self.tags, notes,
-                          self.permissions.get(item.source))
+                          self.permissions.get(item.source), last_try=retry_reason is not None)
         except _Rephrase as problem:
             if retry_reason is None:
                 return _Retry(str(problem))  # this answer's notes are dropped with it
@@ -635,8 +650,13 @@ def _answer(response) -> dict:
 
 
 def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, tags, notes: list[str],
-             permission: Permission | None = None) -> dict:
-    """The item's AI fields from a checked answer (strike id and written_by are added after)."""
+             permission: Permission | None = None, last_try: bool = False) -> dict:
+    """The item's AI fields from a checked answer (strike id and written_by are added after).
+
+    `last_try`: this answer is already the one retry, so an impact that sounds confirmed under a
+    publisher's permission is left out instead of retried (#115).
+    """
+    impact_left_out = False
     headline_only = _headline_only(item)
     required = output_format(headline_only, _impact_allowed(permission))["schema"]["required"]
     if any(key not in data for key in required):
@@ -654,6 +674,14 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
             raise _Rephrase(f"summary has more than {permission.max_sentences} sentences")
         if _impact_allowed(permission):  # otherwise an impact sent anyway is never kept (#107)
             impact = _own_words(data["impact"], "impact", IMPACT_MAX, item.article_text)
+        # The publisher's condition (RTV Rijnmond, 23 Nov 2026, #115): possible consequences are never
+        # presented as confirmed. One retry, then no impact line; the rest of the item stays.
+        problem = sounds_confirmed(impact) if permission is not None and impact is not None else None
+        if problem is not None:
+            if not last_try:
+                raise _Rephrase(f"impact {problem}")
+            notes.append(f"impact left out: impact {problem} (after a retry)")
+            impact, impact_left_out = None, True
 
     if not isinstance(data["tags"], list):
         raise _ItemFailed("unreadable tags")
@@ -663,6 +691,8 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
     picked = pick(data["place"], data["tags"], places=places, tags_list=tags)
     ai = {"severity": data["severity"], "summary": summary, "impact": impact, **picked.record(),
           "strike": strike, "written_by": None}
+    if impact_left_out:  # only then: the page shows no impact block, not "Not enough information"
+        ai["impact_left_out"] = True
     return ai
 
 
@@ -694,6 +724,33 @@ def sentence_count(text: str) -> int:
     that breaks the publisher's limit.
     """
     return sum(1 for part in _SENTENCE_BREAK.split(text.strip()) if part.strip())
+
+
+# Words that state a consequence as certain (#115). Matched as whole words, case ignored.
+_CERTAIN = re.compile(r"\b(?:will|won't|shall|going to|definitely|certainly|certain|surely|confirmed|guaranteed|"
+                      r"inevitably|inevitable|for sure|no doubt|without doubt)\b|'ll\b", re.IGNORECASE)
+# Words that make it possible. "may" not next to a number, so "5 May" or "May 5" (a date) don't count.
+_POSSIBLE = re.compile(r"\b(?:could|might|possibly|possible|potentially|perhaps)\b|(?<!\d\s)\bmay\b(?!\s\d)",
+                       re.IGNORECASE)
+
+
+def sounds_confirmed(impact: str) -> str | None:
+    """Why an impact presents a consequence as confirmed, or None when it is written as possible.
+
+    A publisher's condition (RTV Rijnmond, 23 Nov 2026, #115): possible consequences are not presented
+    as confirmed facts. Failed: a word that states a consequence as certain ("will", "won't",
+    "going to", "confirmed", "certain", "definitely"…), or no "could", "may", "might" (or "possibly",
+    "potentially", "perhaps") anywhere. Advice ("planners should check…") needs no hedge, as long as one
+    consequence in the line has one. On the safe side, like `sentence_count`: "certain terminals" or
+    "the union confirmed" fail too, which costs a retry, never a line that breaks the condition.
+    """
+    text = impact.replace("’", "'")
+    certain = _CERTAIN.search(text)
+    if certain is not None:
+        return f'states a consequence as certain ("{certain.group(0).lower()}")'
+    if _POSSIBLE.search(text) is None:
+        return 'states consequences as certain (no "could", "may" or "might")'
+    return None
 
 
 def copies(text: str, article: str, run: int = COPY_RUN) -> bool:
@@ -905,6 +962,8 @@ def brief_item(item: Item, sources: tuple[Source, ...]) -> dict:
     if ai["summary"] and permission is not None:
         written_under = {"granted": permission.granted.isoformat(), "max_sentences": permission.max_sentences,
                          "impact": permission.impact}
+        if ai.get("impact_left_out"):  # the impact sounded confirmed twice: no impact line (#115)
+            written_under["impact_left_out"] = True
     return {
         "severity": ai["severity"],
         "headline": item.headline,
