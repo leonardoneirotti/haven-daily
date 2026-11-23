@@ -94,7 +94,7 @@ def test_how_it_works_meets_every_condition():
     assert "KNMI" in text and "MeteoAlarm" in text                                       # 1 attribution
     assert METEOALARM_DISCLAIMER in text                                                  # 2 disclaimer
     assert re.search(r'<a href="https://www\.meteoalarm\.org">[^<]*latest warnings', part)  # 3 link
-    assert "not an official MeteoAlarm or KNMI service" in text                           # 4 not official
+    assert "not a MeteoAlarm or KNMI service" in text  # 4 not official (the word itself never appears, §5.3 point 7)
     assert "a morning snapshot, not a live warning service" in text                       # snapshot
 
 
