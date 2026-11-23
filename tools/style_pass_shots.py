@@ -2,6 +2,7 @@
 
     python tools/style_pass_shots.py before --ref origin/main   # the site before the style pass
     python tools/style_pass_shots.py after                      # this checkout
+    python tools/style_pass_shots.py before --out design/screenshots/issue-117 --pages today,how-it-works
 
 Builds the sample site (data/sample/briefs), from this checkout or from a git ref (checked out
 into a temporary worktree), and takes the pictures in headless Edge (spec §8.7), the same way as
@@ -25,10 +26,12 @@ from __future__ import annotations
 import argparse
 import functools
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import threading
+from urllib.parse import quote
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -44,6 +47,8 @@ PAGES = {  # name -> path in the built site
     "day": "days/2026-10-27.html",  # the sample day with a fog warning and an unrated item
     "archive": "archive.html",
     "how-it-works": "about.html",
+    "not-found": "404.html",  # since #117
+    "flag-key": "about.html#flags",  # How it works, scrolled to the flag key (#117)
 }
 DEVICES = {  # name -> (width, height, scale for the first screen, scale for the whole page)
     "laptop": (1440, 900, 1, 0.5),
@@ -53,6 +58,7 @@ FULL_MAX_HEIGHT = 3000  # CSS pixels of a whole page kept in the "full" picture
 EDGE_MIN_WIDTH = 600    # Edge's headless window is never narrower than ~500 px
 SETTLE_MS = 2500        # fonts, the basemap and the map's first view
 JPEG_QUALITY = 72
+SITE_PATH = "haven-daily"  # the site's path on GitHub Pages (config/site.toml base_url)
 
 HARNESS = """<!doctype html>
 <html><head><meta charset="utf-8"><title>shot</title>
@@ -103,7 +109,7 @@ def edge(args: list[str], profile: Path) -> str:
 def shoot(base: str, src: str, device: str, full: bool, out: Path, work: Path) -> None:
     width, height, first_scale, full_scale = DEVICES[device]
     scale = 1 if full else first_scale
-    url = f"{base}/harness.html?src={src}&w={width}&h={height}&full={int(full)}"
+    url = f"{base}/harness.html?src={quote(src, safe='/')}&w={width}&h={height}&full={int(full)}"
     window_width = max(width, EDGE_MIN_WIDTH)
     page_height = height
     if full:  # first pass: how tall is the page (up to FULL_MAX_HEIGHT)?
@@ -141,6 +147,8 @@ def build(work: Path, ref: str | None) -> None:
                            cwd=tree, check=True)
         finally:
             subprocess.run(["git", "worktree", "remove", "--force", str(tree)], cwd=PROJECT_DIR, check=True)
+    # The 404 page links from the site's own path (/haven-daily/, #117): serve a copy there too.
+    shutil.copytree(out, work / SITE_PATH)
     (work / "harness.html").write_text(HARNESS, encoding="utf-8")
 
 
@@ -148,8 +156,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("name", help="folder in design/style-pass/ for the pictures, e.g. before or after")
     parser.add_argument("--ref", help="build the site from this git ref instead of the checkout")
-    parser.add_argument("--pages", default=",".join(PAGES), help="comma-separated: " + ", ".join(PAGES))
+    parser.add_argument("--pages", default="today,day,archive,how-it-works",
+                        help="comma-separated: " + ", ".join(PAGES))
+    parser.add_argument("--out", default=str(OUT_DIR.relative_to(PROJECT_DIR)),
+                        help="folder for the pictures, relative to the project (default: design/style-pass)")
     args = parser.parse_args()
+    out_dir = PROJECT_DIR / args.out
     if not EDGE.exists():
         raise SystemExit(f"Edge not found at {EDGE}")
     with tempfile.TemporaryDirectory(prefix="style-pass-") as tmp:
@@ -163,8 +175,9 @@ def main() -> None:
             for page in args.pages.split(","):
                 for device in DEVICES:
                     for full in (False, True):
-                        out = OUT_DIR / args.name / f"{page}-{device}-{'full' if full else 'first'}.jpg"
-                        shoot(base, f"site/{PAGES[page]}", device, full, out, work)
+                        out = out_dir / args.name / f"{page}-{device}-{'full' if full else 'first'}.jpg"
+                        folder = SITE_PATH if page == "not-found" else "site"
+                        shoot(base, f"{folder}/{PAGES[page]}", device, full, out, work)
         finally:
             server.shutdown()
 

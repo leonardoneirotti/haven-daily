@@ -7,7 +7,9 @@ one-liner, the colours or the fonts change; tests/test_social_preview.py fails u
     .venv\\Scripts\\python.exe tools/make_social_preview.py
 
 What it draws, 1200 x 630 pixels: the page background, "Haven Daily" large, the owner's one-liner
-below it, a thin rule and "Independent portfolio project" small at the bottom. Everything comes
+below it, a thin rule and "Independent portfolio project" small at the bottom; since #117 the
+logo's flags too, H over D on a halyard, on the right above the one-liner (patterns from
+haven/flags.py, the flag colours used for nothing else). Everything comes
 from the site itself: the texts from haven/render.py, the colours from the tokens at the top of
 static/style.css (Harbour Light since #102), the letters from the self-hosted Manrope file in
 static/fonts/. No map data, photos or anyone else's content (hard rule 13).
@@ -25,6 +27,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_DIR))
+from haven.flags import FLAGS, GRID  # noqa: E402
 from haven.render import PREVIEW_SIZE, SITE  # noqa: E402  (after the path is set, so it runs as a script)
 
 STATIC_DIR = PROJECT_DIR / "static"
@@ -47,7 +50,9 @@ def css_tokens(css: Path = STATIC_DIR / "style.css") -> dict[str, tuple[int, int
 
 _TOKENS = css_tokens()
 # The site's palette (§7.2, Harbour Light): fog-white page, navy and secondary ink, the rule line.
-COLOURS = {name: _TOKENS[name] for name in ("bg", "ink", "ink-2", "rule")}
+COLOURS = {name: _TOKENS[name] for name in ("bg", "ink", "ink-2", "rule",
+                                           # the logo's flags (#117): inside the flags only
+                                           "flag-white", "flag-red", "flag-yellow", "flag-blue")}
 
 # The site's type roles (§7.3): Manrope for everything here, one variable file. Headlines 800,
 # body text 400, labels 800 in capitals with letter-spacing.
@@ -62,6 +67,26 @@ TAGLINE_SIZE = 38
 TAGLINE_WIDTH = 960  # wraps the one-liner onto two lines of about equal length
 FOOTER_SIZE = 20
 FOOTER_TRACKING = 3  # extra pixels between letters, like the site's labels (letter-spacing)
+FLAG = 96            # each flag of the hoist, in px: 4 px per grid unit, so every part is on whole pixels
+HOIST_TOP = 96       # top of flag H; flag D follows 8 px below, and the hoist ends above the one-liner
+
+
+def draw_hoist(draw: ImageDraw.ImageDraw) -> None:
+    """The logo's flags, H over D, on a halyard with a clip at each end (#117), right-aligned."""
+    unit = FLAG // GRID
+    left = WIDTH - MARGIN - FLAG
+    halyard = left - 14
+    tops = {"H": HOIST_TOP, "D": HOIST_TOP + FLAG + 8}
+    bottom = tops["D"] + FLAG
+    draw.rectangle((halyard - 1, HOIST_TOP - 12, halyard + 1, bottom + 12), fill=COLOURS["ink"])
+    for y in (HOIST_TOP + 6, bottom - 6):  # the clips: a ring on the halyard and a short arm to the flag
+        draw.ellipse((halyard - 5, y - 5, halyard + 5, y + 5), outline=COLOURS["ink"], width=2)
+        draw.rectangle((halyard + 5, y - 1, left - 1, y + 1), fill=COLOURS["ink"])
+    for letter, top in tops.items():
+        for colour, x, y, w, h in FLAGS[letter].parts:
+            draw.rectangle((left + x * unit, top + y * unit, left + (x + w) * unit - 1, top + (y + h) * unit - 1),
+                           fill=COLOURS[f"flag-{colour}"])
+        draw.rectangle((left, top, left + FLAG - 1, top + FLAG - 1), outline=COLOURS["ink"], width=2)
 
 
 def wrap(text: str, font: ImageFont.FreeTypeFont, width: int) -> list[str]:
@@ -111,6 +136,8 @@ def make(out: Path = OUT) -> Path:
     for n, line in enumerate(wrap(TAGLINE, tagline_font, TAGLINE_WIDTH)):
         draw.text((MARGIN, title_baseline + 102 + n * line_height), line,
                   font=tagline_font, fill=COLOURS["ink-2"], anchor="ls")
+
+    draw_hoist(draw)
 
     # A thin rule and the small label at the bottom.
     footer_baseline = HEIGHT - 80

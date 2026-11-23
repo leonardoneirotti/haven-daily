@@ -45,7 +45,8 @@ def test_the_repo_file_has_the_sites_addresses():
         linkedin_url="https://www.linkedin.com/in/leonardo-neirotti",
         repo_url="https://github.com/leonardoneirotti/haven-daily",
         social_image="social-preview.png",
-        social_image_alt=('Light card with "Haven Daily" in large navy letters, under it '
+        social_image_alt=('Light card with "Haven Daily" in large navy letters and, on the right, the logo: '
+                          'the signal flags H over D on a halyard; under it '
                           'the line "What affects the Port of Rotterdam today, and what it means for logistics '
                           'planners. Updated every morning." and, small at the bottom, "Independent portfolio project".'),
     )

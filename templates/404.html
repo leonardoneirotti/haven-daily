@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Page not found · {{ site.name }}{% endblock %}
+{#
+  The 404 page (#117, spec §2.3). GitHub Pages serves 404.html at whatever address was missing,
+  so `root` is the site's own path from config/site.toml ("/haven-daily/"), never relative.
+  Flag D: "Keep clear of me; I am maneuvering with difficulty." (International Code of Signals,
+  haven/flags.py).
+#}
+{% block main %}
+<main id="main" class="wrap page-not-found">
+  <div class="not-found">
+    {{ m.signal_flag("D", "Signal flag D, Delta") }}
+    <div class="not-found-text">
+      <p class="kicker">Flag D · {{ signal_flags["D"].name }}</p>
+      <h1 class="page-title">Page not found</h1>
+      <p class="not-found-meaning">In signal flags, D says <q>{{ signal_flags["D"].meanings[0][1] }}</q> So are we: this address leads nowhere.</p>
+      <p>The link may have a typo, or the page may have moved. Every brief is still in the archive.</p>
+      <p class="not-found-actions">
+        <a class="btn" href="{{ root }}index.html">Back to Today</a>
+        <a href="{{ root }}archive.html">Go to the archive</a>
+      </p>
+    </div>
+  </div>
+</main>
+{% endblock %}

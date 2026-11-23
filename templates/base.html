@@ -21,7 +21,11 @@
 <meta property="og:image:alt" content="{{ social_image.alt }}">
 {% endif %}
 <meta name="twitter:card" content="{{ 'summary_large_image' if social_image else 'summary' }}">
+{# Flag P, the "Blue Peter" (#117): SVG where the browser takes it, sharp PNGs at 16 and 32 px, and 180 px for a phone's home screen. #}
 <link rel="icon" href="{{ root }}static/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="{{ root }}static/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="{{ root }}static/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="{{ root }}static/apple-touch-icon.png" sizes="180x180">
 <script src="{{ root }}static/site.js"></script>
 {% block head %}{% endblock %}
 <link rel="stylesheet" href="{{ root }}static/style.css">
@@ -30,9 +34,11 @@
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="brand" href="{{ root }}index.html" aria-label="{{ site.name }}, today's brief">
-      {{ m.flags() }}
+    {# The logo (#117): flags H over D, the name in Manrope; on hover and focus what the flags say. #}
+    <a class="brand" href="{{ root }}index.html" aria-label="{{ site.name }}, today's brief" aria-describedby="brand-hint">
+      {{ m.hoist() }}
       <span class="brand-name">{{ site.name }}</span>
+      <span class="brand-hint" id="brand-hint" role="tooltip">H·D in maritime signal flags</span>
     </a>
     {% block topbar_note %}{% endblock %}
     <div class="topbar-tools">
