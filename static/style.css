@@ -327,7 +327,8 @@ html:not(.has-map) .needs-map,
   text-decoration: none;
 }
 
-.btn[aria-pressed="true"] {
+.btn[aria-pressed="true"],
+.btn[aria-current="page"] {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
@@ -430,6 +431,7 @@ html.js .topbar {
 }
 
 .topbar-inner {
+  position: relative; /* the view switch is centred in it on wide screens (#101) */
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -3031,5 +3033,207 @@ td.ais-text {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- The view switch: Map | Newspaper (#101) ----------
+   Two links of the shared button set; the one shown is pressed (aria-current). Below 64rem it has
+   its own row under the brand and the nav, full width on a phone; from 64rem it sits in the middle
+   of the bar. The bar is then taller on smaller screens, so things scrolled to stay clear of it. */
+.view-switch {
+  display: flex;
+  order: 10;
+  flex-basis: 100%;
+  justify-content: center;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+@media (max-width: 39.99rem) {
+  .view-switch .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 63.99rem) {
+  :root:has(.view-switch) {
+    --topbar-h: calc(4rem + var(--btn-h));
+  }
+}
+
+@media (min-width: 64rem) {
+  .view-switch {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    flex-basis: auto;
+    padding-bottom: 0;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* ---------- The newspaper view (#101, spec §7.9) ----------
+   The same brief as a front page, in the site's own type (Harbour Light: Manrope, IBM Plex Mono
+   for data, IBM Plex Serif for the impact): no newspaper's masthead, logo or typeface. Phones read
+   it in one column, in the order of the page: lead, the other stories, the port status. */
+.paper {
+  padding-bottom: 1rem;
+}
+
+.paper-head {
+  margin-bottom: 1.5rem;
+  padding: 1.75rem 0 1.25rem;
+  border-bottom: 2px solid var(--ink);
+}
+
+.paper-kicker {
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.paper-head h1 {
+  margin: 0.35rem 0 0.4rem;
+  font-size: clamp(2rem, 1.4rem + 2.5vw, 3.1rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.paper-grid {
+  display: grid;
+  gap: 2rem;
+}
+
+.paper-news {
+  min-width: 0;
+}
+
+.paper-title {
+  margin: 0.45rem 0 0.35rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.22;
+}
+
+.paper-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.paper-title a:hover,
+.paper-title a:focus-visible {
+  text-decoration: underline;
+}
+
+.paper-headline {
+  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.6rem);
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+}
+
+.paper-body {
+  display: grid;
+  gap: 1rem;
+  margin-top: 0.6rem;
+}
+
+.paper-column .paper-picture img {
+  max-width: 9rem; /* small above the text on a phone, beside it from 40rem */
+}
+
+.paper-text {
+  min-width: 0;
+}
+
+.paper-picture {
+  margin: 0;
+}
+
+.paper-picture img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 22rem;
+  border-radius: 8px;
+}
+
+.paper-picture figcaption {
+  margin-top: 0.25rem;
+  color: var(--ink-2);
+  font-size: 0.75rem;
+}
+
+.paper-lead .item-summary {
+  font-size: 1.1rem;
+}
+
+.paper-columns {
+  display: grid;
+  gap: 1.75rem;
+  margin: 2rem 0 0;
+  padding: 1.5rem 0 0;
+  border-top: 1px solid var(--rule);
+  list-style: none;
+}
+
+.paper-item {
+  min-width: 0;
+}
+
+.paper-quiet p {
+  max-width: var(--measure);
+  color: var(--ink-2);
+}
+
+.paper-status .dials {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* A box at the side, so its heading is a step smaller than the map page's section titles */
+.paper-status .status-head h2 {
+  font-size: 1.35rem;
+}
+
+@media (min-width: 40rem) {
+  .paper-column .paper-body {
+    grid-template-columns: 6rem minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+@media (min-width: 40rem) and (max-width: 63.99rem) {
+  .paper-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .paper-status .dials {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64rem) {
+  .paper-grid {
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    align-items: start;
+    gap: 2.5rem;
+  }
+
+  .paper-lead .paper-body {
+    grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .paper-columns {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .paper-status {
+    position: sticky;
+    top: calc(var(--topbar-h) + 1rem);
   }
 }

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{#
+  The newspaper view (#101, spec §7.9): the same day as a front page. The lead is the first item
+  of the brief that may be shown in full here (render.newspaper_view); the others follow in
+  columns; the port status sits in a box at the side (below on a phone). No map at all: this page
+  loads no chart script, no basemap and no map data. Nothing is remembered or redirected (hard
+  rule 14): the switch at the top is two links.
+#}
+{% block title %}Newspaper · {% if is_index %}{{ site.name }}{% else %}{{ brief.day | long_date }} · {{ site.name }}{% endif %}{% endblock %}
+{% block topbar_note %}<p class="topbar-note">{{ brief.day | short_date }} · No. {{ "%03d" % brief.edition }}</p>{% endblock %}
+{% block main %}
+{% set items = brief["items"] %}
+<main id="main" class="paper">
+  <div class="wrap">
+    <header class="paper-head">
+      <p class="paper-kicker">Haven Daily · Morning brief · No. {{ "%03d" % brief.edition }}</p>
+      <h1 id="brief-title"><span>{{ brief.day.strftime("%A") }}</span> {{ brief.day | date_only }}</h1>
+      <p class="publication">{{ brief.publication }}{% if brief.corrections %} <a href="#corrections">See corrections</a>{% endif %}</p>
+      {{ m.reduced_note(brief) }}
+    </header>
+
+    <div class="paper-grid">
+      <div class="paper-news">
+        {% if paper.lead %}
+        {{ m.paper_story(paper.lead, views, "lead", root) }}
+        {% elif not items %}
+        <div class="paper-quiet">
+          <h2 class="paper-headline">Nothing significant {% if is_latest %}today{% else %}on this day{% endif %}.</h2>
+          {% if brief.build.ai_unavailable %}
+          <p>Without the AI step only items from the Rotterdam-specific sources can be shown, and they had nothing new. The port status still applies.</p>
+          {% else %}
+          <p>{{ brief.build.sources_checked or "All" }} sources were checked and nothing met the bar for a planner brief. The port status still applies.</p>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% if paper.others %}
+        <h2 class="visually-hidden">{% if paper.lead %}More{% else %}Today's{% endif %} stories</h2>
+        <ol class="paper-columns">
+          {% for story in paper.others %}
+          <li class="paper-item">{{ m.paper_story(story, views, "column", root) }}</li>
+          {% endfor %}
+        </ol>
+        {% endif %}
+      </div>
+
+      {# The port status (#101: "a small box at the side"). The status cards of the map page, so the
+         weather keeps every MeteoAlarm condition (spec §2.2, §11): this page has no other dial. #}
+      <aside class="paper-status" aria-labelledby="status-title">
+        <div class="status-head">
+          <h2 id="status-title">Port status</h2>
+          <a href="{{ root }}about.html#thresholds">How the colours are set</a>
+        </div>
+        <ul class="dials">
+          {% for ind in brief.status %}
+          {{ m.dial(ind, root) }}
+          {% endfor %}
+        </ul>
+      </aside>
+    </div>
+  </div>
+
+  {% include "_about_block.html" %}
+  {% include "_build_notes.html" %}
+
+  <div class="wrap">
+    <nav class="day-nav" aria-label="Other days">
+      {% if older %}<a href="{{ root }}days/{{ older.date }}-newspaper.html">{{ m.icon("arrow-left") }}<span>{{ older.day | short_date }}</span></a>{% else %}<span></span>{% endif %}
+      <a href="{{ root }}archive.html">All briefs</a>
+      {% if newer %}<a class="day-nav-newer" href="{{ root }}days/{{ newer.date }}-newspaper.html"><span>{{ newer.day | short_date }}</span>{{ m.icon("arrow-right") }}</a>{% else %}<span></span>{% endif %}
+    </nav>
+  </div>
+</main>
+{% endblock %}

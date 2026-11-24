@@ -577,6 +577,64 @@ SENTENCE_WORDS = {1: "one sentence", 2: "two sentences", 3: "three sentences"}
 IMPACT_WHOSE = "Haven Daily's interpretation, not {source}'s"
 
 
+# ---------- The newspaper view (#101, spec §7.9) ----------
+# A second page per day: the same brief as a front page. The lead is the first item of the brief
+# (most severe first) that may be shown in full there; the others follow in columns.
+
+# One original line drawing per "affects" tag (config/tags.toml), drawn for Haven Daily as SVG in
+# the site's colours and reused every day: no news photo, no real event, ship, company or logo.
+ILLUSTRATIONS = {
+    "Containers": {"file": "containers.svg", "alt": "Illustration: containers stacked on a quay under a crane arm"},
+    "Dry bulk": {"file": "dry-bulk.svg", "alt": "Illustration: a conveyor pouring onto a heap, a grab bucket above"},
+    "Liquid bulk": {"file": "liquid-bulk.svg", "alt": "Illustration: three storage tanks joined by a pipe rack"},
+    "Breakbulk": {"file": "breakbulk.svg", "alt": "Illustration: a crane hook lifting a bundle of steel beams"},
+    "RoRo": {"file": "roro.svg", "alt": "Illustration: a ship's stern ramp lowered, a trailer rolling on"},
+    "Shortsea": {"file": "shortsea.svg", "alt": "Illustration: a small feeder ship with a few containers on deck"},
+    "Ferries": {"file": "ferries.svg", "alt": "Illustration: a ferry with one funnel and lifeboats on low waves"},
+    "Barge": {"file": "barge.svg", "alt": "Illustration: a long inland barge, its wheelhouse at the back"},
+    "Rail": {"file": "rail.svg", "alt": "Illustration: a freight train of container wagons on a double track"},
+    "Truck pickups": {"file": "truck-pickups.svg", "alt": "Illustration: a container truck at a lifted gate barrier"},
+    "Rhine": {"file": "rhine.svg", "alt": "Illustration: a river bend with a water-level gauge board on the bank"},
+    "Hinterland": {"file": "hinterland.svg", "alt": "Illustration: road, rail and river lines leading inland from a quay"},
+    "Sea access": {"file": "sea-access.svg", "alt": "Illustration: a channel buoy and a small lighthouse, a ship coming in"},
+    "Customs": {"file": "customs.svg", "alt": "Illustration: a sealed container door beside a stamped document"},
+    "Labour": {"file": "labour.svg", "alt": "Illustration: a hard hat and a safety vest hanging on a bollard"},
+    "IT systems": {"file": "it-systems.svg", "alt": "Illustration: a screen showing a container terminal grid"},
+}
+# For an item whose tags have no drawing (only a place tag, or none).
+GENERAL_ILLUSTRATION = {"file": "port.svg", "alt": "Illustration: a quay with a bollard and a crane outline"}
+
+# A publisher's item, summarised under its written permission, in the newspaper view before the
+# publisher agreed to it (spec §11, condition 5; `newspaper = true` in its permission line, #101).
+PAPER_HEADLINE_ONLY = "Headline only in this view · the summary is on the Map page"
+
+
+def illustration(item: dict) -> dict | None:
+    """The drawing for an item with a summary: its first tag that has one, else the general one.
+    Items without a summary (headline-only, article not read, unrated) get none: they stay short."""
+    if not item.get("summary"):
+        return None
+    for tag in item.get("affects") or []:
+        if tag in ILLUSTRATIONS:
+            return ILLUSTRATIONS[tag]
+    return GENERAL_ILLUSTRATION
+
+
+def newspaper_view(brief: dict, sources: tuple[Source, ...]) -> dict:
+    """The lead and the columns of a day's front page. Ranks stay those of the brief (and the map).
+
+    An item summarised under a publisher's permission is headline-only here, and never the lead,
+    unless that publisher's permission line says `newspaper = true` (#101)."""
+    allowed = {source.name for source in sources if source.permission is not None and source.permission.newspaper}
+    stories = []
+    for rank, item in enumerate(brief["items"], start=1):
+        restricted = bool(item.get("permission")) and item["source"] not in allowed
+        stories.append({"rank": rank, "item": item, "restricted": restricted,
+                        "picture": None if restricted else illustration(item)})
+    lead = next((story for story in stories if not story["restricted"]), None)
+    return {"lead": lead, "others": [story for story in stories if story is not lead]}
+
+
 def permission_note(item: dict) -> str | None:
     """The publisher's note for an item summarised under its written permission, else None."""
     if not item.get("permission"):
@@ -915,10 +973,16 @@ def make_environment() -> Environment:
         max_items=MAX_ITEMS,
         ais_snapshot_built=AIS_SNAPSHOT_BUILT,
         meteoalarm_disclaimer=METEOALARM_DISCLAIMER,
+        paper_headline_only=PAPER_HEADLINE_ONLY,
         signal_flags=FLAGS,  # the logo, the 404 page and the flag key (#117)
         flag_source=FLAG_SOURCE,
     )
     return env
+
+
+def views(map_href: str, paper_href: str, current: str) -> dict:
+    """The switch at the top of a day's two pages (#101): two links, the one shown marked."""
+    return {"map": map_href, "newspaper": paper_href, "current": current}
 
 
 def write_page(env: Environment, template: str, path: Path, **context) -> None:
@@ -939,23 +1003,30 @@ def render_site(briefs_dir: Path, out_dir: Path, rhine_path: Path | None = None)
 
     # Pages in days/ sit one folder down, so their links start with "../".
     # Relative links keep the site working under GitHub Pages' /<repo>/ path.
+    # Each day twice (#101): the map page and the newspaper page, with a switch between them.
+    sources = load_sources()
     for i, brief in enumerate(briefs):
         older = briefs[i - 1] if i > 0 else None
         newer = briefs[i + 1] if i + 1 < len(briefs) else None
-        write_page(
-            env, "day.html", out_dir / "days" / f"{brief['date']}.html",
-            root="../", active=None, sample=brief["sample"], is_index=False,
-            brief=brief, older=older, newer=newer, is_latest=newer is None,
-            preview=dict(day_preview(brief), path=f"days/{brief['date']}.html"),
-        )
+        day, paper_page = f"days/{brief['date']}.html", f"days/{brief['date']}-newspaper.html"
+        common = dict(root="../", active=None, sample=brief["sample"], is_index=False, brief=brief,
+                      older=older, newer=newer, is_latest=newer is None)
+        write_page(env, "day.html", out_dir / day, **common,
+                   views=views(f"../{day}", f"../{paper_page}", "map"),
+                   preview=dict(day_preview(brief), path=day))
+        write_page(env, "newspaper.html", out_dir / paper_page, **common,
+                   views=views(f"../{day}", f"../{paper_page}", "newspaper"),
+                   paper=newspaper_view(brief, sources),
+                   preview=dict(day_preview(brief), path=paper_page))
 
     latest = briefs[-1]
-    write_page(
-        env, "day.html", out_dir / "index.html",
-        root="", active="today", sample=latest["sample"], is_index=True,
-        brief=latest, older=briefs[-2] if len(briefs) > 1 else None, newer=None, is_latest=True,
-        preview=site_preview("", None),
-    )
+    today = dict(root="", active="today", sample=latest["sample"], is_index=True, brief=latest,
+                 older=briefs[-2] if len(briefs) > 1 else None, newer=None, is_latest=True)
+    write_page(env, "day.html", out_dir / "index.html", **today,
+               views=views("index.html", "newspaper.html", "map"), preview=site_preview("", None))
+    write_page(env, "newspaper.html", out_dir / "newspaper.html", **today,
+               views=views("index.html", "newspaper.html", "newspaper"),
+               paper=newspaper_view(latest, sources), preview=site_preview("newspaper.html", "Newspaper"))
     write_page(
         env, "archive.html", out_dir / "archive.html",
         root="", active="archive", sample=sample, months=group_by_month(briefs),

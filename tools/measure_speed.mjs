@@ -39,6 +39,7 @@ const PAGES = {
   "day-ships": "days/2026-10-28.html", // a quiet day with 34 ships on the chart
   archive: "archive.html",
   "how-it-works": "about.html",
+  newspaper: "newspaper.html", // the newspaper view (#101): no map at all
   "control-nocss": "control-nocss.html", // experiments only: the archive without its stylesheet
 };
 const MAP_PAGES = new Set(["today", "day-ships"]);
@@ -143,7 +144,9 @@ window.__perf = { lt: [], lcp: 0, fcp: 0, frames: [], text: 0, map: 0 };
 // and the port status are laid out on screen. Frames only run once the page can be painted.
 (function textProbe() {
   requestAnimationFrame(function (t) {
-    var news = document.querySelector(".panel-title, .panel-quiet"), status = document.querySelector(".panel-status li");
+    // The map page's panel, or the newspaper page's lead and status box (#101).
+    var news = document.querySelector(".panel-title, .panel-quiet, .paper-headline, .paper-title"),
+      status = document.querySelector(".panel-status li, .paper-status .dial");
     if (news && status && news.getBoundingClientRect().height && status.getBoundingClientRect().height) __perf.text = t;
     else if (document.readyState !== "complete" || !__perf.fcp) textProbe();
   });

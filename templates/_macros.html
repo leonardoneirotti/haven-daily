@@ -169,6 +169,67 @@
 {%- endmacro %}
 
 {# Five slots, one per possible item: a day's severity at a glance. #}
+{# One story of the newspaper view (#101): the lead ("lead", an h2 with a large headline) or one
+   in the columns ("column", an h3). Same labels, links and rules as the card (news_item): the
+   English headline with "translated by AI" and the original, the short grey line for an item
+   with no summary, the publisher's permission note, the impact in IBM Plex Serif. An item a
+   publisher hasn't agreed to show here (story.restricted) is headline-only, its line linking to
+   the item on the Map page. One drawing per item with a summary, labelled "Illustration". #}
+{% macro paper_story(story, views, size, root) -%}
+{% set item = story.item %}{% set rank = story.rank %}
+<article class="paper-{{ size }}" id="item-{{ rank }}" aria-labelledby="item-{{ rank }}-title">
+  <p class="item-top">
+    {{ num(rank, item.severity_key) }}
+    <span class="sev sev-{{ item.severity_key }}"><span class="visually-hidden">Severity: </span>{{ item.severity_key }}</span>
+    <span class="item-meta">
+      <span>{{ item.source }}</span>
+      <span>{{ item.language_name }}</span>
+      {% if item.published_label %}<time datetime="{{ item.published }}">{{ item.published_label }}</time>{% endif %}
+    </span>
+  </p>
+  {% if size == "lead" %}
+  <h2 class="paper-title paper-headline" id="item-{{ rank }}-title">{% if item.url %}<a href="{{ item.url }}">{{ item.shown_headline }}</a>{% else %}{{ item.shown_headline }}{% endif %}</h2>
+  {% else %}
+  <h3 class="paper-title" id="item-{{ rank }}-title">{% if item.url %}<a href="{{ item.url }}">{{ item.shown_headline }}</a>{% else %}{{ item.shown_headline }}{% endif %}</h3>
+  {% endif %}
+  {% if item.headline_en %}<p class="item-original">Headline translated by AI · original ({{ item.language_name }}): <span lang="{{ item.language }}">{{ item.headline }}</span></p>{% endif %}
+  {% if story.restricted %}
+  <p class="item-summary is-empty"><a href="{{ views.map }}#item-{{ rank }}">{{ paper_headline_only }}</a></p>
+  {% elif item.headline_note %}
+  <p class="item-summary is-empty">{{ item.headline_note }}</p>
+  {% if item.affects %}<p class="affects"><strong>Affects</strong> {{ item.affects | join(" · ") }}</p>{% endif %}
+  {% else %}
+  <div class="paper-body">
+    {% if story.picture %}
+    <figure class="paper-picture">
+      <img src="{{ root }}static/illustrations/{{ story.picture.file }}" alt="{{ story.picture.alt }}" width="160" height="100"{% if size != "lead" %} loading="lazy"{% endif %}>
+      <figcaption>Illustration</figcaption>
+    </figure>
+    {% endif %}
+    <div class="paper-text">
+      <p class="item-summary">{{ item.summary }}</p>
+      {% if item.permission_note %}<p class="item-permission">{{ item.permission_note }}</p>{% endif %}
+      {% if item.shows_impact %}
+      <div class="item-impact">
+        <p class="impact-label">Impact for planners <em>{{ item.impact_whose }}</em></p>
+        {% if item.impact %}
+        <p class="impact-text">{{ item.impact }}</p>
+        {% else %}
+        <p class="impact-text is-empty">Not enough information in the source to judge the impact.</p>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% if item.affects %}<p class="affects"><strong>Affects</strong> {{ item.affects | join(" · ") }}</p>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+  <p class="item-actions">
+    {% if item.url %}<a class="btn" href="{{ item.url }}">Read original{% if item.language != "en" %} ({{ item.language_name }}){% endif %}{{ icon("external") }}</a>{% endif %}
+    {% if item.translate_url %}<a class="btn" href="{{ item.translate_url }}">{{ icon("languages") }}Read in English{{ icon("external") }}</a>{% endif %}
+  </p>
+</article>
+{%- endmacro %}
+
 {% macro severity_strip(brief) -%}
 <span class="strip" role="img" aria-label="{{ brief['items'] | length }} items{% for s in severity_keys if brief.counts[s] %}, {{ brief.counts[s] }} {{ s }}{% endfor %}">
   {% for item in brief["items"] %}<span class="slot num-{{ item.severity_key }}">{{ loop.index }}</span>{% endfor %}

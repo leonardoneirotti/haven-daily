@@ -27,6 +27,9 @@
 #              docs/permissions/), granted (date received), max_sentences (checked in code),
 #              impact (false = no "impact for planners" line; true = the line, labelled as
 #              Haven Daily's interpretation and written as possible, checked in code, #115).
+#              Optional: newspaper (true = the newspaper view shows the summary too, #101; left out
+#              = headline-only there, until the publisher agrees to that new way of showing its
+#              items, spec §11 condition 5).
 #              Permission withdrawn: delete the line, and move its row back under
 #              Headline-only in SOURCES.md.
 #   english_headline  true = for an item in Dutch, the AI also writes an English headline,

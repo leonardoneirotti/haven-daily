@@ -51,6 +51,14 @@
       <span class="brand-hint" id="brand-hint" role="tooltip">H·D in maritime signal flags</span>
     </a>
     {% block topbar_note %}{% endblock %}
+    {# The two views of a day (#101): two links, so it works without JavaScript and remembers
+       nothing (hard rule 14). Centred in the bar on wide screens; its own row on smaller ones. #}
+    {% if views is defined %}
+    <nav class="view-switch" aria-label="View">
+      <a class="btn" href="{{ views.map }}"{% if views.current == "map" %} aria-current="page"{% endif %}>Map</a>
+      <a class="btn" href="{{ views.newspaper }}"{% if views.current == "newspaper" %} aria-current="page"{% endif %}>Newspaper</a>
+    </nav>
+    {% endif %}
     <div class="topbar-tools">
       <nav class="site-nav" aria-label="Main">
         <ul>

@@ -21,7 +21,8 @@ ACCESS_TYPES = ("rss", "html")
 
 _SOURCE_FIELDS = {"id", "name", "verdict", "urls", "access", "language", "auto_keep", "note", "why", "home",
                   "permission", "english_headline", "enabled"}
-_PERMISSION_FIELDS = ("file", "granted", "max_sentences", "impact")
+_PERMISSION_FIELDS = ("file", "granted", "max_sentences", "impact")  # all required
+_PERMISSION_OPTIONAL = ("newspaper",)  # #101: false unless written
 _PERMISSION_FILE = re.compile(r"^docs/permissions/[\w.-]+\.md$")
 _LANGUAGE = re.compile(r"^[a-z]{2}$")
 
@@ -53,6 +54,9 @@ class Permission:
     granted: date  # the day the written permission was received
     max_sentences: int  # the summary's limit, checked in code (haven/summarise.py)
     impact: bool  # False: no "impact for planners" line for this publisher's items
+    # True: the newspaper view may show the summary too (#101). Until the publisher agrees in writing
+    # to that new way of showing its items (spec §11, condition 5), its items are headline-only there.
+    newspaper: bool = False
 
 
 @dataclass(frozen=True)
@@ -466,9 +470,10 @@ def _check_permission(value, fail) -> Permission:
     if not isinstance(value, dict):
         fail("'permission' must be written as permission = { file = ..., granted = ..., "
              "max_sentences = ..., impact = ... }")
-    unknown = sorted(set(value) - set(_PERMISSION_FIELDS))
+    allowed = _PERMISSION_FIELDS + _PERMISSION_OPTIONAL
+    unknown = sorted(set(value) - set(allowed))
     if unknown:
-        fail(f"permission: unknown field {unknown[0]!r} (allowed: {', '.join(_PERMISSION_FIELDS)})")
+        fail(f"permission: unknown field {unknown[0]!r} (allowed: {', '.join(allowed)})")
     for name in _PERMISSION_FIELDS:
         if name not in value:
             fail(f"permission: missing {name!r}")
@@ -481,7 +486,10 @@ def _check_permission(value, fail) -> Permission:
         fail("permission: max_sentences must be a whole number of 1 or more")
     if not isinstance(impact, bool):
         fail("permission: impact must be true or false")
-    return Permission(file=file, granted=granted, max_sentences=max_sentences, impact=impact)
+    newspaper = value.get("newspaper", False)
+    if not isinstance(newspaper, bool):
+        fail("permission: newspaper must be true or false")
+    return Permission(file=file, granted=granted, max_sentences=max_sentences, impact=impact, newspaper=newspaper)
 
 
 # ---------- config/site.toml: the site's own addresses (spec §2.3, issue #28) ----------

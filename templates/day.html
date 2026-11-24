@@ -179,24 +179,7 @@
     </section>
   </div>
 
-  {# Who makes this, for a recruiter (L2, #86): the owner's About text, on the Today page only,
-     right below the brief. Claude's default, for the owner to confirm (spec §7.8). #}
-  {% if is_index %}
-  <section class="wrap about" aria-labelledby="about-title">
-    <h2 id="about-title">About this project</h2>
-    <div class="about-body">
-      <p>{{ site.about }}</p>
-      <p class="about-identity">{{ site.author }} · {{ site.identity }}</p>
-      {# What the logo says (owner's pick, PR #120), with the way to the flag key. #}
-      <p class="about-flags">Our logo spells H·D, Haven Daily, in <a href="{{ root }}about.html#flags">maritime signal flags</a>.</p>
-      <ul class="about-links">
-        <li><a href="{{ site.linkedin_url }}">{{ site.author }} on LinkedIn</a></li>
-        <li><a href="{{ site.repo_url }}">Source code on GitHub</a></li>
-        <li><a href="{{ root }}about.html">How it works</a></li>
-      </ul>
-    </div>
-  </section>
-  {% endif %}
+  {% include "_about_block.html" %}
 
   {% if ships %}
   <section class="wrap ship-list" aria-labelledby="ships-title">
@@ -232,37 +215,7 @@
   </section>
   {% endif %}
 
-  <section class="wrap notes" aria-labelledby="build-title">
-    <h2 id="build-title">How this brief was made</h2>
-    <div class="notes-body">
-      <dl class="stats">
-        {% if brief.build.sources_checked is not none %}<div><dt>Sources checked</dt><dd>{{ brief.build.sources_checked }}</dd></div>{% endif %}
-        {% if brief.build.items_collected is not none %}<div><dt>Items collected</dt><dd>{{ brief.build.items_collected }}</dd></div>{% endif %}
-        {% if brief.build.items_kept is not none %}<div><dt>Kept as relevant</dt><dd>{{ brief.build.items_kept }}</dd></div>{% endif %}
-        <div><dt>Shown (max {{ max_items }})</dt><dd>{{ items | length }}</dd></div>
-        {# Who wrote the summaries, by model name (design review S8, #84; render.summaries_line). #}
-        {% if brief.summaries_line %}<div class="stat-text"><dt>Summaries</dt><dd>{{ brief.summaries_line }}</dd></div>{% endif %}
-      </dl>
-      {# One plain sentence per failure (#138, render.failure_lines); the stored brief keeps the
-         technical line (address, HTTP status) for the owner. #}
-      {% if brief.failure_lines %}
-      <ul class="failures">
-        {% for line in brief.failure_lines %}
-        <li>{{ m.icon("triangle-alert") }}<span>{{ line }}</span></li>
-        {% endfor %}
-      </ul>
-      {% else %}
-      <p class="all-ok">{{ m.icon("circle-check") }}<span>All sources responded.</span></p>
-      {% endif %}
-      {% if brief.corrections %}
-      <ul class="corrections" id="corrections" aria-label="Corrections">
-        {% for fix in brief.corrections %}
-        <li>{{ m.icon("pencil") }}<strong>Corrected <time datetime="{{ fix.at }}">{{ fix.when }}</time></strong><span>{{ fix.note }}</span></li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-    </div>
-  </section>
+  {% include "_build_notes.html" %}
 
   <div class="wrap">
     <nav class="day-nav" aria-label="Other days">

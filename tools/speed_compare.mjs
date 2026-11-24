@@ -28,6 +28,10 @@ const zoom = (entry) => entry.interactions
   ? Math.max(...ZOOMS.map((name) => entry.interactions[name]?.longestTask ?? 0))
   : null;
 
+// What the newspaper view must not load (#101): the chart's scripts, styles and basemap.
+const MAP_FILE = /leaflet|basemap\.js|map\.js|pins\.js|map-loader\.js|water\.js/;
+const mapFiles = (entry) => entry.files.filter(([url]) => MAP_FILE.test(url)).length;
+
 const ROWS = [
   ["Sent", (e) => e.sent, kb],
   ["Fonts", (e) => fonts(e), (v, e) => `${kb(v)} (${fontFiles(e)} files)`],
@@ -40,6 +44,7 @@ const ROWS = [
   ["Longest task while loading", (e) => e.timing.longest, ms],
   ["Map move: longest freeze", move, ms, TARGETS.move],
   ["Zoom step: longest task", zoom, ms, TARGETS.zoom],
+  ["Map files requested", mapFiles, (v) => String(v)],
 ];
 
 const out = [];
@@ -51,7 +56,8 @@ for (const page of Object.keys(after.pages)) {
   for (const [name, get, fmt, target] of ROWS) {
     const bv = b ? get(b) : null, av = get(a);
     if (bv == null && av == null) continue;
-    const verdict = target == null ? "" : av == null ? `${ms(target)}` : `${ms(target)} ${av <= target ? "✅" : "❌"}`;
+    let verdict = target == null ? "" : av == null ? `${ms(target)}` : `${ms(target)} ${av <= target ? "✅" : "❌"}`;
+    if (name === "Map files requested") verdict = page === "newspaper" ? `0 ${av === 0 ? "✅" : "❌"}` : "";
     out.push(`| ${name} | ${b ? fmt(bv, b) : "–"} | ${fmt(av, a)} | ${verdict} |`);
   }
   if (a.errors?.length) out.push(`JavaScript errors after: ${a.errors.join(" | ")}`, "");

@@ -41,7 +41,7 @@ jobs:
       # Chrome's sandbox can't start on Ubuntu runners (AppArmor); the browser only ever
       # opens our own sample site on 127.0.0.1.
       HAVEN_BROWSER_ARGS: --no-sandbox
-      PAGES: today,day-ships,archive,how-it-works
+      PAGES: today,day-ships,archive,how-it-works,newspaper
       # "Before" is main; for the second #104 pull request, the first one's branch until it is
       # merged, so each pull request is measured on its own changes.
       BEFORE: ${{ github.ref_name == 'issue-104-lighter-map' && 'origin/issue-104-load-first' || 'origin/main' }}
