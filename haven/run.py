@@ -56,7 +56,7 @@ from haven.collect import ArticleResult, CollectResult, add_article_text, run_co
 from haven.config import load_filter, load_sources
 from haven.env import load_env
 from haven.fetch import Fetcher
-from haven.filter import AI_CHECK, FilterResult, ai_client, run_filter
+from haven.filter import AI_CHECK, FilterResult, ai_client, drop_injected, run_filter
 from haven.rhine import RhineResult, kaub_no_data, lobith_no_data, read_rhine
 from haven.strike import FAILURE_SOURCE as STRIKE_STEP
 from haven.strike import StrikeFlag, StrikeResult, read_strike_flag, reading
@@ -169,6 +169,14 @@ def run(*, last_trigger: bool = False, data_dir: Path = storage.DATA_DIR, utc_no
         if texts is None:
             texts = ArticleResult(items=[items[n] for n in kept_at], failures=[])
         failures.extend(texts.failures)
+        # Fix 6 (#125): the article text is in memory now, so the rules' check for text addressed to
+        # an AI runs again; such an item is dropped (with a failure line) and never reaches the AI.
+        checked, injected = drop_injected(texts.items)
+        failures.extend(injected)
+        for n, item in zip(kept_at, checked):
+            items[n] = item
+        kept_at = [n for n, item in zip(kept_at, checked) if item.filter.get("kept")]
+        texts = ArticleResult(items=[item for item in checked if item.filter.get("kept")], failures=texts.failures)
         known = _guarded(SUMMARISER, failures, lambda: _known_strikes(today, data_dir)) or []
         pending = _guarded(SUMMARISER, failures,
                            lambda: steps.start_summary(texts.items, client, known, today, read_at=read_at))

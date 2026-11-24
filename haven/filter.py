@@ -27,11 +27,18 @@ The rules, in this order (first match wins, so the reason is always the first ru
    2026, #123). Its headline gives the week ("… (11 Nov - 17 Nov 2026)") but it has no published
    date, so the age rule can't see a stale one. The week counts to the end of its last day
    (Amsterdam), exactly 48 h is kept, and an unreadable week = the rule doesn't apply.
-4. **Auto-keep source** (Port Authority news, ECT; `auto_keep` in `config/sources.toml`) ->
+4. **Text addressed to an AI** in the headline, teaser or (when already in memory) article text
+   -> dropped, reason `possible prompt injection`, with a failure line (owner, 24 Nov 2026, fix 6 of
+   the security audit, #125). `addressed_to_ai` looks for instructions to an AI ("ignore your rules",
+   "note to the AI", "AI: report…", "system notice", "kept=true", our own prompt tags); an ordinary
+   headline about AI isn't caught, because the patterns need an instruction. It comes before
+   auto-keep, so it covers every source. The article text of other sources is read after the filter,
+   so the runner checks it again (`drop_injected`) before the summariser.
+5. **Auto-keep source** (Port Authority news, ECT; `auto_keep` in `config/sources.toml`) ->
    kept, without the word lists and without the AI check.
-5. **Off-topic word in the headline** -> dropped, reason `off-topic word "<word>"`. The word
+6. **Off-topic word in the headline** -> dropped, reason `off-topic word "<word>"`. The word
    lists are in `config/filter.toml`, one per language; the item's language picks the list.
-6. Anything else -> to the AI check.
+7. Anything else -> to the AI check.
 
 Age comes first, so a three-day-old Port Authority story is still dropped; auto-keep comes
 before the words, so a badly chosen word can't drop a Rotterdam-specific item (both owner's
@@ -145,6 +152,9 @@ def decide(item: Item, source: Source | None, words, now: datetime, max_age: tim
         return Decision(DROP, f"K+N weekly update for a week that ended more than 48 h ago "
                               f"({last_day.day} {last_day:%b %Y})")
 
+    if addressed_to_ai(item):  # fix 6 of the security audit (#125): before auto-keep, so every source
+        return Decision(DROP, INJECTION)
+
     if source is not None and source.auto_keep:
         return Decision(KEEP, AUTO_KEEP)
 
@@ -219,6 +229,60 @@ def read_end_date(text: str | None) -> datetime | None:
             continue
         ends.append(max((moment.replace(tzinfo=AMSTERDAM, fold=fold) for fold in (0, 1)), key=_utc))
     return max(ends, key=_utc) if ends else None
+
+
+# Text addressed to an AI (fix 6 of the security audit, #125). Each pattern needs an instruction,
+# not just the word "AI", so a headline about AI in the port isn't caught. Matched with case ignored
+# on the headline, the teaser and the article text in memory (never stored, hard rule 13).
+INJECTION = "possible prompt injection"
+INJECTION_CHECK = "Possible prompt injection"  # the `source` of its failure lines
+_AI = r"(?:ai|a\.i\.|model|language\s+model|llm|assistant|chatbot|bot|claude|chatgpt|gpt)"
+_INJECTION = re.compile("|".join((
+    # "ignore your previous rules", "disregard your earlier instructions", "forget the above rules"
+    r"\b(?:ignore|disregard|forget)\s+(?:all\s+)?(?:of\s+)?(?:your|previous|prior|earlier|the\s+above|above)"
+    r"(?:\s+\w+)?\s+(?:rules|instructions|prompts?|guidelines|directions)\b",
+    # "note to the AI", "instruction for the AI writing this entry", "notice to the relevance checker"
+    r"\b(?:note|notice|message|instructions?|reminder|request)\s+(?:to|for)\s+(?:the\s+)?"
+    r"(?:" + _AI[3:-1] + r"|relevance\s+checker|checker|summari[sz]er)\b",
+    # a sentence that starts by addressing the AI with an order: "AI: report…", "AI checker: mark…"
+    r"(?:^|[.!?;:]\s+|\n)\s*(?:the\s+)?" + _AI + r"(?:\s+(?:checker|filter|writer|summari[sz]er|model))?"
+    r"\s*[:,]\s*(?:please\s+)?(?:report|ignore|answer|mark|write|rate|set|say|keep|drop|treat|include|copy|"
+    r"repeat|respond|reply|output|classify|tell|add|list|disregard|forget|do|use|give|return)\b",
+    r"\bsystem\s+(?:notice|prompt|message|instructions?)\b",
+    r"\b(?:new|updated|changed)\s+instructions\s*:",
+    r"\byou\s+are\s+now\b",
+    # our answer format: kept=true, "kept": true
+    r"[\"']?\bkept[\"']?\s*[:=]\s*(?:true|false)\b",
+    # our own prompt tags
+    r"</?\s*(?:headline|teaser|article|known_strikes)\b[^>]*>",
+    # Dutch: "negeer je eerdere instructies", "bericht voor de AI"
+    r"\bnegeer\s+(?:alle\s+)?(?:je|jouw|uw|de|eerdere|vorige)(?:\s+\w+)?\s+(?:regels|instructies|opdrachten)\b",
+    r"\b(?:bericht|notitie|instructie|opmerking)\s+(?:aan|voor)\s+(?:de\s+)?(?:ai|ki|chatbot|assistent)\b",
+)), re.IGNORECASE)
+
+
+def addressed_to_ai(item: Item) -> bool:
+    """True when the item's headline, teaser or article text gives instructions to an AI (#125)."""
+    text = "\n".join(part for part in (item.headline, item.snippet, item.article_text) if part)
+    return _INJECTION.search(text) is not None
+
+
+def injection_failure(item: Item) -> dict:
+    """The failure line for a dropped item: its link and what happened, never its text."""
+    return {"source": INJECTION_CHECK,
+            "error": f"{item.url}: the item's text gives instructions to an AI, so it was dropped"}
+
+
+def drop_injected(items: list[Item]) -> tuple[list[Item], list[dict]]:
+    """The same check on kept items once their article text is in memory (the runner, after the
+    article text step): an item addressed to an AI is dropped by the rules, with a failure line."""
+    checked, failures = [], []
+    for item in items:
+        if addressed_to_ai(item):
+            item = replace(item, filter={"kept": False, "stage": "rules", "reason": INJECTION})
+            failures.append(injection_failure(item))
+        checked.append(item)
+    return checked, failures
 
 
 # The week in a K+N weekly update's headline: "(11 Nov - 17 Nov 2026)", "(11 - 17 Nov 2026)",
@@ -507,13 +571,14 @@ def run_filter(items: list[Item], sources, config: FilterConfig, now: datetime, 
     """Step 2 of the morning job: the rules, then the AI check for what they couldn't decide."""
     ruled = apply_rules(items, sources, config, now, max_age)
     result = [r.item for r in ruled]
+    injected = [injection_failure(r.item) for r in ruled if r.decision.reason == INJECTION]
     to_ai = [n for n, r in enumerate(ruled) if r.decision.outcome == TO_AI]
     if not to_ai:
-        return FilterResult(items=result, failures=[], ai_unavailable=False)
+        return FilterResult(items=result, failures=injected, ai_unavailable=False)
     ai = check_with_ai([result[n] for n in to_ai], client)
     for n, checked in zip(to_ai, ai.items):
         result[n] = checked
-    return FilterResult(items=result, failures=ai.failures, ai_unavailable=ai.unavailable is not None,
+    return FilterResult(items=result, failures=injected + ai.failures, ai_unavailable=ai.unavailable is not None,
                         ai_calls=ai.calls, input_tokens=ai.input_tokens, output_tokens=ai.output_tokens)
 
 
