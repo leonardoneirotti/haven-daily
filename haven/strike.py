@@ -58,7 +58,8 @@ STRIKE_WORDS = (
     "strike*", "walkout*", "walk-out*", "work stoppage*", "go-slow*", "industrial action",
     "labour action", "labor action", "work-to-rule",
     "staking*", "staken", "staakt", "staakten", "werkonderbreking*", "werkstaking*", "prikactie*",
-    "havenstaking*", "busstaking*", "werk neer",
+    "havenstaking*", "busstaking*", "werk neer", "actie", "acties", "vakbondsactie*", "werkactie*",
+    "FNV Havens", "CNV",  # union names: a sign of labour action (owner, 24 Nov 2026)
     "streik*", "warnstreik*", "arbeitsniederlegung*",
 )
 # The port, or freight transport serving it (rule E, §5.4): en, nl, de.
@@ -72,7 +73,7 @@ FREIGHT_WORDS = (
     "haven*", "overslag*", "vracht*", "binnenvaart*", "schipper*", "scheepvaart*", "loods", "loodsen",
     "loodswezen", "sleepdienst*", "sleepboot*", "sleepboten", "douane*", "sluis", "sluizen",
     "sluiswachter*", "brugwachter*", "havenarbeider*", "sjorder*", "goederen*", "rederij*",
-    "transporteur*",
+    "transporteur*", "FNV Havens",
     "hafen*", "güter*", "binnenschiff*", "lotsen",
 )
 # Passenger public transport: any of these and the strike can't be confirmed as a freight one.
