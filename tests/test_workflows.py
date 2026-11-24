@@ -46,7 +46,9 @@ def test_daily_guards_first_and_passes_the_last_trigger_to_the_runner():
 def test_daily_runs_only_on_main_and_checks_out_main():
     code = code_lines(DAILY)
     assert "github.ref == 'refs/heads/main'" in code
-    assert "ref: main" in code
+    # A real run checks out main; only a dry run checks out the commit it was started from.
+    assert "ref: main" in code_lines(PAGES)
+    assert "ref: ${{ inputs.dry_run && github.sha || 'main' }}" in code
 
 
 def test_the_only_secret_anywhere_is_the_claude_key_in_the_daily_runner_step():

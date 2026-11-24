@@ -86,7 +86,7 @@ def test_the_site_is_deployed_after_the_publish_job():
 
 def test_publish_reads_only_the_standard_library():
     """The publish job installs no packages, so haven.publish must not need any."""
-    allowed = {"__future__", "subprocess", "sys", "dataclasses", "pathlib", "typing"}
+    allowed = {"__future__", "argparse", "re", "subprocess", "sys", "dataclasses", "pathlib", "typing"}
     source = (ROOT / "haven" / "publish.py").read_text(encoding="utf-8")
     imported = set(re.findall(r"^(?:from|import)\s+([\w.]+)", source, re.MULTILINE))
     assert {name.split(".")[0] for name in imported} <= allowed

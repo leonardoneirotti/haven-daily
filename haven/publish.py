@@ -15,11 +15,19 @@ three files. It:
    `git push origin HEAD:main`; if either fails, once more. A second failure fails the job:
    the brief is then not on `main`, so the next trigger builds the day again.
 
+**A dry run** (`--dry-run-branch dry-run/<run id>`, the workflow's `dry_run` input, owner 24 Nov
+2026): the same checks of what is staged (2-3), then a commit "Brief YYYY-MM-DD (dry run, not
+published)" pushed to that new branch only. Step 1 is skipped (a dry run may run a branch's code,
+checked out at its commit), and so is the rebase on main (5): it never touches main. Only a branch
+name `dry-run/<letters, digits, . _ ->` is accepted.
+
 Git's own messages go to the job log only; nothing here reaches the public page.
 """
 
 from __future__ import annotations
 
+import argparse
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -38,6 +46,7 @@ ATTEMPTS = 2  # the push, plus one retry
 AS_BOT = ("-c", f"user.name={BOT_NAME}", "-c", f"user.email={BOT_EMAIL}")
 
 Git = Callable[[list[str], Path], subprocess.CompletedProcess]
+DRY_RUN_BRANCH = re.compile(r"dry-run/[A-Za-z0-9][A-Za-z0-9._-]*")  # a new throwaway branch, never main
 
 
 class PublishError(RuntimeError):
@@ -67,12 +76,17 @@ def _last_line(text: str) -> str:
     return lines[-1].strip() if lines else "no message"
 
 
-def publish(repo: Path = PROJECT_DIR, git: Git = run_git) -> Published:
-    """Commit today's new data files as the bot and push them to main. Raises PublishError."""
+def publish(repo: Path = PROJECT_DIR, git: Git = run_git, dry_run_branch: str | None = None) -> Published:
+    """Commit today's new data files as the bot and push them to main, or on a dry run to the branch
+    `dry_run_branch` only. Raises PublishError."""
     repo = Path(repo)
-    branch = _git(git, repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
-    if branch != BRANCH:
-        raise PublishError(f"the checkout is on {branch!r}, not {BRANCH!r}: the brief is only ever pushed from main")
+    if dry_run_branch is not None:
+        if not DRY_RUN_BRANCH.fullmatch(dry_run_branch) or ".." in dry_run_branch:
+            raise PublishError(f"a dry run pushes only to a branch named dry-run/<id>, not {dry_run_branch!r}")
+    else:
+        branch = _git(git, repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
+        if branch != BRANCH:
+            raise PublishError(f"the checkout is on {branch!r}, not {BRANCH!r}: the brief is only ever pushed from main")
 
     if not (repo / "data").is_dir():
         raise PublishError("nothing new in data/ to commit (no data/ folder)")
@@ -82,6 +96,11 @@ def publish(repo: Path = PROJECT_DIR, git: Git = run_git) -> Published:
     except PublishError:
         git(["reset", "-q", "--", "data"], repo)  # unstage again; the files stay on disk for the log
         raise
+
+    if dry_run_branch is not None:
+        _git(git, repo, *AS_BOT, "commit", "-q", "-m", f"Brief {day} (dry run, not published)")
+        _git(git, repo, "push", "origin", f"HEAD:refs/heads/{dry_run_branch}")
+        return Published(day=day, files=files, attempts=1)
 
     _git(git, repo, *AS_BOT, "commit", "-q", "-m", f"Brief {day} (automatic)")
 
@@ -119,14 +138,18 @@ def _check_staged(name_status: str) -> tuple[str, tuple[str, ...]]:
     return PurePosixPath(briefs[0]).stem, tuple(path for _, path in staged)
 
 
-def main() -> int:
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(prog="python -m haven.publish", description=__doc__.splitlines()[0])
+    parser.add_argument("--dry-run-branch", help="a dry run: push to this new dry-run/<id> branch, never to main")
+    args = parser.parse_args(argv)
     try:
-        result = publish()
+        result = publish(dry_run_branch=args.dry_run_branch)
     except PublishError as error:
         print(f"Publish: {error}", file=sys.stderr)
         return 1
     tries = "" if result.attempts == 1 else f" (after {result.attempts} tries)"
-    print(f"Pushed the brief for {result.day} to {BRANCH}{tries}: {', '.join(result.files)}")
+    target = args.dry_run_branch or BRANCH
+    print(f"Pushed the brief for {result.day} to {target}{tries}: {', '.join(result.files)}")
     return 0
 
 
