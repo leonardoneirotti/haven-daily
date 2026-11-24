@@ -924,6 +924,15 @@ html.js .topbar {
   display: block;
 }
 
+/* An English headline the AI wrote for a Dutch item (#134): said right under it, always. */
+.panel-translated {
+  display: block;
+  margin-top: 0.125rem;
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
 .panel-quiet {
   flex: 1;
   padding: 1.25rem;
@@ -2135,6 +2144,15 @@ html.js .topbar {
 
 .item-summary {
   max-width: var(--measure);
+}
+
+/* Under an English headline the AI wrote: who translated it, and the original (#134). */
+.item-original {
+  max-width: var(--measure);
+  margin-top: 0.25rem;
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  line-height: 1.45;
 }
 
 /* The publisher's note under a summary written with its permission (#107). */

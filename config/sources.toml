@@ -29,6 +29,10 @@
 #              Haven Daily's interpretation and written as possible, checked in code, #115).
 #              Permission withdrawn: delete the line, and move its row back under
 #              Headline-only in SOURCES.md.
+#   english_headline  true = for an item in Dutch, the AI also writes an English headline,
+#              shown as the main one with the Dutch original below it, "translated by AI"
+#              (#134). Only for a summarised source (verdict "use", or with permission);
+#              default false. The item's language decides, so an English item is untouched.
 
 # --- use ----------------------------------------------------------------------
 
@@ -41,6 +45,7 @@ urls = ["https://www.portofrotterdam.com/en/news-and-press-releases"]
 access = "html"
 language = "en"
 auto_keep = true
+english_headline = true  # owner, 24 Nov 2026 (#134)
 note = "The /en/rss.xml feed is stale; read the HTML list."
 
 [[source]]
@@ -51,6 +56,7 @@ home = "https://pin.portofrotterdam.com/"
 urls = ["https://pin.portofrotterdam.com/rss.xml"]
 access = "rss"
 language = "en"
+english_headline = true  # owner, 24 Nov 2026 (#134)
 note = "40-60 notices a week, mostly noise: goes through the AI check. Feed keeps only ~10 items (gap detection, spec §5.8)."
 
 [[source]]
@@ -126,6 +132,7 @@ verdict = "headline-only"
 # Written permission for AI summaries, received 19 Nov 2026 (#107); the impact line allowed on
 # 23 Nov 2026 (docs/permissions/2026-11-23-rtv-rijnmond.md, #115). Withdrawn? Delete this one line.
 permission = { file = "docs/permissions/2026-11-19-rtv-rijnmond.md", granted = 2026-11-19, max_sentences = 2, impact = true }
+# No english_headline: a translated headline needs RTV Rijnmond's agreement first (owner, 24 Nov 2026, #134).
 why = "Its terms reserve all rights and its robots.txt blocks ClaudeBot and other AI crawlers, so summaries need RTV Rijnmond's written permission."
 home = "https://www.rijnmond.nl/"
 urls = ["https://www.rijnmond.nl/rss/nieuws"]

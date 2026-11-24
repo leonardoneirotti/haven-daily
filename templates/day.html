@@ -38,7 +38,8 @@
             {{ m.num(loop.index, item.severity_key) }}
             <span class="panel-text">
               <span class="panel-meta"><span class="sev sev-{{ item.severity_key }}">{{ item.severity_key }}</span></span>
-              <span class="panel-title">{{ item.headline }}</span>
+              <span class="panel-title">{{ item.shown_headline }}</span>
+              {% if item.headline_en %}<span class="panel-translated">Headline translated by AI</span>{% endif %}
               {% if item.headline_note %}<span class="panel-summary is-empty">{{ item.headline_note }}</span>
               {% else %}<span class="panel-summary">{{ item.summary }}</span>
               {% if item.permission_note %}<span class="panel-permission">{{ item.permission_note }}</span>{% endif %}{% endif %}

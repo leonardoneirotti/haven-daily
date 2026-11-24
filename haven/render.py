@@ -541,6 +541,9 @@ def prepare_item(item: dict, brief_date: str) -> None:
     item.setdefault("access", "full")  # "headline-only" for paywalled sources
     item.setdefault("map", None)  # {"lat", "lon", "label"} when the item has a place on the map
     item.setdefault("permission", None)  # {"granted", "max_sentences", "impact"}: written permission (#107)
+    # An English headline the AI wrote for a Dutch item (#134) is the one shown; the original goes below it.
+    item.setdefault("headline_en", None)
+    item["shown_headline"] = item["headline_en"] or item["headline"]
     item["permission_note"] = permission_note(item)
     # No impact block when the publisher's permission doesn't cover one (#107), or when the impact was
     # left out because it sounded confirmed twice (#115): not "Not enough information".
@@ -625,7 +628,7 @@ def map_payload(brief: dict) -> dict:
         {
             "rank": rank,
             "severity": item["severity_key"],
-            "title": item["headline"],
+            "title": item["shown_headline"],
             **item["map"],
         }
         for rank, item in enumerate(brief["items"], start=1)
