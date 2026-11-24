@@ -41,6 +41,10 @@
 13. No third-party article text or snippets in the repo; text is used in memory only.
 14. Privacy: no cookies, no browser storage, no analytics or tracking, nothing loaded from other sites (links are fine); footer privacy note on every page. Tested by `tests/test_privacy.py`.
 
+## Commits
+
+Before every commit, run git branch --show-current; never commit on main.
+
 ## Editing a published brief
 
 A brief in `data/briefs/` is public as soon as the morning job commits it. Whenever you edit one:
