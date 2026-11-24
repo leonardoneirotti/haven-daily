@@ -406,25 +406,30 @@ side = "right"
 osm = "relation/12218249"
 
 # ---------- Roads (the port's motorways, #138) ----------
-# A road is long, so its pin is one point on the motorway itself, where port traffic meets the
-# A4: a junction node on the carriageway (highway=motorway_junction, checked to lie on a way with
+# A road is long, so its pin is one point on the motorway itself, on its stretch inside the port:
+# a junction node on the carriageway (highway=motorway_junction, checked to lie on a way with
 # ref=A15 / ref=A20), read with an Overpass query on 24 Nov 2026. Added because the A15/A20 road
 # works of 23 Nov 2026 got no pin: the list had no roads, so "none" was the only right answer.
+# A road is only a fallback: a more specific place the item names wins (places.prefer_specific).
+# Not the junctions with the A4 (Benelux, Kethelplein) any more: further east, they hid 4 more pin
+# pairs at the opening view (owner's option A, review of PR #139).
 
 [[place]]
+# Exit 15 (Havens 4100-5200), 1.0 km from the Botlek pin
 id = "a15"
 label = "A15"
 kind = "road"
-lat = 51.8759
-lon = 4.3618
+lat = 51.8686
+lon = 4.2714
 side = "right"
-osm = "node/1367173739"
+osm = "node/44155110"
 
 [[place]]
+# Exit 7 (Maassluis)
 id = "a20"
 label = "A20"
 kind = "road"
-lat = 51.9246
-lon = 4.3587
+lat = 51.9253
+lon = 4.2672
 side = "right"
-osm = "node/44421242"
+osm = "node/322088946"
