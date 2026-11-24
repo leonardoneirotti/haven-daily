@@ -19,16 +19,18 @@ SAMPLE_BRIEFS = PROJECT_DIR / "data" / "sample" / "briefs"
 
 ONE_LINER = ("What affects the Port of Rotterdam today, and what it means for logistics planners. "
              "Updated every morning.")
-ABOUT = ("Haven Daily is an independent portfolio project by Leonardo Neirotti, an International Business "
-         "student at Rotterdam University of Applied Sciences. Every morning an automated pipeline reads public "
-         "sources, uses AI to filter and summarise what matters for logistics planners, and publishes this brief. "
-         "It is not affiliated with the Port of Rotterdam Authority or any company named here.")
+# The owner's About text; who he is moved to its own sentence under it (IDENTITY, #138).
+ABOUT = ("Haven Daily is an independent portfolio project by Leonardo Neirotti. Every morning an automated "
+         "pipeline reads public sources, uses AI to filter and summarise what matters for logistics planners, "
+         "and publishes this brief. It is not affiliated with the Port of Rotterdam Authority or any company "
+         "named here.")
+IDENTITY = ("Leonardo Neirotti · Second-year International Business student (Supply Chain Management) "
+            "at Rotterdam University of Applied Sciences.")
 # The page description search engines show (owner, 3 Nov 2026, PR #93: item 6).
 DESCRIPTION = ("What affects the Port of Rotterdam today, and what it means for logistics planners. "
                "Independent, unofficial portfolio project.")
-# Under the About text in "Who makes this" (owner, 3 Nov 2026, PR #93: default 3).
-BUILT_BY = ("Built by Leonardo Neirotti, second-year BBA student (Supply Chain Management), "
-            "with Python and GitHub Actions.")
+# Under the About text in "Who makes this" (owner, 3 Nov 2026, PR #93: default 3; identity moved out, #138).
+BUILT_BY = "Built with Python and GitHub Actions."
 LINKEDIN = "https://www.linkedin.com/in/leonardo-neirotti"
 REPO = "https://github.com/leonardoneirotti/haven-daily"
 
@@ -153,9 +155,9 @@ def test_who_makes_this_is_the_about_text_with_both_links(how):
     assert {LINKEDIN, REPO} <= links(maker)
 
 
-def test_who_makes_this_adds_the_built_by_line_right_under_the_about_text(how):
+def test_who_makes_this_adds_the_identity_and_built_by_lines_right_under_the_about_text(how):
     maker = text_of(part(how, r'<section aria-labelledby="maker">.*?</section>'))
-    assert ABOUT + " " + BUILT_BY in maker
+    assert ABOUT + " " + IDENTITY + " " + BUILT_BY in maker
 
 
 def about_block(page: str) -> str | None:
@@ -167,7 +169,7 @@ def test_the_today_page_shows_the_about_text_with_both_links_below_the_brief(pag
     today = pages["index.html"]
     block = about_block(today)
     assert block, "no About block on the Today page"
-    assert ABOUT in text_of(block)
+    assert ABOUT + " " + IDENTITY in text_of(block)
     assert {LINKEDIN, REPO} <= links(block)
     # Claude's default (#86, for the owner to confirm): right below the brief (items and port
     # status), before the ship list and "How this brief was made".

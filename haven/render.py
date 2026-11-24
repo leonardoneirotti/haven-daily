@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 from datetime import date, datetime, timedelta
 from itertools import groupby
@@ -34,6 +35,11 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = PROJECT_DIR / "templates"
 STATIC_DIR = PROJECT_DIR / "static"
 
+# The owner's one identity sentence, used everywhere he is described (owner, #138): the footer of
+# every page, the Today page's About block, "Who makes this" on How it works, and the README.
+IDENTITY = ("Second-year International Business student (Supply Chain Management) "
+            "at Rotterdam University of Applied Sciences.")
+
 SITE = {
     "name": "Haven Daily",
     "author": "Leonardo Neirotti",
@@ -43,13 +49,14 @@ SITE = {
     # The page description search engines show, on every page (owner, 3 Nov 2026, PR #93).
     "description": ("What affects the Port of Rotterdam today, and what it means for logistics planners. "
                     "Independent, unofficial portfolio project."),
-    "about": ("Haven Daily is an independent portfolio project by Leonardo Neirotti, an International Business "
-              "student at Rotterdam University of Applied Sciences. Every morning an automated pipeline reads "
-              "public sources, uses AI to filter and summarise what matters for logistics planners, and publishes "
-              "this brief. It is not affiliated with the Port of Rotterdam Authority or any company named here."),
-    # Under the About text in "Who makes this" (owner, 3 Nov 2026, PR #93).
-    "built_by": ("Built by Leonardo Neirotti, second-year BBA student (Supply Chain Management), "
-                 "with Python and GitHub Actions."),
+    # Who the owner is now has one sentence of its own (IDENTITY, #138), shown under the name.
+    "about": ("Haven Daily is an independent portfolio project by Leonardo Neirotti. Every morning an automated "
+              "pipeline reads public sources, uses AI to filter and summarise what matters for logistics planners, "
+              "and publishes this brief. It is not affiliated with the Port of Rotterdam Authority or any company "
+              "named here."),
+    "identity": IDENTITY,
+    # Under the About text in "Who makes this" (owner, 3 Nov 2026, PR #93; the identity moved out, #138).
+    "built_by": "Built with Python and GitHub Actions.",
     # The site's addresses (base URL, LinkedIn, repository) are in config/site.toml (#28);
     # make_environment adds them to `site` for the templates.
 }
@@ -340,12 +347,56 @@ def strike_link(link: dict, ranks: dict[str, int] | None, today: str) -> dict:
             "day_link": day_link}
 
 
-def failure_groups(failures: list[dict]) -> list[dict]:
-    """Failure lines grouped per source, in the order the sources first appear."""
-    groups: dict[str, list[str]] = {}
-    for failure in failures:
-        groups.setdefault(failure.get("source") or "Unknown step", []).append(failure.get("error") or "")
-    return [{"source": source, "errors": errors} for source, errors in groups.items()]
+# Failure notes for readers (#138). The stored brief keeps the technical line ("<address>: HTTP 403"),
+# which the owner needs to fix things; the page turns it into one plain sentence naming the source.
+# A line the rules don't recognise keeps its own words, without the address.
+_ADDRESS = re.compile(r"^(https?://\S+?): (.+)$", re.S)
+_UNREACHABLE = re.compile(r"^HTTP \d{3}\b|timed out|tried twice|network error|redirects|robots\.txt could not be read",
+                          re.I)
+_ROBOTS_BLOCK = re.compile(r"^robots\.txt (disallows|asks for)")
+_CHANGED = re.compile(r"layout changed|feed changed|feed shape changed|area renamed|not RSS|no <channel>|Atom feed|"
+                      r"not valid XML|not JSON|not a MeteoAlarm|without a headline or link", re.I)
+_FAULT = re.compile(r"^unexpected error")
+FAILURE_SENTENCES = {
+    "unreachable": "{name} could not be reached today.",
+    "robots": "{name} was not read today: its website asks automated readers not to visit.",
+    "changed": "{name} could not be read today: its {kind} has changed.",
+    "fault": "{name} could not be read today because of a fault in Haven Daily.",
+    "article": "One {name} article could not be opened, so that item has no summary.",
+}
+
+
+def _source_reads() -> dict[str, tuple[tuple[str, ...], str | None]]:
+    """{source name: (the addresses the job reads, access)} from config/sources.toml."""
+    return {source.name: (source.urls, source.access) for source in load_sources()}
+
+
+def plain_failure(failure: dict, reads: dict | None = None) -> str:
+    """One failure line as a reader should see it (#138): no addresses, no status codes."""
+    reads = _source_reads() if reads is None else reads
+    name = failure.get("source") or "Unknown step"
+    error = (failure.get("error") or "").strip()
+    match = _ADDRESS.match(error)
+    url, problem = (match.group(1), match.group(2).strip()) if match else (None, error)
+    urls, access = reads.get(name, ((), None))
+    article = bool(url and urls and url not in urls)  # an article page, not the list or feed itself
+    if _FAULT.match(problem):
+        kind = "fault"
+    elif _ROBOTS_BLOCK.match(problem):
+        kind = "robots"
+    elif _UNREACHABLE.search(problem):
+        kind = "article" if article else "unreachable"
+    elif _CHANGED.search(problem):
+        kind = "article" if article else "changed"
+    else:
+        return f"{name}: {problem.rstrip('.')}."
+    return FAILURE_SENTENCES[kind].format(name=name, kind="page" if access == "html" else "feed")
+
+
+def failure_lines(failures: list[dict], reads: dict | None = None) -> list[str]:
+    """Every failure as a plain sentence, each sentence once, in the order they first appear."""
+    reads = _source_reads() if reads is None else reads
+    return list(dict.fromkeys(plain_failure(failure, reads) for failure in failures))
 
 
 def outside_url(url) -> str | None:
@@ -495,12 +546,12 @@ def prepare_indicator(indicator: dict, previous: dict | None, is_first: bool, br
 
 
 # The one grey line of a short card, an item with no summary (design review S5, #82, spec §7.5).
-# The headline-only wording is the owner's (PR #80, paywall added in PR #88, spec §2.1); the panel
-# shows the same line when opened.
+# Shortened by the owner (option A, #138; was the owner's longer wording of PR #80/#88): why a source
+# is headline-only is said once, on How it works. The panel shows the same line when opened.
 HEADLINE_NOTES = {
-    "headline-only": "Headline only (paywalled, or the source's terms don't allow a summary) · severity rated from the headline",
-    "unread": "Headline only (the article couldn't be read) · severity rated from the headline",
-    "unrated": "Headline only (the AI step failed for this item) · no summary, impact or severity",
+    "headline-only": "Headline only · severity from the headline",
+    "unread": "Headline only · article couldn't be read · severity from the headline",
+    "unrated": "Headline only · AI step failed · no summary or severity",
 }
 
 
@@ -661,6 +712,7 @@ def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.to
     """Add the fields the templates need: edition number, ranked items, status changes and
     meanings, map data. The Rhine's thresholds and meanings come from `rhine_path`."""
     thresholds, meanings = load_rhine(rhine_path), load_rhine_meanings(rhine_path)
+    reads = _source_reads()  # for the failure notes (#138)
     briefs.sort(key=lambda brief: brief["date"])
     # Items shown on each day's page, {date: {url: rank}}: the strike line links an earlier
     # item's card only if its day page really shows it (spec §5.7 point 10).
@@ -691,7 +743,7 @@ def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.to
         build.setdefault("ai_unavailable", False)
 
         build.setdefault("summaries", None)
-        brief["failure_groups"] = failure_groups(build["failures"])
+        brief["failure_lines"] = failure_lines(build["failures"], reads)
 
         # "Since yesterday" only against the day before: after a missing day there is no yesterday.
         yesterday = previous_status if previous_day == brief["day"] - timedelta(days=1) else {}
@@ -729,8 +781,14 @@ def group_by_month(briefs: list[dict]) -> list[tuple[str, list[dict]]]:
     return [(f"{month:%B %Y}", list(days)) for month, days in grouped]
 
 
+# A paused source (`enabled = false`, #138): listed with its verdict, not read for now.
+PAUSED_USE = "Paused for now: its website refuses Haven Daily's automated reader, so it isn't read."
+
+
 def source_use(source: Source) -> str:
     """One line on how the pipeline uses a source, from its config (Method page, #24)."""
+    if source.verdict != "drop" and not source.enabled:  # paused (#138)
+        return PAUSED_USE
     if source.effective_verdict == "use" and source.permission is not None:  # #107
         permission = source.permission
         text = "the lead paragraph in its feed" if source.id in LEAD_PARAGRAPH_FEEDS else "the article"
@@ -742,12 +800,11 @@ def source_use(source: Source) -> str:
         return line + (". The impact for planners is Haven Daily's own interpretation, written as possible "
                        "and checked for wording that sounds confirmed.")
     if source.verdict == "use" and source.auto_keep:
-        return ("Rotterdam-specific, so its new items skip the AI relevance check. Each is summarised "
-                "from the article.")
+        return "Rotterdam-specific, so it skips the AI relevance check; summarised from the article."
     if source.verdict == "use":
-        return "New items go through the AI relevance check. Kept ones are summarised from the article."
+        return "AI relevance check; kept items are summarised from the article."
     if source.verdict == "headline-only":
-        return "Headline and link only. The AI sees the headline alone, to judge relevance and to rate it."
+        return "Headline and link only; the AI sees the headline alone."
     return "Not collected."
 
 

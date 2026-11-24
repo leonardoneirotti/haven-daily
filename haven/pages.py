@@ -181,7 +181,7 @@ PARSERS: dict[str, Parser] = {
 def collect_page(source: Source, fetcher: Fetcher) -> FeedResult:
     """Read every page URL of an HTML source. Never raises for a broken page or a layout change."""
     if not source.fetched:
-        raise ValueError(f"{source.id}: verdict 'drop' sources are never fetched")
+        raise ValueError(f"{source.id}: dropped and paused sources are never fetched")
     if source.access != "html":
         raise ValueError(f"{source.id}: access is {source.access!r}; collect_page reads only 'html' sources")
 

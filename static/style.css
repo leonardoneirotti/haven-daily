@@ -912,20 +912,6 @@ html.js .topbar {
   display: block;
 }
 
-/* A publisher's note next to a summary written under its written permission (#107): opens with
-   the summary, in the same quiet grey, a step smaller. */
-.panel-permission {
-  display: none;
-  margin-top: 0.25rem;
-  color: var(--ink-2);
-  font-size: 0.8125rem;
-  line-height: 1.4;
-}
-
-.panel-item.is-active .panel-permission {
-  display: block;
-}
-
 /* An English headline the AI wrote for a Dutch item (#134): said right under it, always. */
 .panel-translated {
   display: block;
@@ -965,6 +951,11 @@ html.js .topbar {
 .panel-status li:nth-child(even) {
   padding-left: 1rem;
   border-left: 1px solid var(--rule);
+}
+
+/* Three cells in v1 (no Ships cell until v2, #138): the last one takes the whole row */
+.panel-status li:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 .mini-label {
@@ -1012,7 +1003,9 @@ html.js .topbar {
     padding-left: 1.25rem;
   }
 
-  .panel-status li:nth-last-child(-n + 2) {
+  /* The bottom row: the last cell, and the one before it when both share the row */
+  .panel-status li:last-child,
+  .panel-status li:nth-last-child(2):nth-child(odd) {
     border-bottom: 0;
   }
 
@@ -1955,6 +1948,7 @@ html.chart-expanded {
 
 @media (min-width: 40rem) and (max-width: 63.99rem) {
   .dials { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .dials.no-ships { grid-template-columns: repeat(3, minmax(0, 1fr)); } /* v1: no Ships dial (#138) */
 }
 
 .dial {
@@ -2616,15 +2610,6 @@ td.ais-text {
 .reduced-note { color: var(--medium-ink); }
 .all-ok { color: var(--ok-ink); }
 
-/* Several failure lines from one source, listed under its name */
-.failure-lines {
-  margin: 0.2rem 0 0;
-  padding-left: 1.1rem;
-  list-style: disc;
-}
-
-.failures .failure-lines li { display: list-item; }
-
 .corrections .icon,
 .failures .icon,
 .all-ok .icon,
@@ -2696,9 +2681,10 @@ td.ais-text {
   }
 
   .footer-inner > .disclaimer,
-  .footer-inner > .privacy { grid-column: 1; }
+  .footer-inner > .privacy,
+  .footer-inner > .identity { grid-column: 1; }
 
-  .footer-inner > .footer-links { grid-column: 2; grid-row: 1 / span 2; }
+  .footer-inner > .footer-links { grid-column: 2; grid-row: 1 / span 3; }
 
   .footer-inner > .credits { grid-column: 2; }
 }
@@ -2710,9 +2696,13 @@ td.ais-text {
   font-weight: 600;
 }
 
-.privacy {
+.privacy,
+.identity {
   max-width: var(--measure);
 }
+
+/* Who the owner is, one sentence (#138): under the disclaimer and in the About texts */
+.about-identity { font-weight: 600; }
 
 .footer-links {
   display: flex;

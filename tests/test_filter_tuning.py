@@ -312,13 +312,16 @@ def test_the_spec_records_the_owners_decisions_of_24_november():
 
 def test_how_it_works_explains_the_new_rules():
     from haven.config import load_sources
-    from tests.test_method_page import render_method
+    from tests.test_method_page import render_method, section
     from tests.test_render_real import text_of
 
     text = text_of(render_method(sources=load_sources()))
-    assert "weekly port roundups for a week that ended more than 48 hours ago" in text
-    assert "A possible knock-on effect is not enough." in text
-    assert "so is an item about a strike that doesn't affect Rotterdam" in text
-    assert "Within each severity, items with a summary come before headline-only ones." in text
-    assert "describes consequences as possible, never as certain" in text
-    assert "When unsure, it keeps the item." not in text
+    # The same rules in the shorter page of #138 (owner: "shorter", and no "when unsure, keeps").
+    assert "old weekly roundups" in text
+    assert "keeps only items with a clear link to the port" in text
+    assert "a possible knock-on effect is not enough" in text
+    assert "a strike that doesn't affect Rotterdam, is always Low" in text
+    assert "Within a severity, items with a summary come first." in text
+    assert "consequences written as possible, never certain" in text
+    steps = text_of(section(render_method(sources=load_sources()), "steps"))
+    assert "unsure" not in steps  # the filter no longer keeps an item when unsure (#124)

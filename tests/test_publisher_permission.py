@@ -38,7 +38,7 @@ from haven.render import permission_note
 from tests.test_cards_panel import card_of, panel_entries
 from tests.test_feeds import entry, fetcher_for, rss, xml
 from tests.test_method_page import render_method
-from tests.test_render_real import make_brief, news, render_day, text_of
+from tests.test_render_real import make_brief, news, news_card, render_day, text_of
 from tests.test_summarise import FakeClient, answer, item as ect_item
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -379,10 +379,14 @@ def test_the_card_shows_the_note_and_no_impact_block(tmp_path):
     assert "Affects Labour" in text and "Read original" in text
 
 
-def test_the_panel_shows_the_note_next_to_the_summary(tmp_path):
-    [entry_html] = panel_entries(render_day(tmp_path, make_brief(items=[rijnmond_news()])))
+def test_the_panel_shows_the_summary_and_leaves_the_note_to_the_card(tmp_path):
+    """Owner, #138: the note is not in the panel's list; the card right below keeps it, and How it
+    works says it in full, so RTV Rijnmond's request ("make sure it's clear") is still met."""
+    html = render_day(tmp_path, make_brief(items=[rijnmond_news()]))
+    [entry_html] = panel_entries(html)
     text = text_of(entry_html)
-    assert TWO in text and NOTE in text
+    assert TWO in text and NOTE not in text
+    assert NOTE in text_of(news_card(html, 1))
 
 
 def test_an_impact_allowed_by_a_later_permission_is_shown(tmp_path):

@@ -236,16 +236,17 @@ def test_item_not_shown_on_its_day_page_links_only_the_original():
 # --- failures per source ------------------------------------------------------------------
 
 
-def test_failures_are_grouped_per_source_in_first_seen_order():
+def test_failures_are_plain_sentences_in_first_seen_order():
+    """One sentence per failure, each naming its source (#138; was grouped under the source's name)."""
     failures = [
         {"source": "Strike flag", "error": "item 3 of 17 Nov: unreadable state"},
         {"source": "NL Times", "error": "HTTP 503"},
         {"source": "Strike flag", "error": "item 5 of 18 Nov: unreadable match"},
     ]
-    assert render.failure_groups(failures) == [
-        {"source": "Strike flag", "errors": ["item 3 of 17 Nov: unreadable state",
-                                             "item 5 of 18 Nov: unreadable match"]},
-        {"source": "NL Times", "errors": ["HTTP 503"]},
+    assert render.failure_lines(failures) == [
+        "Strike flag: item 3 of 17 Nov: unreadable state.",
+        "NL Times could not be reached today.",
+        "Strike flag: item 5 of 18 Nov: unreadable match.",
     ]
 
 
@@ -394,7 +395,7 @@ def test_headline_only_item_with_a_severity_says_rated_from_headline_only(tmp_pa
                 summary=None, impact=None)
     card = text_of(news_card(render_day(tmp_path, make_brief(items=[item])), 1))
     # The short card (#82, S5): one line instead of a tag, no impact block (spec §7.5).
-    assert "Headline only (paywalled, or the source's terms don't allow a summary) · severity rated from the headline" in card
+    assert "Headline only · severity from the headline" in card  # shortened, #138
     assert "Not enough information" not in card
 
 
@@ -403,15 +404,15 @@ def test_full_item_whose_article_could_not_be_read_is_rated_from_headline_only(t
     # it has a severity but no summary, and keeps access "full".
     item = news("low", "Invented unreadable story", summary=None, impact=None)
     card = text_of(news_card(render_day(tmp_path, make_brief(items=[item])), 1))
-    assert "Headline only (the article couldn't be read) · severity rated from the headline" in card
+    assert "Headline only · article couldn't be read · severity from the headline" in card  # #138
     assert "terms" not in card
 
 
 def test_unrated_headline_only_item_is_not_called_rated(tmp_path):
     item = news(None, "Invented headline-only story", access="headline-only")
     card = text_of(news_card(render_day(tmp_path, make_brief(items=[item])), 1))
-    assert "rated from the headline" not in card
-    assert "the AI step failed for this item" in card
+    assert "from the headline" not in card
+    assert "AI step failed" in card
 
 
 def test_full_item_is_not_called_headline_only(tmp_path):
@@ -433,11 +434,12 @@ def test_item_with_no_published_time_renders(tmp_path):
 # --- ships in v1 -------------------------------------------------------------------------------
 
 
-def test_ships_dial_in_v1_says_no_data_and_that_ships_are_not_collected_yet(tmp_path):
+def test_no_ships_dial_in_v1(tmp_path):
+    """Hidden until ship positions are collected (owner, #138); the legend line under the chart
+    still says they aren't collected yet."""
     html = render_day(tmp_path, make_brief())
-    text = text_of(dial(html, "ships"))
-    assert "No data" in text
-    assert "Ship positions are not collected yet" in text
+    assert 'data-key="ships"' not in html
+    assert "Ship positions are not collected yet" in text_of(html)
     assert "The AIS snapshot failed" not in text_of(html)
 
 
@@ -461,8 +463,8 @@ def test_build_notes_show_counts_summaries_and_grouped_failures(tmp_path):
     assert "Sources checked 9" in text and "Items collected 41" in text
     assert "Kept as relevant 7" in text and "Shown (max 5) 5" in text
     assert "Summaries 7 by Claude Sonnet 5.5, 0 by the backup model" in text  # plain words, #84
-    assert text.count("Strike flag") == 1
-    assert "first problem" in text and "second problem" in text and "HTTP 503" in text
+    assert "Strike flag: first problem." in text and "Strike flag: second problem." in text
+    assert "NL Times could not be reached today." in text and "HTTP 503" not in text  # plain words, #138
 
 
 def test_build_notes_without_summaries_field_still_render(tmp_path):

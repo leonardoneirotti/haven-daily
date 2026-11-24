@@ -8,7 +8,7 @@
 # Fields:
 #   id     what the AI answers (lowercase letters, digits and -; never "none")
 #   label  shown on the chart, and usable as an "affects" location tag
-#   kind   terminal / area / anchorage / lock / barrier / bridge / fairway
+#   kind   terminal / area / anchorage / lock / barrier / bridge / fairway / road
 #   lat, lon  taken ONCE from OpenStreetMap (Overpass, 2 Nov 2026): the centre of the
 #          element named in `osm` (a node's own position). Never from the AI.
 #   side   "right" or "left" of the pin number; "left" where the right is crowded
@@ -404,3 +404,27 @@ lat = 51.8474
 lon = 4.4957
 side = "right"
 osm = "relation/12218249"
+
+# ---------- Roads (the port's motorways, #138) ----------
+# A road is long, so its pin is one point on the motorway itself, where port traffic meets the
+# A4: a junction node on the carriageway (highway=motorway_junction, checked to lie on a way with
+# ref=A15 / ref=A20), read with an Overpass query on 24 Nov 2026. Added because the A15/A20 road
+# works of 23 Nov 2026 got no pin: the list had no roads, so "none" was the only right answer.
+
+[[place]]
+id = "a15"
+label = "A15"
+kind = "road"
+lat = 51.8759
+lon = 4.3618
+side = "right"
+osm = "node/1367173739"
+
+[[place]]
+id = "a20"
+label = "A20"
+kind = "road"
+lat = 51.9246
+lon = 4.3587
+side = "right"
+osm = "node/44421242"

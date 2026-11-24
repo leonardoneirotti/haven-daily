@@ -47,7 +47,8 @@ def test_config_and_sources_md_list_the_same_sources_with_the_same_verdicts():
 
 def test_config_uses_the_same_urls_as_sources_md():
     in_md = {name: urls for name, (verdict, urls) in sources_md().items() if verdict != "drop"}
-    in_config = {s.name: s.urls for s in load_sources() if s.fetched}
+    # Paused sources (#138) keep their URLs in both files, so they count too.
+    in_config = {s.name: s.urls for s in load_sources() if s.verdict != "drop"}
     assert in_config == in_md
 
 

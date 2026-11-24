@@ -118,7 +118,7 @@ def test_road_works_on_the_a15_now_get_a_pin():
 
 @pytest.mark.parametrize("source, error, line", [
     ("NL Times", "https://nltimes.nl/tags/port-rotterdam: HTTP 403", "NL Times could not be reached today."),
-    ("Contargo business news", "https://www.contargo.net/en/news/: timed out after 20 s (tried twice)",
+    ("Contargo business news", "https://www.contargo.net/en/business/business-news: timed out after 20 s (tried twice)",
      "Contargo business news could not be reached today."),
     ("ECT news", "https://www.ect.nl/en/news-feed: HTTP 503 (tried twice)", "ECT news could not be reached today."),
     ("ECT news", "https://www.ect.nl/en/news-feed: robots.txt disallows /en/news-feed for HavenDaily; not fetched",
