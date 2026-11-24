@@ -10,7 +10,10 @@ module only reads them back and applies the rules.
    all its items of the 60 days count, so an older cancellation still cancels it.
 2. **Same strike, several items:** grouped by `strike_id`; the **newest item wins** (latest
    collection day, then latest `published`, then later in the file).
-3. **Level from the newest item** (§5.7 table), only for `affects_rotterdam: true`.
+3. **Level from the newest item** (§5.7 table), only for `affects_rotterdam: true`. **Alert
+   (red) needs the item's own words** (issue #130): its summary, or its headline when it has
+   none, must name a strike and the port or freight transport, and no passenger public
+   transport (`port_or_freight_strike`). Otherwise the strike is capped at Watch (amber).
 4. **Safety rule:** only a confident match (`new` / `same`) can lower a level. An `unsure` item
    that would lower it (or keep it) leaves the strike as it was and is shown next to it; one that
    would **raise** it counts as a strike of its own, shown next to the strike it might be.
@@ -30,7 +33,8 @@ from pathlib import Path
 
 from haven import storage
 from haven.clock import AMSTERDAM
-from haven.filter import age_start
+from haven.config import Place, load_places
+from haven.filter import age_start, off_topic_word
 from haven.summarise import published_day
 
 FAILURE_SOURCE = "Strike flag"
@@ -45,6 +49,40 @@ PLACE = f"From the news of the last {WINDOW_DAYS} days"
 NOTHING_LINKED = "Haven Daily's news sources"  # the source when no item is linked
 UNREADABLE_DETAILS = "strike details unreadable (what kind of report, which strike, or whether it affects Rotterdam); item skipped"
 _RANK = {None: 0, "amber": 1, "red": 2}
+
+# The code check before Alert (issue #130, owner, 24 Nov 2026; spec §5.7 point 4). The words are
+# matched like the filter's off-topic words: any case, whole words, a * at the end for any ending
+# (Dutch and German compounds). The place list's labels also count as "the port".
+# A strike: en, nl, de.
+STRIKE_WORDS = (
+    "strike*", "walkout*", "walk-out*", "work stoppage*", "go-slow*", "industrial action",
+    "labour action", "labor action", "work-to-rule",
+    "staking*", "staken", "staakt", "staakten", "werkonderbreking*", "werkstaking*", "prikactie*",
+    "havenstaking*", "busstaking*", "werk neer", "actie", "acties", "vakbondsactie*", "werkactie*",
+    "FNV Havens", "CNV",  # union names: a sign of labour action (owner, 24 Nov 2026)
+    "streik*", "warnstreik*", "arbeitsniederlegung*",
+)
+# The port, or freight transport serving it (rule E, §5.4): en, nl, de.
+FREIGHT_WORDS = (
+    "port", "ports", "harbour*", "harbor*", "terminal*", "dock", "docks", "docker*", "dockworker*",
+    "dock worker*", "longshore*", "stevedor*", "lasher*", "lashing", "freight*", "cargo*", "container*",
+    "barge*", "inland shipping", "inland waterway*", "shipping", "ship", "ships", "vessel*", "carrier*",
+    "haulier*", "hauler*", "haulage", "trucker*", "truck*", "lorry", "lorries", "goods train*", "pilot*",
+    "pilotage", "towage", "tug", "tugs", "tugboat*", "lock", "locks", "lock keeper*", "bridge staff",
+    "bridge operator*", "customs", "seafarer*", "skipper*",
+    "haven*", "overslag*", "vracht*", "binnenvaart*", "schipper*", "scheepvaart*", "loods", "loodsen",
+    "loodswezen", "sleepdienst*", "sleepboot*", "sleepboten", "douane*", "sluis", "sluizen",
+    "sluiswachter*", "brugwachter*", "havenarbeider*", "sjorder*", "goederen*", "rederij*",
+    "transporteur*", "FNV Havens",
+    "hafen*", "güter*", "binnenschiff*", "lotsen",
+)
+# Passenger public transport: any of these and the strike can't be confirmed as a freight one.
+PASSENGER_WORDS = (
+    "public transport", "openbaar vervoer", "ov", "bus", "buses", "busses", "bussen", "busstaking*",
+    "buschauffeur*", "busvervoer", "busdienst*", "tram", "trams", "tramstaking*", "metro", "metros",
+    "metrostaking*", "streekvervoer", "stadsvervoer", "reizigers", "reizigersvervoer", "commuter*",
+    "RET", "HTM", "Arriva", "Qbuzz", "Connexxion", "NS",
+)
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 
@@ -63,6 +101,7 @@ class _Report:
     match: str
     strike_id: str | None
     as_of: date  # its published day, else the day it was collected
+    alert_ok: bool = True  # its own words confirm a port or freight strike (#130)
 
 
 @dataclass(frozen=True)
@@ -93,16 +132,18 @@ class StrikeResult:
 
 
 def flag_from_items(days: list[tuple[date, list]], today: date, sources=(),
-                    ai_unavailable: bool = False) -> StrikeFlag:
+                    ai_unavailable: bool = False, places: tuple[Place, ...] | None = None) -> StrikeFlag:
     """The strike flag for `today` from (collection day, records) pairs, in any order.
 
     `days` must include today's records (not stored yet when the runner calls this) and the
     stored days up to `REACH_DAYS` back; older days are ignored. `sources` gives source names.
+    `places` (default: `config/places.toml`) are the place names that count as the port.
     """
     if ai_unavailable:
         return StrikeFlag(None, None, ai_unavailable=True)
+    places = load_places() if places is None else places
     failures: list[dict] = []
-    reports = _reports(days, today, failures)
+    reports = _reports(days, today, failures, places)
     names = {source.id: source.name for source in sources}
 
     groups: dict[str, list[_Report]] = {}
@@ -153,7 +194,16 @@ def flag_from_items(days: list[tuple[date, list]], today: date, sources=(),
 
 
 def _judge(report: _Report, today: date) -> _Judged:
-    """A strike's level and text from its newest item (§5.7 table)."""
+    """A strike's level and text from its newest item (§5.7 table), never Alert unless the
+    item's own words confirm a port or freight strike (#130): then Watch, with the same text."""
+    result = _judge_by_table(report, today)
+    if result.level == "red" and not report.alert_ok:
+        return _Judged("amber", result.value, result.deciding)
+    return result
+
+
+def _judge_by_table(report: _Report, today: date) -> _Judged:
+    """The §5.7 table alone."""
     def judged(level, text):
         return _Judged(level, _with_location(text, report) if level else None, report)
 
@@ -216,7 +266,26 @@ def _shown(report: _Report, role: str, today: date, names: dict) -> dict:
 # --- reading the records ---------------------------------------------------------------
 
 
-def _reports(days, today: date, failures: list[dict]) -> list[_Report]:
+def port_or_freight_strike(record: dict, places: tuple[Place, ...] = ()) -> bool:
+    """Do the item's own words confirm a strike at the port or on freight transport serving it?
+
+    The words are its summary, or its headline when it has no summary (headline-only items, whose
+    headline alone may raise the flag, §2.1). They must name a strike and the port or freight
+    transport (a word of `FREIGHT_WORDS` or a place name), and no passenger public transport:
+    "te hoge vrachtwagens en ov-staking" names trucks, but its strike is a public-transport one
+    (issue #130). Nothing here asks the AI; it checks the AI's `affects_rotterdam`.
+    """
+    summary = record.get("summary")
+    text = summary if isinstance(summary, str) and summary.strip() else record.get("headline")
+    if not isinstance(text, str) or not text.strip():
+        return False
+    port = FREIGHT_WORDS + tuple(place.label for place in places)
+    return (off_topic_word(text, STRIKE_WORDS) is not None
+            and off_topic_word(text, port) is not None
+            and off_topic_word(text, PASSENGER_WORDS) is None)
+
+
+def _reports(days, today: date, failures: list[dict], places: tuple[Place, ...] = ()) -> list[_Report]:
     reports = []
     for day, records in days:
         if not 0 <= (today - day).days <= REACH_DAYS:
@@ -226,13 +295,14 @@ def _reports(days, today: date, failures: list[dict]) -> list[_Report]:
                 continue
             if not (isinstance(record.get("filter"), dict) and record["filter"].get("kept") is True):
                 continue
-            report = _report(record, day, position, failures)
+            report = _report(record, day, position, failures, places)
             if report is not None:
                 reports.append(report)
     return reports
 
 
-def _report(record: dict, day: date, position: int, failures: list[dict]) -> _Report | None:
+def _report(record: dict, day: date, position: int, failures: list[dict],
+            places: tuple[Place, ...] = ()) -> _Report | None:
     details = record["strike"]
     where = f"item {position + 1} of {day.isoformat()}"
     state, match = details.get("state"), details.get("match")
@@ -257,6 +327,7 @@ def _report(record: dict, day: date, position: int, failures: list[dict]) -> _Re
         match=match,
         strike_id=strike_id if isinstance(strike_id, str) and strike_id else None,
         as_of=published_day(record.get("published")) or day,
+        alert_ok=port_or_freight_strike(record, places),
     )
 
 

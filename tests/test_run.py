@@ -302,7 +302,10 @@ def test_known_strikes_come_from_the_stored_items_of_the_last_14_days(tmp_path):
 def test_strike_flag_reads_todays_items_and_the_stored_days(tmp_path):
     today_strike = {"state": "announced", "location": "Maasvlakte", "affects_rotterdam": True,
                     "start": "2026-11-20", "end": "2026-11-20", "match": "new", "strike_id": "strike-2026-11-20-1"}
-    fake = Fake(summary_ai_for={HEADLINE_ONLY.url: summary_ai(3, summary=None, strike=today_strike)})
+    # A port strike headline: only that can turn the flag red (#130).
+    port_strike = replace(HEADLINE_ONLY, headline="Dockers strike at ECT Delta on 20 November")
+    fake = Fake(collected=[AUTO, AI_KEPT, AI_DROPPED, RULE_DROPPED, port_strike],
+                summary_ai_for={HEADLINE_ONLY.url: summary_ai(3, summary=None, strike=today_strike)})
     go(tmp_path, fake)
     strike = storage.read("briefs", TODAY, tmp_path)["status"][2]
     assert strike["key"] == "strike"

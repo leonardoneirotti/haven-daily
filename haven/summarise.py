@@ -202,7 +202,9 @@ or go-slow, also when announced, called off or settled). Otherwise:
 - state: "announced" (planned or called), "ongoing" (happening now) or "cancelled" (called off, \
 postponed indefinitely, or settled);
 - location: where, in a few words (for example "ECT Delta, Maasvlakte");
-- affects_rotterdam: true if it affects the Port of Rotterdam or freight to and from it;
+- affects_rotterdam: true if it affects the Port of Rotterdam or freight to and from it. A strike in \
+passenger public transport (bus, tram, metro, regional or city transport, passenger trains; Dutch "ov") \
+is false, even in Rotterdam or when it slows traffic near the port;
 - start_phrase and end_phrase: copy the words that say when it starts and when it ends, \
 exactly as written in the item (for example "on Thursday", "tomorrow", "5 November", "from 5 to 7 \
 November"). Do not turn them into a date and do not change them: the code works out the date. For \
