@@ -166,7 +166,8 @@ def test_the_batch_asks_for_it_too_and_keeps_it():
 
 
 def translated(**fields):
-    return news("low", DUTCH, source="PIN notices to shipping", language="nl", headline_en=ENGLISH, **fields)
+    fields.setdefault("headline_en", ENGLISH)
+    return news("low", DUTCH, source="PIN notices to shipping", language="nl", **fields)
 
 
 def test_the_card_shows_the_english_headline_and_the_dutch_original_below_it(tmp_path):

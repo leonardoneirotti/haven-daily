@@ -20,7 +20,7 @@ VERDICTS = ("use", "headline-only", "drop")
 ACCESS_TYPES = ("rss", "html")
 
 _SOURCE_FIELDS = {"id", "name", "verdict", "urls", "access", "language", "auto_keep", "note", "why", "home",
-                  "permission"}
+                  "permission", "english_headline"}
 _PERMISSION_FIELDS = ("file", "granted", "max_sentences", "impact")
 _PERMISSION_FILE = re.compile(r"^docs/permissions/[\w.-]+\.md$")
 _LANGUAGE = re.compile(r"^[a-z]{2}$")
@@ -69,6 +69,8 @@ class Source:
     why: str | None = None  # one public line on the Method page: why it is headline-only or dropped (#24)
     home: str | None = None  # the source's normal public page, linked from its name on the Method page (PR #76)
     permission: Permission | None = None  # written permission that lifts a headline-only source (#107)
+    # The AI writes an English headline for its Dutch items (#134). Only for a source it summarises.
+    english_headline: bool = False
 
     @property
     def effective_verdict(self) -> str:
@@ -429,6 +431,12 @@ def _check_source(file: str, number: int, entry: dict) -> Source:
             fail("a permission only lifts a headline-only source (its own verdict stays headline-only)")
         permission = _check_permission(entry["permission"], fail)
 
+    english_headline = entry.get("english_headline", False)
+    if not isinstance(english_headline, bool):
+        fail("'english_headline' must be true or false")
+    if english_headline and (verdict != "use" and not (verdict == "headline-only" and permission is not None)):
+        fail("'english_headline' is only for a source that is summarised (verdict 'use', or written permission)")
+
     return Source(
         id=entry["id"],
         name=entry["name"],
@@ -441,6 +449,7 @@ def _check_source(file: str, number: int, entry: dict) -> Source:
         why=why,
         home=home,
         permission=permission,
+        english_headline=english_headline,
     )
 
 
