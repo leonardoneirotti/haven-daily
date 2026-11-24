@@ -52,7 +52,7 @@ def test_the_laptop_chart_keeps_mains_size_full_width_and_the_window_height_minu
     assert "height: clamp(36rem, calc(100vh - 5.5rem), 62rem);" in stage
     assert "width:" not in stage and "margin-inline" not in stage  # full width
     assert "border-radius" not in stage and "box-shadow" not in stage  # no frame at the window's edges
-    assert "80rem" not in CSS and "64rem);" not in stage
+    assert "min(80rem" not in CSS and "64rem);" not in stage
 
 
 def test_the_phone_chart_is_unchanged():
@@ -229,4 +229,4 @@ def test_the_browser_check_has_a_row_for(name):
 
 def test_the_spec_describes_the_upgrades():
     assert "Full screen" in SPEC and "pin card" in SPEC.lower()
-    assert "option E" in SPEC and "80rem wide, centred" not in SPEC  # the laptop chart: main's size again
+    assert "option E" in SPEC and "**at most 80rem wide, centred in a rounded frame**" not in SPEC  # main's size again

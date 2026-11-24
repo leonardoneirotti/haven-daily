@@ -759,16 +759,11 @@ html.js .topbar {
 }
 
 /* Wide screens: the chart fills the first screen and the panel floats over the open sea.
-   At most 80rem wide, centred in a rounded frame, as tall as the window minus the top bar (owner's
-   choice, 24 Nov 2026, #134; was the full window width and 100vh - 5.5rem, 36-62rem). */
+   Full width (owner's option E, 24 Nov 2026, #134: a chart at most 80rem wide hid more pin pairs
+   at the opening view, so the laptop chart kept this size). */
 @media (min-width: 64rem) {
   .stage {
-    width: min(80rem, calc(100% - 2 * var(--gutter)));
-    height: clamp(40rem, calc(100vh - var(--topbar-h)), 64rem);
-    margin-inline: auto;
-    overflow: hidden;
-    border-radius: var(--radius);
-    box-shadow: 0 0 0 1px var(--rule);
+    height: clamp(36rem, calc(100vh - 5.5rem), 62rem);
   }
 
   .chart,

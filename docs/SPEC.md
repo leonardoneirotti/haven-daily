@@ -1149,7 +1149,7 @@ Principle: **fact vs interpretation in two typefaces** — the impact is the onl
 ### 7.4 Layout
 
 **Wide screens (≥ 64rem): the "stage"**
-- The chart fills the first screen: height `clamp(40rem, 100vh − var(--topbar-h), 64rem)`, **at most 80rem wide, centred in a rounded frame** (`width: min(80rem, 100% − 2 × gutter)`, the `--radius` corners, a 1px rule; *owner's choice, 24 Nov 2026, #134: taller and less wide; was the full window width and `clamp(36rem, 100vh − 5.5rem, 62rem)`*). On a 1440 × 900 laptop: 1280 × 844 (was 1440 × 812). Phones unchanged. **Except on a day with nothing on the chart** (see "First screen" below).
+- The chart fills the first screen: full width, height `clamp(36rem, 100vh − 5.5rem, 62rem)` (on a 1440 × 900 laptop: 1440 × 812). *(#134: the owner first chose a taller chart at most 80rem wide, centred in a rounded frame, 1280 × 844 on that laptop. It hid 36 more pin pairs at the opening view (§8.5), so the owner went back to this size: option E, 24 Nov 2026. The rounded frame went too: at full width its corners would only clip the chart at the window's edges.)* **Except on a day with nothing on the chart** (see "First screen" below).
 - **News panel floats over the chart's western side (open North Sea)**: `position:absolute; top/bottom/left: 1rem; width: 25rem`, background white at 97 % (no backdrop blur — too slow), 1px rule border, 14px corners, soft shadow. On phones the panel is white too, edge to edge.
   - Panel head: kicker "MORNING BRIEF · NO. 003" (small capitals), weekday huge (Manrope 800, ~2.9rem), date below, publication line.
   - When the list is longer than the panel, a soft shade at the edge that has more shows that it scrolls (#102).
