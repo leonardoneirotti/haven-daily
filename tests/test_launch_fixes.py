@@ -423,16 +423,14 @@ def test_a_real_page_has_no_strip_under_the_header_and_a_sample_page_keeps_its_n
 CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 
 
-def test_the_laptop_chart_is_the_window_height_minus_the_top_bar():
-    """Owner, review of PR #139: the window minus the top bar (56 px and its 1 px border): 843 px on
-    a 1440 x 900 laptop (was 812), so the whole chart, its buttons, legend, scale and credit, and the
-    panel's last link are on screen when the page opens (measured in headless Edge, PR #139)."""
+def test_the_laptop_chart_keeps_mains_height():
+    """Owner, option A of the PR #139 review: main's height (812 px at 1440 x 900). A taller chart has a
+    higher minimum zoom (the map sheet's north-south extent is fixed), so more pin pairs were hidden
+    at the opening view. With the one-liner gone the whole chart is on screen when the page opens
+    (chart 57..869 px at 1440 x 900, measured in headless Edge, PR #139)."""
     from test_map_upgrades import wide_rules
     stage = wide_rules(".stage")
-    assert "height: clamp(36rem, calc(100vh - var(--topbar-h) - 1px), 62rem);" in stage
-    assert re.search(r"--topbar-h:\s*3\.5rem;", CSS)  # the bar the chart sits under
-    topbar = re.search(r"(?m)^\.topbar \{(.*?)^\}", CSS, flags=re.S).group(1)
-    assert "border-bottom: 1px solid" in topbar  # the 1px the height also leaves room for
+    assert "height: clamp(36rem, calc(100vh - 5.5rem), 62rem);" in stage
     assert "width:" not in stage and "margin-inline" not in stage  # still full width
 
 
