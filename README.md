@@ -2,6 +2,8 @@
 
 A public web page, updated every morning, that tells a logistics planner what is affecting the Port of Rotterdam today and what it means for them. Personal, unofficial portfolio project. See `CLAUDE.md` for all decisions.
 
+By Leonardo Neirotti · Second-year International Business student (Supply Chain Management) at Rotterdam University of Applied Sciences.
+
 ## What exists so far
 
 The **site renderer**: Python turns one JSON "brief" per day into static HTML pages. Each page opens on a chart of the port with that morning's ships and the day's numbered items. The collector, filter, AI summaries and AIS snapshot (build plan steps 1–7 and 11) come later and only need to produce brief files in the same format.
@@ -27,7 +29,7 @@ haven/publish.py          commits only today's new data/ files to main as github
 haven/compare.py          Haiku 5.5 vs Sonnet 5.5 on the same kept items, side by side; one model through the batch for the re-run (run by hand; docs/model-comparison.md)
 config/sources.toml       every source from SOURCES.md: verdict, URLs, RSS/HTML, language, auto-keep, public `home` page and `why` (Method page)
 config/filter.toml        off-topic word lists for the relevance filter (small starter lists, tuned after the first runs)
-config/places.toml        the 41 places an item can be pinned to, coordinates taken once from OpenStreetMap (each with its OSM id)
+config/places.toml        the 43 places an item can be pinned to, coordinates taken once from OpenStreetMap (each with its OSM id)
 config/tags.toml          the 16 "affects" tags, each with a one-line meaning sent to the AI (place labels count as tags too)
 config/rhine.toml         the Kaub thresholds in cm (Alert ≤ 80 or > 640, Watch ≤ 150 or > 460), each with its public source
 config/site.toml          the site's own addresses (base URL, LinkedIn, repository) and its social preview image (og:image)

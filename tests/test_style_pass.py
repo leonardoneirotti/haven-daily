@@ -235,12 +235,13 @@ def test_the_header_holds_the_brand_and_the_navigation_only(site):
         assert not header.find(class_="tagline") and not header.find(class_="sample-note"), page.name
 
 
-def test_the_one_liner_and_the_sample_note_follow_right_under_it(site):
+def test_the_sample_note_follows_right_under_the_header(site):
+    # The one-liner left the page in #138 (owner's review of PR #139); the sample note stays.
     for page in pages(site):
         header = soup_of(page).find("header", class_="topbar")
         masthead = header.find_next_sibling()
         assert "masthead" in masthead.get("class", []), page.name
-        assert masthead.find("p", class_="tagline").get_text(strip=True) == render.SITE["tagline"]
+        assert masthead.find("p", class_="tagline") is None, page.name
         assert masthead.find("p", class_="sample-note"), f"{page.name}: sample site, so marked (rule 10)"
 
 

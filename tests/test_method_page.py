@@ -276,14 +276,14 @@ def test_the_no_article_text_rule_is_stated(about):
 def test_severity_rules_follow_the_spec(about):
     text = text_of(section(about, "severity"))
     assert "already over" in text  # Low, spec §2.1 (#67)
-    assert "severity rated from the headline" in text  # spec §2.1, the card's words since #82
+    assert "severity from the headline" in text  # spec §2.1, the card's words (shortened, #138)
     assert "Not enough information" in text
 
 
-def test_the_chart_says_lines_are_decoration_and_ships_are_not_collected_yet(about):
+def test_the_chart_says_lines_are_decoration_and_nothing_about_ships_in_v1(about):
     text = text_of(section(about, "chart"))
     assert "decoration" in text and "not depth contours" in text
-    assert "Ship positions are not collected yet" in text
+    assert "Ship positions are not collected yet" not in text  # nothing about ships until v2 (#138)
     assert "ship positions" not in text_of(section(about, "steps")).lower()
 
 

@@ -62,19 +62,20 @@
     </div>
   </div>
 </header>
-{# What this is, right under the brand on every page (S1, #86): the owner's words, spec §7.8. Outside
-   the header bar since #102: the bar slides away on scrolling and comes back; these scroll with the page. #}
+{# The sample-data note (hard rule 10), right under the header bar. The owner's one-liner was here too
+   until #138 (review of PR #139): it is no longer on the page, only in the description that link
+   previews and search engines show (`site.description`) and on the social preview card. #}
+{% if sample %}
 <div class="masthead">
-  <p class="tagline">{{ site.tagline }}</p>
-  {% if sample %}
   <p class="sample-note"><strong>Sample data.</strong> The ships, news and readings on this page are invented to preview the design.</p>
-  {% endif %}
 </div>
+{% endif %}
 {% block main %}{% endblock %}
 <footer class="site-footer">
   <div class="wrap footer-inner">
     <p class="disclaimer">Personal, unofficial project by {{ site.author }}. Not affiliated with the Port of Rotterdam Authority. AI-generated summaries — always check the original source.</p>
     <p class="privacy">Privacy: no cookies, no tracking, nothing loaded from other sites. The site is hosted on GitHub Pages, which logs visitors' IP addresses for security (<a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy Statement</a>).</p>
+    <p class="identity">{{ site.author }} · {{ site.identity }}</p>
     <ul class="footer-links">
       <li><a href="{{ root }}about.html">How it works</a></li>
       <li><a href="{{ root }}archive.html">Archive</a></li>

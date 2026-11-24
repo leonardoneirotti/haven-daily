@@ -37,9 +37,9 @@
   // past the sheet, and pans past its edge only on the open-sea side under the panel
   // (below). On wide screens the news panel floats over its western side, so the chart
   // opens on the whole port in the space to the right of the panel. Phones open on the
-  // western port. Both move to show the day's pins (#85). On a day with nothing
-  // on the chart (#81) the panel sits beside or above a short strip instead of over
-  // it; panelCover() is then 0, so the strip simply fits the same views.
+  // western port. Both move to show the day's pins (#85). On a phone, a day with nothing
+  // on the chart (#81) gets a short strip below the panel; panelCover() is 0 there, so the
+  // strip simply fits the same views. Wide screens look the same on every day (#138).
   var bbox = basemap.bbox; // south, west, north, east
   var sheet = L.latLngBounds([bbox[0], bbox[1]], [bbox[2], bbox[3]]);
   var panel = document.querySelector(".panel");

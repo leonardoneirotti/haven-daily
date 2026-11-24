@@ -105,16 +105,16 @@ def test_day_with_ships_but_no_pins_keeps_the_full_chart(tmp_path):
     assert "stage-empty" not in stage_tag(html)
 
 
-def test_the_stylesheet_makes_the_empty_chart_a_strip():
-    """The class is used: some .stage-empty rule sets the chart's height (exact sizes: spec §7.4)."""
+def test_the_stylesheet_makes_the_empty_chart_a_strip_on_phones():
+    """The class is used: some .stage-empty rule sets the chart's height on phones (spec §7.4). Wide
+    screens keep the full chart on every day (owner, before merging PR #139, #138)."""
     assert any(".stage-empty" in sel and ".chart-map" in sel and re.search(r"(^|;)\s*height\s*:", body)
                for sel, body in css_rules(CSS))
 
 
-def test_the_empty_strip_is_not_an_overlay_on_wide_screens():
-    """On a wide screen the panel of an empty day is in the page flow, not floating over the chart."""
-    assert any(".stage-empty" in sel and ".panel" in sel and re.search(r"position\s*:\s*(static|relative)", body)
-               for sel, body in css_rules(CSS))
+def test_no_rule_takes_the_panel_of_an_empty_day_out_of_its_float():
+    """Since #138 the panel floats over the map on every day, empty ones too (owner, before merging #139)."""
+    assert not any(".stage-empty" in sel and ".panel" in sel for sel, body in css_rules(CSS))
 
 
 # --- M2: the brief comes before the chart ----------------------------------------------------
@@ -128,26 +128,21 @@ def test_panel_head_items_and_status_come_before_the_chart(tmp_path, items):
         assert html.index(part) < chart, part
 
 
-def test_phones_no_longer_hide_the_panel_item_list():
-    """Only an empty day on a wide screen hides it (the full brief follows right below the strip)."""
+def test_no_rule_hides_the_panel_item_list():
+    """Not on phones (#81), and since #138 not on an empty day on a wide screen either."""
     for sel, body in css_rules(CSS):
-        if ".panel-items" in sel and re.search(r"display\s*:\s*none", body):
-            assert ".stage-empty" in sel, sel
+        assert not (".panel-items" in sel and re.search(r"display\s*:\s*none", body)), sel
 
 
 # --- S4: ships note in v1, failure note in v2 ------------------------------------------------
 
 
 @pytest.mark.parametrize("items", [[], [news("medium", map=dict(PLACE))]])
-def test_v1_has_no_note_box_over_the_chart(tmp_path, items):
+def test_v1_has_no_note_box_over_the_chart_and_no_ships_line(tmp_path, items):
+    # Since #138 (owner's review of PR #139) v1 says nothing about ships until they are collected.
     html = render_day(tmp_path, make_brief(items=items))
     assert "chart-note" not in html
-    assert SHIPS_LATER_LINE in text_of(legend(html))
-
-
-def test_v1_ships_line_is_grey_text_in_the_legend(tmp_path):
-    html = legend(render_day(tmp_path, make_brief()))
-    assert re.search(r'<span class="legend-note">\s*' + re.escape(SHIPS_LATER_LINE), html)
+    assert SHIPS_LATER_LINE not in text_of(legend(html))
 
 
 def test_v1_day_with_ships_has_no_ships_line(tmp_path):

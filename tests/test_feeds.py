@@ -6,6 +6,7 @@ repo). The network is a fake; no test touches the internet or really waits.
 """
 
 import json
+from dataclasses import replace
 from datetime import date, datetime, timezone
 
 import pytest
@@ -188,7 +189,8 @@ def test_use_source_that_opts_out_of_ai_becomes_headline_only_with_a_note():
 
 # --- the configured RSS sources ----------------------------------------------------------
 
-RSS_SOURCES = [s for s in load_sources() if s.fetched and s.access == "rss"]
+# Paused sources (#138) are switched on here, so their feed code stays tested.
+RSS_SOURCES = [replace(s, enabled=True) for s in load_sources() if s.verdict != "drop" and s.access == "rss"]
 
 
 def test_the_five_rss_sources_of_issue_9_are_configured():

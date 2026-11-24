@@ -153,7 +153,7 @@ def collect_feed(source: Source, fetcher: Fetcher, previous_run: datetime | None
     only used for the PIN gap check. None = no previous run known, so no gap check.
     """
     if not source.fetched:
-        raise ValueError(f"{source.id}: verdict 'drop' sources are never fetched")
+        raise ValueError(f"{source.id}: dropped and paused sources are never fetched")
     if source.access != "rss":
         raise ValueError(f"{source.id}: access is {source.access!r}; collect_feed reads only 'rss' sources")
 

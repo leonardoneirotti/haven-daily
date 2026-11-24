@@ -11,6 +11,9 @@
 {% block main %}
 {% set items = brief["items"] %}
 {% set ships = brief.ships %}
+{# The Ships dial waits for v2 (#138): shown once ship positions are collected (a missing
+   snapshot is then a failure, hard rule 9), or on a day that has ships (the samples). #}
+{% set show_ships = ships or ais_snapshot_built %}
 <main id="main">
   {# The stage. The brief comes first: the panel (date, items, port status), then the chart as its
      index. On wide screens the panel floats over the chart's western side (open sea). On a day with
@@ -41,8 +44,8 @@
               <span class="panel-title">{{ item.shown_headline }}</span>
               {% if item.headline_en %}<span class="panel-translated">Headline translated by AI</span>{% endif %}
               {% if item.headline_note %}<span class="panel-summary is-empty">{{ item.headline_note }}</span>
-              {% else %}<span class="panel-summary">{{ item.summary }}</span>
-              {% if item.permission_note %}<span class="panel-permission">{{ item.permission_note }}</span>{% endif %}{% endif %}
+              {% else %}<span class="panel-summary">{{ item.summary }}</span>{% endif %}
+              {# No permission note in this list (owner, #138): it stays on the item's card. #}
             </span>
           </a>
         </li>
@@ -60,10 +63,12 @@
           {% if ind.meaning %}<span class="mini-meaning">{{ ind.meaning }}</span>{% endif %}
         </li>
         {% endfor %}
+        {% if show_ships %}
         <li>
           <span class="mini-label">{{ m.icon("ship") }}Ships in the port area</span>
           <span class="mini-value">{% if ships %}{{ ships.count }}{% else %}No data{% endif %}</span>
         </li>
+        {% endif %}
       </ul>
       <a class="panel-more" href="#brief">{{ m.icon("arrow-down") }}Full brief and port status</a>
     </div>
@@ -108,8 +113,7 @@
         {# How to move and zoom (#111): a mouse or touchpad, or a touch screen (style.css picks one). #}
         <span class="legend-how needs-map"><span class="how-fine">Drag to move · <span data-zoom-key>Ctrl</span> + scroll or pinch to zoom</span><span class="how-touch">Drag to move · pinch to zoom</span></span>
         {% if brief.chart_empty %}<span class="legend-note">No item has a place on the chart {% if is_latest %}today{% else %}on this day{% endif %}.</span>{% endif %}
-        {# v1: ships are not built yet (#31), so this is expected, not a failure: grey text, no box. #}
-        {% if not ships and not ais_snapshot_built %}<span class="legend-note">Ship positions are not collected yet.</span>{% endif %}
+        {# v1: nothing about ships at all until they are collected (owner, #138 review of PR #139). #}
       </div>
     </div>
   </section>
@@ -142,10 +146,11 @@
         <h2 id="status-title">Port status</h2>
         <a href="{{ root }}about.html#thresholds">How the colours are set</a>
       </div>
-      <ul class="dials">
+      <ul class="dials{% if not show_ships %} no-ships{% endif %}">
         {% for ind in brief.status %}
         {{ m.dial(ind, root) }}
         {% endfor %}
+        {% if show_ships %}
         <li class="dial" data-key="ships">
           <p class="dial-label">{{ m.icon("ship") }}Ships in the port area</p>
           <div class="dial-reading">
@@ -169,6 +174,7 @@
           <p class="dial-meta"><span>Snapshot <time datetime="{{ ships.snapshot_start }}">{{ ships.snapshot_start | clock }}</time>–<time datetime="{{ ships.snapshot_end }}">{{ ships.snapshot_end | clock }}</time></span><span>{{ ships.source_name }}</span></p>
           {% endif %}
         </li>
+        {% endif %}
       </ul>
     </section>
   </div>
@@ -180,6 +186,7 @@
     <h2 id="about-title">About this project</h2>
     <div class="about-body">
       <p>{{ site.about }}</p>
+      <p class="about-identity">{{ site.author }} · {{ site.identity }}</p>
       {# What the logo says (owner's pick, PR #120), with the way to the flag key. #}
       <p class="about-flags">Our logo spells H·D, Haven Daily, in <a href="{{ root }}about.html#flags">maritime signal flags</a>.</p>
       <ul class="about-links">
@@ -236,12 +243,12 @@
         {# Who wrote the summaries, by model name (design review S8, #84; render.summaries_line). #}
         {% if brief.summaries_line %}<div class="stat-text"><dt>Summaries</dt><dd>{{ brief.summaries_line }}</dd></div>{% endif %}
       </dl>
-      {% if brief.failure_groups %}
+      {# One plain sentence per failure (#138, render.failure_lines); the stored brief keeps the
+         technical line (address, HTTP status) for the owner. #}
+      {% if brief.failure_lines %}
       <ul class="failures">
-        {% for group in brief.failure_groups %}
-        <li>{{ m.icon("triangle-alert") }}<span><strong>{{ group.source }}:</strong>
-          {%- if group.errors | length == 1 %} {{ group.errors[0] }}
-          {%- else %}<ul class="failure-lines">{% for error in group.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}</span></li>
+        {% for line in brief.failure_lines %}
+        <li>{{ m.icon("triangle-alert") }}<span>{{ line }}</span></li>
         {% endfor %}
       </ul>
       {% else %}

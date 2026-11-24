@@ -25,10 +25,10 @@ ROOT = Path(__file__).resolve().parent.parent
 CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 MAP_JS = (ROOT / "static" / "map.js").read_text(encoding="utf-8")
 
-HEADLINE_ONLY_LINE = ("Headline only (paywalled, or the source's terms don't allow a summary) · "
-                      "severity rated from the headline")
-UNREAD_LINE = "Headline only (the article couldn't be read) · severity rated from the headline"
-UNRATED_LINE = "Headline only (the AI step failed for this item) · no summary, impact or severity"
+# Shortened by the owner (option A, #138).
+HEADLINE_ONLY_LINE = "Headline only · severity from the headline"
+UNREAD_LINE = "Headline only · article couldn't be read · severity from the headline"
+UNRATED_LINE = "Headline only · AI step failed · no summary or severity"
 INTRO_SENTENCE = '"Show on chart" moves the chart above the brief.'
 
 

@@ -84,7 +84,7 @@ from haven.clock import AMSTERDAM
 from haven.config import Permission, Place, Source, Tag, load_places, load_sources, load_tag_list
 from haven.feeds import Item
 from haven.filter import BREAKER, NO_KEY, notice_ended
-from haven.places import pick
+from haven.places import pick, prefer_specific
 
 __all__ = ["BATCH_WAIT", "BREAKER", "CANCEL_WAIT", "FALLBACK_MODEL", "SUMMARY_MODEL", "BatchRun", "SummaryResult",
            "brief_item", "finish_batch", "known_strikes", "phrase_in", "published_day", "resolve_phrase",
@@ -191,7 +191,9 @@ it, each at the time the notice was published. So a measure that a De-activate n
 is already over.
 
 place: the id of the one place below that the item is mainly about, or "none" if it is about \
-none of them or about the port as a whole. Only ids from this list:
+none of them or about the port as a whole. Prefer the most specific place the item names (a \
+terminal or port area over a road): pick a road only when the item names no more specific place \
+on this list. Only ids from this list:
 {places}
 
 tags: up to 5 of these for what the item affects, most important first. Each tag only for what \
@@ -722,7 +724,9 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
     source_text = item.headline if headline_only else f"{item.headline}\n{item.article_text}"
     strike = _strike(data["strike"], source_text, known_ids, today, published_day(item.published), notes)
 
-    picked = pick(data["place"], data["tags"], places=places, tags_list=tags)
+    # A road is a fallback: a more specific place the item names wins (#138, owner's review of #139).
+    place = prefer_specific(data["place"], f"{item.headline}\n{summary or ''}", places)
+    picked = pick(place, data["tags"], places=places, tags_list=tags)
     ai = {"severity": data["severity"], "summary": summary, "impact": impact, **picked.record(),
           "strike": strike, "written_by": None}
     if impact_left_out:  # only then: the page shows no impact block, not "Not enough information"

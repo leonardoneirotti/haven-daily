@@ -6,6 +6,7 @@ third-party article text in the repo). The network is a fake; no test touches
 the internet or really waits.
 """
 
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -52,8 +53,9 @@ def doc(inner):
 
 
 def real(source_id):
-    """The source as configured in config/sources.toml (so ids and URLs stay real)."""
-    return next(s for s in load_sources() if s.id == source_id)
+    """The source as configured in config/sources.toml (so ids and URLs stay real). A paused source
+    (NL Times since #138) is switched on here: its parser stays tested, ready to be switched back on."""
+    return replace(next(s for s in load_sources() if s.id == source_id), enabled=True)
 
 
 def with_verdict(src, verdict):
@@ -585,7 +587,7 @@ def test_item_article_text_defaults_to_none_and_stays_out_of_the_record():
 
 
 def test_every_html_source_in_config_has_a_parser():
-    html_sources = {s.id for s in load_sources() if s.fetched and s.access == "html"}
+    html_sources = {s.id for s in load_sources() if s.verdict != "drop" and s.access == "html"}  # paused too
     assert html_sources == set(pages.PARSERS)
 
 

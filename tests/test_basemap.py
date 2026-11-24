@@ -148,10 +148,10 @@ def test_tanks_decode_to_points_on_the_sheet_with_a_radius(basemap):
         assert 0 <= x <= 12_200 and 0 <= y <= 4_200 and 4 <= values[i + 2] < 200
 
 
-# ---------- The 41 places ----------
+# ---------- The 43 places ----------
 
-def test_there_are_41_places():
-    assert len(PLACES) == 41
+def test_there_are_43_places():
+    assert len(PLACES) == 43  # 41, plus the A15 and A20 since #138
 
 
 @pytest.mark.parametrize("place", PLACES, ids=[p["id"] for p in PLACES])

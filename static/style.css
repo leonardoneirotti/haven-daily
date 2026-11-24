@@ -688,7 +688,7 @@ html.js .topbar {
   }
 }
 
-/* What this is (S1, #86), right under the bar, and the sample-data note (hard rule 10). */
+/* The sample-data note (hard rule 10), right under the bar. (The one-liner left the page, #138.) */
 .masthead {
   display: flex;
   flex-wrap: wrap;
@@ -698,12 +698,6 @@ html.js .topbar {
   max-width: calc(var(--page-width) + 2 * var(--gutter));
   margin-inline: auto;
   padding: 0.55rem max(var(--gutter), env(safe-area-inset-right, 0px)) 0.6rem max(var(--gutter), env(safe-area-inset-left, 0px));
-}
-
-.tagline {
-  color: var(--ink-2);
-  font-size: 0.875rem;
-  line-height: 1.4;
 }
 
 .sample-note {
@@ -716,11 +710,6 @@ html.js .topbar {
 }
 
 @media (max-width: 40rem) {
-  .tagline,
-  .sample-note {
-    font-size: 0.8125rem;
-  }
-
   .sample-note {
     border-radius: 10px;
   }
@@ -760,7 +749,10 @@ html.js .topbar {
 
 /* Wide screens: the chart fills the first screen and the panel floats over the open sea.
    Full width (owner's option E, 24 Nov 2026, #134: a chart at most 80rem wide hid more pin pairs
-   at the opening view, so the laptop chart kept this size). */
+   at the opening view). Main's height: #138 tried the window minus the top bar (843 px at 1440 x 900),
+   but a taller chart can't zoom out as far (the map sheet's north-south extent is fixed), so more
+   pin pairs were hidden; the owner chose this size again (option A, review of PR #139). With the
+   one-liner gone it ends 31 px above the window's edge, so all of it shows when the page opens. */
 @media (min-width: 64rem) {
   .stage {
     height: clamp(36rem, calc(100vh - 5.5rem), 62rem);
@@ -912,20 +904,6 @@ html.js .topbar {
   display: block;
 }
 
-/* A publisher's note next to a summary written under its written permission (#107): opens with
-   the summary, in the same quiet grey, a step smaller. */
-.panel-permission {
-  display: none;
-  margin-top: 0.25rem;
-  color: var(--ink-2);
-  font-size: 0.8125rem;
-  line-height: 1.4;
-}
-
-.panel-item.is-active .panel-permission {
-  display: block;
-}
-
 /* An English headline the AI wrote for a Dutch item (#134): said right under it, always. */
 .panel-translated {
   display: block;
@@ -965,6 +943,11 @@ html.js .topbar {
 .panel-status li:nth-child(even) {
   padding-left: 1rem;
   border-left: 1px solid var(--rule);
+}
+
+/* Three cells in v1 (no Ships cell until v2, #138): the last one takes the whole row */
+.panel-status li:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 .mini-label {
@@ -1012,7 +995,9 @@ html.js .topbar {
     padding-left: 1.25rem;
   }
 
-  .panel-status li:nth-last-child(-n + 2) {
+  /* The bottom row: the last cell, and the one before it when both share the row */
+  .panel-status li:last-child,
+  .panel-status li:nth-last-child(2):nth-child(odd) {
     border-bottom: 0;
   }
 
@@ -1044,62 +1029,20 @@ html.js .topbar {
   }
 }
 
-/* ---------- A day with nothing on the chart: a short strip (#81) ----------
-   No item of the day has a place and there are no ships, so a full screen of empty map would
-   push the brief down. Phones: about a third of the screen, enough for the zoom buttons.
-   Wide screens: the panel stops floating and sits beside the strip; its item list is left out,
-   because the full brief starts right below. */
-.stage-empty .chart-map {
-  height: 30vh;
-  min-height: 15rem;
-  max-height: 20rem;
-}
-
-.stage-empty .chart-frame::after {
-  box-shadow: inset 0 0 40px 0 rgba(15, 34, 49, 0.08);
-}
-
-@media (min-width: 64rem) {
-  .stage-empty {
-    display: grid;
-    grid-template-columns: var(--panel-width) minmax(0, 1fr);
-    height: auto;
-    border-bottom: 1px solid var(--rule);
-  }
-
-  .stage-empty .panel {
-    position: static;
-    width: auto;
-    background: var(--surface);
-    border: 0;
-    border-right: 1px solid var(--rule);
-    border-radius: 0;
-    box-shadow: none;
-  }
-
-  .stage-empty .panel-items {
-    display: none;
-  }
-
-  .stage-empty .chart {
-    position: relative;
-    inset: auto;
-    min-height: 18rem;
-  }
-
+/* ---------- A day with nothing on the chart, on a phone: a short strip (#81) ----------
+   No item of the day has a place and there are no ships, so a phone shows about a third of the
+   screen of map, enough for the zoom buttons. Wide screens have no layout of their own for such a
+   day since #138: the same full-width map with the panel floating over it as on any day (owner,
+   before merging PR #139). */
+@media (max-width: 63.99rem) {
   .stage-empty .chart-map {
-    height: 100%;
-    min-height: 0;
-    max-height: none;
+    height: 30vh;
+    min-height: 15rem;
+    max-height: 20rem;
   }
 
-  .stage-empty .chart-legend,
-  .stage-empty .chart-note {
-    left: 1rem;
-  }
-
-  .stage-empty .chart-legend {
-    max-width: calc(100% - 9rem);
+  .stage-empty .chart-frame::after {
+    box-shadow: inset 0 0 40px 0 rgba(15, 34, 49, 0.08);
   }
 }
 
@@ -1229,8 +1172,8 @@ html.js .topbar {
 }
 
 /* v2 only: the day's AIS snapshot failed (hard rule 9). Pinned to the chart's top-left corner,
-   where the ship filter would be, so it never covers the port (#81). In v1 there is no box:
-   the legend says in grey that ship positions are not collected yet. */
+   where the ship filter would be, so it never covers the port (#81). In v1 nothing is said
+   about ships (#138). */
 .chart-note {
   position: absolute;
   top: 10px;
@@ -1354,7 +1297,7 @@ html.js .topbar {
   }
 }
 
-/* Plain grey notes in the legend: why the chart is empty, ships not collected yet (v1) */
+/* Plain grey notes in the legend: why the chart is empty */
 .chart-legend > .legend-note {
   color: var(--ink-2);
 }
@@ -1955,6 +1898,7 @@ html.chart-expanded {
 
 @media (min-width: 40rem) and (max-width: 63.99rem) {
   .dials { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .dials.no-ships { grid-template-columns: repeat(3, minmax(0, 1fr)); } /* v1: no Ships dial (#138) */
 }
 
 .dial {
@@ -2616,15 +2560,6 @@ td.ais-text {
 .reduced-note { color: var(--medium-ink); }
 .all-ok { color: var(--ok-ink); }
 
-/* Several failure lines from one source, listed under its name */
-.failure-lines {
-  margin: 0.2rem 0 0;
-  padding-left: 1.1rem;
-  list-style: disc;
-}
-
-.failures .failure-lines li { display: list-item; }
-
 .corrections .icon,
 .failures .icon,
 .all-ok .icon,
@@ -2696,9 +2631,10 @@ td.ais-text {
   }
 
   .footer-inner > .disclaimer,
-  .footer-inner > .privacy { grid-column: 1; }
+  .footer-inner > .privacy,
+  .footer-inner > .identity { grid-column: 1; }
 
-  .footer-inner > .footer-links { grid-column: 2; grid-row: 1 / span 2; }
+  .footer-inner > .footer-links { grid-column: 2; grid-row: 1 / span 3; }
 
   .footer-inner > .credits { grid-column: 2; }
 }
@@ -2710,9 +2646,13 @@ td.ais-text {
   font-weight: 600;
 }
 
-.privacy {
+.privacy,
+.identity {
   max-width: var(--measure);
 }
+
+/* Who the owner is, one sentence (#138): under the disclaimer and in the About texts */
+.about-identity { font-weight: 600; }
 
 .footer-links {
   display: flex;
