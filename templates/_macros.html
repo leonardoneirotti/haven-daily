@@ -92,7 +92,7 @@
     {% for link in ind.links %}
     <li>
       {% if link.role_label %}<span class="dial-link-role">{{ link.role_label }}</span>{% endif %}
-      <a href="{{ link.url }}">{{ link.headline }}{{ icon("external") }}</a>
+      {% if link.url %}<a href="{{ link.url }}">{{ link.headline }}{{ icon("external") }}</a>{% else %}<span>{{ link.headline }}</span>{% endif %}
       <span class="dial-link-meta">{{ link.meta }}{% if link.day_link %} · <a href="{{ root }}{{ link.day_link.href }}">{{ link.day_link.label }}</a>{% endif %}</span>
     </li>
     {% endfor %}
@@ -130,7 +130,7 @@
         {% if item.published_label %}<time datetime="{{ item.published }}">{{ item.published_label }}</time>{% endif %}
       </span>
     </p>
-    <h3 class="item-title" id="item-{{ rank }}-title"><a href="{{ item.url }}">{{ item.headline }}</a></h3>
+    <h3 class="item-title" id="item-{{ rank }}-title">{% if item.url %}<a href="{{ item.url }}">{{ item.headline }}</a>{% else %}{{ item.headline }}{% endif %}</h3>
     {% if item.headline_note %}
     {# The short card (S5, #82): no summary, so nothing to interpret either. One grey line says
        why (headline-only source, article not read, or unrated: the AI failed, spec §5.6). #}
@@ -159,7 +159,7 @@
       {% if item.map %}
       <button type="button" class="btn chart-button needs-map" data-action="show-item" data-rank="{{ rank }}" aria-pressed="false">{{ icon("map-pin") }}Show on chart</button>
       {% endif %}
-      <a class="btn" href="{{ item.url }}">Read original{% if item.language != "en" %} ({{ item.language_name }}){% endif %}{{ icon("external") }}</a>
+      {% if item.url %}<a class="btn" href="{{ item.url }}">Read original{% if item.language != "en" %} ({{ item.language_name }}){% endif %}{{ icon("external") }}</a>{% endif %}
       {% if item.translate_url %}<a class="btn" href="{{ item.translate_url }}">{{ icon("languages") }}Read in English{{ icon("external") }}</a>{% endif %}
     </p>
   </article>

@@ -120,7 +120,7 @@ Each day page also shows: publication line ("Published 06:52 · Amsterdam time",
 11. **A published brief is never changed silently.** Any change to a published brief's content adds an entry to its `corrections` list (§6), shown on the page.
 12. **Respect AI opt-outs.** If a source opts out of AI use (robots.txt blocks AI crawlers such as ClaudeBot/GPTBot, or signals like `ai-train=no`), only its **headline and link** are used, shown like a paywalled item. Its article text is never sent to an AI. The headline may still go to the AI, for the relevance filter and for what can be read from the headline alone: severity, place, "affects" tags and strike details (§2.1); nothing else from the source does. *(Added 31 Oct 2026; headline rating added 1 Nov 2026. Affects NL Times, Nieuwsblad Transport, PortsEurope, TradeWinds, RTV Rijnmond as tested. The Loadstar is headline-only because of its RSS terms, not an AI block (corrected 1 Nov 2026).)* **Written permission overrides the AI block, for that publisher only** *(owner's decision, 19 Nov 2026, #107)*: when a publisher gives Haven Daily written permission for AI summaries, its own robots.txt AI block (or `ai-train`/`ai-input` signal) no longer makes it headline-only. The permission covers that publisher's own content only, never another source, and it doesn't change robots.txt Disallow rules (hard rule 4). The reply is saved in `docs/permissions/`, the publisher's conditions are recorded in §11 and enforced in code where code can, and the permission is one `permission` line on the source in `config/sources.toml` (deleting it = withdrawn, §11). So far: **RTV Rijnmond**, written permission received 19 Nov 2026 (`docs/permissions/2026-11-19-rtv-rijnmond.md`).
 13. **No third-party article text in the repo.** No article text or feed snippets are ever committed (the repo is public, so committing them would republish them). Text is fetched and used **in memory only**, for summarising, then discarded. The stored item keeps the URL, so the original can always be reopened. *(Added 31 Oct 2026.)*
-14. **Privacy: no cookies, no tracking, nothing loaded from other sites.** No page sets a cookie or uses browser storage (local/session storage, IndexedDB, Cache API), there is no analytics or tracking of any kind (counters, pixels, embeds), and opening a page makes the browser contact no server but this site: fonts, styles, scripts, images and the map all come from the site itself. Links to other sites are fine (a link only contacts that site when clicked). `tests/test_privacy.py` keeps it this way (§5.3). *(Added 2 Nov 2026, issue #68; Claude's proposal to make it a hard rule, confirmed by the owner 2 Nov 2026, PR #79.)*
+14. **Privacy: no cookies, no tracking, nothing loaded from other sites.** No page sets a cookie or uses browser storage (local/session storage, IndexedDB, Cache API), there is no analytics or tracking of any kind (counters, pixels, embeds), and opening a page makes the browser contact no server but this site: fonts, styles, scripts, images and the map all come from the site itself. Links to other sites are fine (a link only contacts that site when clicked). `tests/test_privacy.py` keeps it this way (§5.3), and **since #125 the browser enforces it too**: every page carries a Content-Security-Policy (§5.14). *(Added 2 Nov 2026, issue #68; Claude's proposal to make it a hard rule, confirmed by the owner 2 Nov 2026, PR #79.)*
 
 ---
 
@@ -242,7 +242,7 @@ Rules and limits:
 
 ### 5.1.2 The daily workflow as built (issue #26, 2 Nov 2026)
 
-**`.github/workflows/daily.yml`**, two jobs:
+**`.github/workflows/daily.yml`**, two jobs *(three since #125: the `brief` job below is split into a read-only **build** job and a write-only **publish** job; see §5.14)*:
 1. **`brief`** (only on `main`; `contents: write`; at most 45 minutes): checkout of the latest `main` → **guard** (`python -m haven.guard`, standard library only, so it runs before anything is installed and a stopped run takes seconds) → install → **`python -m haven.run`**, with `--last-trigger` when the guard says so; only this step gets `ANTHROPIC_API_KEY` (`secrets.ANTHROPIC_API_KEY`) → **`python -m haven.publish`** (commit `data/` to `main`).
 2. **`site`** (only when the guard said build): calls **`pages.yml`** (`workflow_call`), so a morning deploy uses exactly the steps of a normal one.
 
@@ -297,9 +297,11 @@ config/
   site.toml            the site's own addresses (base URL, LinkedIn, repository) and its social preview image: file name + alt text (#28, §7.7)
 tests/                 pytest; run with `python -m pytest` (settings in pytest.ini). conftest.py: no API keys, no internet in any test
 .github/workflows/
-  daily.yml            the morning job: guard → run → commit data/ to main → pages.yml (§5.1.2)
+  daily.yml            the morning job: build (read-only: guard → run → today's files as an artifact) → publish (write: commit data/ to main) → pages.yml (§5.1.2, §5.14)
   pages.yml            render the latest main + deploy, on every push to main, by hand, and from daily.yml
   tests.yml            run all tests on every pull request and push to main; no secrets
+  (every action pinned to a full commit SHA with its version in a comment, §5.14)
+.github/dependabot.yml keeps the action pins current (monthly); Python security updates are a repo setting (§5.14)
 .github/rulesets/
   main.json            the ruleset on main: no force-push, no deletion (§5.1, §5.1.2)
 templates/             base.html, day.html, archive.html, about.html, 404.html, _macros.html
@@ -325,8 +327,10 @@ design/logo-concepts/  generated logo explorations
 site/                  output, not committed (Actions builds it)
 CLAUDE.md, SOURCES.md, README.md
 BUILD_PLAN.md          pointer only: the plan is the GitHub issues + §10
-requirements.txt       jinja2>=3.1,<4, tzdata (time zone rules; Windows has none built in), beautifulsoup4>=4.12,<5 (HTML lists, §5.8), anthropic>=2.3,<3 (Claude API, §5.4)
-requirements-dev.txt   + pytest, + shapely>=2.0,<3 (only for the basemap tool), + pillow==12.3.0 (only for the preview card tool)
+requirements.in        what the daily build needs, as ranges: jinja2>=3.1,<4, tzdata (time zone rules; Windows has none built in), beautifulsoup4>=4.12,<5 (HTML lists, §5.8), anthropic>=2.3,<3 (Claude API, §5.4)
+requirements.txt       its lock: every package (dependencies too) at one exact version with its hashes (`uv pip compile … --universal --generate-hashes`, §5.14)
+requirements-dev.in    + pytest, + shapely>=2.0,<3 (only for the basemap tool), + pillow==13.0.0 (only for the icon and preview card tools), at the versions of requirements.txt
+requirements-dev.txt   its lock, the same way
 .gitignore             .venv/, __pycache__/, *.pyc, osm caches, site/
 ```
 
@@ -334,9 +338,9 @@ Run locally:
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install --require-hashes -r requirements.txt
 .\.venv\Scripts\python.exe -m haven.render            # -> site/index.html
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pip install --require-hashes -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m pytest                  # all tests
 .\.venv\Scripts\python.exe tools\build_basemap.py      # only to rebuild the map
 ```
@@ -905,6 +909,44 @@ Live run (2 Nov 2026, 13:31, from a desktop, nothing written): both read with no
 *Note for #23 (fixed in #23):* the renderer couldn't show a real brief: a strike reading with nothing linked has `source_url: null`, and `render.prepare_indicator` called `.startswith` on it. Now tested on briefs written by the runner (§5.3).
 
 ---
+
+### 5.14 Security (audit and hardening, 24 Nov 2026, issue #125)
+
+**The audit (24 Nov 2026), what passed:**
+- the Claude key is in no commit (all refs, unreachable objects too), no file of the built or live site and no workflow log;
+- `.env` is ignored and was never committed;
+- secret scanning and push protection are on;
+- Jinja2 escapes every outside text, and a test render with hostile text showed no raw tag;
+- collected links are http(s) only;
+- workflow permissions are narrow, and pull requests from forks get no secrets;
+- nothing is loaded from other sites.
+
+**What it found, fixed in #125 (owner's approval, 24 Nov 2026):**
+
+1. **The daily job's write token reached every step.** `actions/checkout` keeps the token in the checkout for later steps, including "Build the brief", which runs installed packages, reads outside text and holds the Claude key. **Now three jobs:**
+   - **`brief`** (`contents: read`, checkout with `persist-credentials: false`): guard → install → `haven.run` → uploads **only today's files** (`data/*/<day>.*`, the guard's `day`) as the artifact `brief-data`, kept 1 day.
+   - **`publish`** (`contents: write`): checks out `main` with full history, sets up Python **without installing any package**, downloads the artifact into `data/` and runs `haven.publish` (standard library only, tested). `haven.publish` still refuses anything but new files in `data/` with exactly one new brief.
+   - **`site`**: after both, as before.
+
+   Checked on a runner before merging (temporary workflow, fake files dated 2099): the build job kept no credentials; exactly the day's 3 files arrived at their `data/` paths; a file for another date was left out.
+2. **Packages were ranges, resolved fresh every run.** Now `requirements.in` / `requirements-dev.in` hold the ranges (edited by hand), and `requirements.txt` / `requirements-dev.txt` are **locks**: every package, dependencies included, at one exact version with its hashes, made with `uv pip compile --universal --python-version 3.12 --generate-hashes` (one lock for Linux on GitHub and Windows on the laptop). Every workflow installs with **`--require-hashes`** (tested). The dev lock takes the daily lock's versions (`-c requirements.txt`). **Dependabot alerts and security updates** are on (repo setting): a pull request when a locked version gets a known vulnerability. The locks hold exactly the versions GitHub installed on launch day. All 32 package versions (both locks, plus the laptop's pip) had no known advisory (OSV, 24 Nov 2026).
+3. **Actions were pinned to major tags** (`@v7`), which can be moved. Now every action is pinned to a **full commit SHA with its version in a comment** (`actions/checkout@3d3c42e… # v7.0.1`; the commits the tags pointed to on 24 Nov, so nothing changed), all GitHub's own (tested). `.github/dependabot.yml` proposes new versions monthly. **Repo setting:** only GitHub's own actions are allowed.
+4. **Links and the browser:**
+   - `render.outside_url` lets a link through only when it is an `http`/`https` address with a host. Otherwise the item shows its headline with no link and no "Read original" or "Read in English". The same check covers status sources and linked strike items. It checks again what the collectors already ensure, so a hand-edited brief (a correction) can't put a `javascript:` or `data:` link on the page (tested with 9 bad forms).
+   - Every page now starts with **`<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">`**, so the browser itself blocks any script, style, font or image from another site and any inline or evaluated script (hard rule 14).
+   - Inline style **attributes** stay allowed, because the gauges and the chart set CSS variables. Meta, not a header: GitHub Pages can't send headers.
+   - Checked in headless Edge on the sample site (Today, a day page, Archive, How it works, 404): no violation, the chart and fonts load. A control page with an inline script and an outside script was blocked.
+5. **Pillow 12.3.0 had 62 advisories.** Now 13.0.0; the icons and the social preview are still pixel-identical (tests). The laptop's `.venv` was rebuilt from the lock, with pip 26.3.
+7. **Small extras:**
+   - `<meta name="referrer" content="no-referrer">` on every page, so a clicked link doesn't tell the other site where the visitor came from;
+   - repo setting: workflow runs from **all outside contributors'** pull requests need approval, not only first-timers'.
+
+**Prompt injection** (audit item 3, run 24 Nov 2026 on PR #124's prompts, $0.060, made-up items only): see #125. A fix (6) is decided by the owner after seeing the results.
+
+**The owner checks himself** (account settings, not in the repo):
+- two-factor login on GitHub and on the Anthropic Console;
+- a monthly **spend limit** on the Anthropic Console just above the €5 budget, with an email alert;
+- if the key is ever exposed: revoke it in the Console first, then replace the GitHub secret.
 
 ## 6. Data format: one brief per day
 

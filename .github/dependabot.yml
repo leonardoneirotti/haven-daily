@@ -1,0 +1,13 @@
+# Dependabot (security audit, #125).
+# - GitHub Actions: every action is pinned to a full commit SHA with its version in a comment;
+#   Dependabot opens a pull request when GitHub releases a new version, so the pins don't go stale.
+# - Python packages: security updates only (turned on in the repository settings): a pull request
+#   when a locked version in requirements.txt or requirements-dev.txt gets a known vulnerability.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "Actions"
