@@ -629,6 +629,14 @@ def map_payload(brief: dict) -> dict:
             "rank": rank,
             "severity": item["severity_key"],
             "title": item["shown_headline"],
+            # What the pin card shows (#134): the original under an English headline, the summary
+            # (or the short card's line), and the same links as the card below.
+            "original": item["headline"] if item["headline_en"] else None,
+            "language": item["language"],
+            "summary": item["summary"],
+            "note": item["headline_note"] if not item["summary"] else None,
+            "url": item["url"],
+            "translate_url": item["translate_url"],
             **item["map"],
         }
         for rank, item in enumerate(brief["items"], start=1)

@@ -80,8 +80,12 @@ const DEVICES = {
   phone: { width: 390, height: 844, dpr: 3, mobile: true },
 };
 
+// A browser without full screen for a page element, as on an iPhone (#134): the chart expands instead.
+const NO_FULLSCREEN = `for (const name of ["fullscreenEnabled", "webkitFullscreenEnabled"])
+  Object.defineProperty(Document.prototype, name, { get: () => false, configurable: true });`;
+
 // A fresh tab on Today, the chart drawn and still.
-async function open(which, device) {
+async function open(which, device, options = {}) {
   const d = DEVICES[device];
   const { targetId } = await send("Target.createTarget", { url: "about:blank" });
   const { sessionId } = await send("Target.attachToTarget", { targetId, flatten: true });
@@ -93,6 +97,7 @@ async function open(which, device) {
   await s("Emulation.setDeviceMetricsOverride", { width: d.width, height: d.height, deviceScaleFactor: d.dpr, mobile: d.mobile });
   if (d.mobile) await s("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
   await s("Page.addScriptToEvaluateOnNewDocument", { source: PROBE });
+  if (options.noFullscreen) await s("Page.addScriptToEvaluateOnNewDocument", { source: NO_FULLSCREEN });
   await s("Page.navigate", { url: `${base}${which}/index.html` });
   for (let i = 0; i < 150; i++) {
     if (await ev(`!!document.querySelector(".leaflet-container") && !!document.getElementById("port-map").style.getPropertyValue("--px-per-m")`)) break;
@@ -119,6 +124,39 @@ async function open(which, device) {
     }
     return null; })()`);
   return tab;
+}
+
+// The centre of the first element matching `selector`, or null.
+const centre = (t, selector) => t.ev(`(() => { const b = document.querySelector(${JSON.stringify(selector)});
+  if (!b) return null; const r = b.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
+const NUMBER = '.leaflet-marker-pane .callout-item[data-action="show-item"]';
+// The pin card (#134): open or not, its headline, whether the keyboard focus is in it or on a number.
+const cardState = (t) => t.ev(`(() => { const c = document.querySelector(".chart-card [role=dialog]");
+  const f = document.activeElement;
+  return { open: !!c, title: c ? c.querySelector("#chart-card-title").textContent.slice(0, 28) : "",
+    focus: c && c.contains(f) ? "in the card" : f && f.matches && f.matches(${JSON.stringify(NUMBER)}) ? "on the number" : "elsewhere",
+    scrollY: Math.round(scrollY) }; })()`);
+const fullState = (t) => t.ev(`(() => { const f = document.querySelector(".chart-frame"), m = document.getElementById("port-map").getBoundingClientRect();
+  return { full: document.fullscreenElement === f, expanded: f.classList.contains("is-expanded"),
+    size: Math.round(m.width) + " × " + Math.round(m.height) }; })()`);
+async function key(t, name, code, keyCode) {
+  for (const type of ["keyDown", "keyUp"]) await t.s("Input.dispatchKeyEvent", { type, key: name, code, windowsVirtualKeyCode: keyCode });
+}
+async function click(t, p) {
+  await mouse(t, "mouseMoved", p.x, p.y);
+  await mouse(t, "mousePressed", p.x, p.y, { buttons: 1, clickCount: 1 });
+  await mouse(t, "mouseReleased", p.x, p.y, { buttons: 0, clickCount: 1 });
+}
+async function tap(t, p) {
+  await touch(t, "touchStart", [[p.x, p.y]]);
+  await touch(t, "touchEnd", []);
+}
+async function openCardByClick(t) {
+  const n = await centre(t, NUMBER);
+  if (!n) return null;
+  await click(t, n);
+  await sleep(2500); // the chart flies to the item, then the card opens
+  return cardState(t);
 }
 
 const mouse = (t, type, x, y, extra = {}) => t.s("Input.dispatchMouseEvent", { type, x, y, button: "left", ...extra });
@@ -226,6 +264,106 @@ const CHECKS = [
     await sleep(600);
     return `header ${(await t.state()).header === "shown" ? "comes back over the chart" : "stays away"}`;
   }],
+  // ---------- The map upgrades (#134) ----------
+  ["Laptop: chart size", "laptop", async (t) => `${(await fullState(t)).size} px`],
+  ["Phone: chart size", "phone", async (t) => `${(await fullState(t)).size} px`],
+  ["Laptop: click on item 1's number opens its card", "laptop", async (t) => {
+    const c = await openCardByClick(t);
+    if (!c) return "no numbered marker on this page";
+    return c.open ? `card opens: "${c.title}…", focus ${c.focus}` : "no card";
+  }],
+  ["Laptop: Escape closes the card", "laptop", async (t) => {
+    const c = await openCardByClick(t);
+    if (!c || !c.open) return "no card";
+    await key(t, "Escape", "Escape", 27);
+    await sleep(500);
+    const after = await cardState(t);
+    return `card ${after.open ? "stays" : "closes"}, focus ${after.focus}`;
+  }],
+  ["Laptop: a click outside closes the card", "laptop", async (t) => {
+    const c = await openCardByClick(t);
+    if (!c || !c.open) return "no card";
+    const outside = await t.ev(`(() => { const r = document.querySelector(".stage").getBoundingClientRect();
+      return r.left > 12 ? { x: Math.round(r.left / 2), y: Math.round(r.top + r.height / 2) } : { x: 6, y: Math.round(r.bottom + 30) }; })()`);
+    await click(t, outside);
+    await sleep(500);
+    return `card ${(await cardState(t)).open ? "stays" : "closes"}`;
+  }],
+  ["Laptop: keyboard Enter on item 1's number", "laptop", async (t) => {
+    if (!(await t.ev(`(() => { const b = document.querySelector(${JSON.stringify(NUMBER)}); if (b) b.focus(); return !!b; })()`))) return "no numbered marker on this page";
+    await t.s("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
+    await t.s("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    await sleep(2500);
+    const c = await cardState(t);
+    if (!c.open) return "no card";
+    await key(t, "Escape", "Escape", 27);
+    await sleep(500);
+    return `card opens, focus ${c.focus}; after Escape focus ${(await cardState(t)).focus}`;
+  }],
+  ["Laptop: full-screen button", "laptop", async (t) => {
+    const b = await centre(t, ".chart-fullscreen");
+    if (!b) return "no full-screen button";
+    await click(t, b);
+    await sleep(1200);
+    const on = await fullState(t);
+    const close = await centre(t, ".chart-close");
+    if (close) await click(t, close);
+    await sleep(1200);
+    const off = await fullState(t);
+    return `${on.full ? "full screen" : on.expanded ? "expanded" : "nothing"}: chart ${on.size}; close button ${off.full || off.expanded ? "doesn't close it" : "closes it"} (${off.size})`;
+  }],
+  ["Laptop: no browser full screen (expanded chart)", "laptop", async (t) => {
+    const b = await centre(t, ".chart-fullscreen");
+    if (!b) return "no full-screen button";
+    await click(t, b);
+    await sleep(1200);
+    const on = await fullState(t);
+    await key(t, "Escape", "Escape", 27);
+    await sleep(800);
+    const off = await fullState(t);
+    return `${on.expanded ? "expanded" : on.full ? "full screen" : "nothing"}: chart ${on.size}; Escape ${off.expanded ? "doesn't close it" : "closes it"}`;
+  }, { noFullscreen: true }],
+  ["Phone: tap on item 1's number", "phone", async (t) => {
+    await scrollChartToTop(t, -150);
+    const n = await centre(t, NUMBER);
+    if (!n) return "no numbered marker on this page";
+    const before = await cardState(t);
+    await tap(t, n);
+    await sleep(2500);
+    const c = await cardState(t);
+    return `${c.open ? `card opens: "${c.title}…"` : "no card"}; page scrolls ${c.scrollY - before.scrollY} px`;
+  }],
+  // The card's top was under the ship filter and the item line on a phone (PR #136 screenshot).
+  ["Phone: the card clear of the bars on top and inside the chart", "phone", async (t) => {
+    await scrollChartToTop(t, -150);
+    const n = await centre(t, NUMBER);
+    if (!n) return "no numbered marker on this page";
+    await tap(t, n);
+    await sleep(2500);
+    const r = await t.ev(`(() => { const c = document.querySelector(".chart-card .leaflet-popup-content-wrapper");
+      if (!c) return null;
+      const b = c.getBoundingClientRect(), m = document.getElementById("port-map").getBoundingClientRect();
+      const bars = Array.from(document.querySelectorAll(".chart-filter, .chart-focus")).filter((e) => !e.hidden && e.offsetParent)
+        .reduce((low, e) => Math.max(low, e.getBoundingClientRect().bottom), m.top);
+      return { gap: Math.round(b.top - bars), inside: b.top >= m.top - 0.5 && b.bottom <= m.bottom + 0.5 &&
+        b.left >= m.left - 0.5 && b.right <= m.right + 0.5, size: Math.round(b.width) + " × " + Math.round(b.height) }; })()`);
+    if (!r) return "no card";
+    return `card ${r.size}, top ${r.gap >= 0 ? `${r.gap} px below the bars` : `${-r.gap} px under the bars`}; ` +
+      (r.inside ? "whole card inside the chart" : "card runs past the chart's edge");
+  }],
+  ["Phone: full-screen button (expanded, as on an iPhone)", "phone", async (t) => {
+    await scrollChartToTop(t, -150);
+    const b = await centre(t, ".chart-fullscreen");
+    if (!b) return "no full-screen button";
+    await tap(t, b);
+    await sleep(1200);
+    const on = await fullState(t);
+    const close = await centre(t, ".chart-close");
+    if (close) await tap(t, close);
+    await sleep(1200);
+    const off = await fullState(t);
+    return `${on.expanded ? "expanded" : "nothing"}: chart ${on.size}; close button ${off.expanded ? "doesn't close it" : "closes it"}`;
+  }, { noFullscreen: true }],
   ["Phone: vertical swipe on the chart, opening view (finger up 240 px)", "phone", async (t) => {
     await scrollChartToTop(t, -150);
     const r = await swipe(t, await t.openPoint(0.5, 0.6), 0, -240);
@@ -254,12 +392,12 @@ const CHECKS = [
 ];
 
 const rows = [];
-for (const [name, device, check] of CHECKS) {
+for (const [name, device, check, options] of CHECKS) {
   const cells = [];
   for (const which of ["before", "after"]) {
     let tab = null;
     try {
-      tab = await open(which, device);
+      tab = await open(which, device, options);
       cells.push(await check(tab));
     } catch (error) {
       cells.push(`error: ${String(error.message).slice(0, 80)}`);
@@ -269,7 +407,7 @@ for (const [name, device, check] of CHECKS) {
   }
   rows.push(`| ${name} | ${cells[0]} | ${cells[1]} |`);
 }
-console.log(["### Map input (#111): Today, headless browser", "", "| Input | Before | After |", "|---|---|---|", ...rows, ""].join("\n"));
+console.log(["### Map input (#111, #134): Today, headless browser", "", "| Input | Before | After |", "|---|---|---|", ...rows, ""].join("\n"));
 ws.close();
 browser.kill();
 server.close();

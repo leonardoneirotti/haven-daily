@@ -20,6 +20,7 @@ on:
       - tools/measure_speed.mjs
       - tools/speed_compare.mjs
       - tools/check_map_input.mjs
+      - tools/check_map_pins.py
       - tools/build_basemap.py
       - .github/workflows/speed.yml
 
@@ -89,3 +90,48 @@ jobs:
       - name: Map input
         timeout-minutes: 15
         run: node tools/check_map_input.mjs "$RUNNER_TEMP/before" "$RUNNER_TEMP/after" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # Which numbered pins fit at the opening view (#85), before and after, at both laptop sizes
+  # (owner, PR #136): tools/check_map_pins.py, this branch's copy for both sites, every place
+  # alone and every pair of places. Phones are left out: their chart didn't change in #134.
+  pins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        size: [laptop, laptop-1280]
+    env:
+      HAVEN_BROWSER: google-chrome
+      HAVEN_BROWSER_ARGS: --no-sandbox
+      BEFORE: origin/main
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # main too, for the "before" site
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install --require-hashes -r requirements.txt
+
+      - name: Main, with this branch's check tool
+        run: |
+          git worktree add "$RUNNER_TEMP/main" "$BEFORE"
+          cp tools/check_map_pins.py "$RUNNER_TEMP/main/tools/check_map_pins.py"
+          google-chrome --version
+
+      # The tool exits 1 when any check has a problem; the comparison below is what counts.
+      - name: Check before
+        timeout-minutes: 55
+        run: python "$RUNNER_TEMP/main/tools/check_map_pins.py" --only ${{ matrix.size }} --json "$RUNNER_TEMP/before.json" > "$RUNNER_TEMP/before.log" || tail -n 40 "$RUNNER_TEMP/before.log"
+
+      - name: Check after
+        timeout-minutes: 55
+        run: python tools/check_map_pins.py --only ${{ matrix.size }} --json "$RUNNER_TEMP/after.json" > "$RUNNER_TEMP/after.log" || tail -n 40 "$RUNNER_TEMP/after.log"
+
+      - name: Compare
+        run: python tools/check_map_pins.py --compare "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" | tee -a "$GITHUB_STEP_SUMMARY"

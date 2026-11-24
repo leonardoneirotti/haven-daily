@@ -5,8 +5,8 @@ different set of numbered items each time:
   - all 41 places at once (the "all-places check page");
   - every place alone;
   - every pair of places (820 pairs).
-Each check runs at laptop size (1440 x 900) and phone size (390 x 844, an iframe that wide,
-as in spec §8.7), and measures the numbered markers on the chart:
+Each check runs at laptop size (1440 x 900; "laptop-1280": 1280 x 800, #134) and phone size
+(390 x 844, an iframe that wide, as in spec §8.7), and measures the numbered markers on the chart:
   overlap    two visible markers (number + label) overlap
   hidden     an item's number is not fully on the chart, or is under the news panel
   lost       an item is on no marker (or on more than one)
@@ -15,14 +15,18 @@ and, about the run itself:
   timeout    the check didn't finish within CHECK_LIMIT_S; logged, the run goes on
   unfinished Edge stopped (or hit BLOCK_LIMIT_S) during this check; logged, the run goes on
 
-Edge runs with reduced motion, so no animation keeps it busy, and a fresh Edge runs each
+The browser (Edge on Windows; HAVEN_BROWSER, plus HAVEN_BROWSER_ARGS, elsewhere, as for the Node
+tools) runs with reduced motion, so no animation keeps it busy, and a fresh browser runs each
 block of BLOCK checks. Progress is printed after every check.
 
-Not run in CI (it needs Edge). Writes nothing to the repo: the page is built in a temporary
-folder (or in --site, kept for screenshots). Items are invented ("Invented item 1").
+Runs in the speed run too (speed.yml, owner, PR #136): this tool on main and on the branch, at
+both laptop sizes, then --compare writes which checks no longer fit to the run's summary.
+Writes nothing to the repo: the page is built in a temporary folder (or in --site, kept for
+screenshots). Items are invented ("Invented item 1").
 
     python tools/check_map_pins.py --only laptop --checks pairs   # 820 checks, ~1-2 s each
     python tools/check_map_pins.py --only laptop --checks all,singles
+    python tools/check_map_pins.py --compare before.json after.json   # what changed, as Markdown
 """
 
 from __future__ import annotations
@@ -32,6 +36,9 @@ import copy
 import functools
 import itertools
 import json
+import os
+import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -45,10 +52,14 @@ sys.path.insert(0, str(ROOT))
 from haven import render  # noqa: E402
 from haven.config import load_places  # noqa: E402
 
-EDGE = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-SIZES = {"laptop": (1440, 900), "phone": (390, 844)}
-BLOCK = 20  # checks per Edge process
-BLOCK_LIMIT_S = 180  # an Edge still running after this is stopped; the run goes on with the next check
+EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+BROWSER = os.environ.get("HAVEN_BROWSER") or EDGE  # "google-chrome" on the GitHub runner
+BROWSER_ARGS = os.environ.get("HAVEN_BROWSER_ARGS", "").split()  # "--no-sandbox" on the runner
+SIZES = {"laptop": (1440, 900), "laptop-1280": (1280, 800), "phone": (390, 844)}
+KINDS = ("no-map", "lost", "overlap", "hidden", "label-cut", "timeout", "unfinished")
+NOT_SHOWN = {"hidden", "lost"}  # an item's number isn't fully on the chart, right of the panel
+BLOCK = 20  # checks per browser process
+BLOCK_LIMIT_S = 180  # a browser still running after this is stopped; the run goes on with the next check
 CHECK_LIMIT_S = 30  # one check that takes longer is logged as "timeout"
 BASE_BRIEF = ROOT / "data" / "sample" / "briefs" / "2026-10-29.json"  # a sample day with pins
 
@@ -238,20 +249,24 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def run_edge(url: str, profile: Path) -> bool:
-    """Edge with the check page, reduced motion on. False if it hit BLOCK_LIMIT_S: then Edge
-    and all its child processes are ended (a leftover Edge holding the same profile would
-    take over the next launch)."""
+    """The browser with the check page, reduced motion on. False if it hit BLOCK_LIMIT_S: then
+    the browser and all its child processes are ended (a leftover one holding the same profile
+    would take over the next launch): taskkill on Windows, the process group elsewhere."""
+    windows = os.name == "nt"
     edge = subprocess.Popen(
-        [str(EDGE), "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--user-data-dir={profile}",
+        [BROWSER, *BROWSER_ARGS, "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--user-data-dir={profile}",
          "--window-size=1600,1000", "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
          "--disable-backgrounding-occluded-windows", "--force-prefers-reduced-motion", "--dump-dom", url],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=not windows,
     )
     try:
         edge.wait(timeout=BLOCK_LIMIT_S)
         return True
     except subprocess.TimeoutExpired:
-        subprocess.run(["taskkill", "/T", "/F", "/PID", str(edge.pid)], capture_output=True)
+        if windows:
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(edge.pid)], capture_output=True)
+        else:
+            os.killpg(edge.pid, signal.SIGKILL)
         edge.wait()
         return False
 
@@ -275,7 +290,7 @@ def run_size(name: str, site: Path, harness: str, server: Server, profile: Path,
         results += got
         start += len(got)
         if start < end:
-            why = "Edge hit the block limit" if not finished else "Edge stopped"
+            why = "the browser hit the block limit" if not finished else "the browser stopped"
             print(f"  {name}: {start + 1}/{total} {todo[start]['name']}  [unfinished: {why}; skipped]", flush=True)
             results.append({"name": todo[start]["name"], "problems": [{"kind": "unfinished", "why": why}]})
             start += 1
@@ -289,7 +304,7 @@ def report(name: str, results: list[dict]) -> int:
     moving = sum(1 for r in results if r.get("reduced") is False)
     if moving:
         print(f"  warning: {moving} checks ran without reduced motion")
-    for kind in ("no-map", "lost", "overlap", "hidden", "label-cut", "timeout", "unfinished"):
+    for kind in KINDS:
         hits = [(r["name"], p) for r in results for p in r["problems"] if p["kind"] == kind]
         names = sorted({n for n, _ in hits})
         print(f"  {kind:10} {len(names):4} checks")
@@ -302,6 +317,26 @@ def report(name: str, results: list[dict]) -> int:
     return failed
 
 
+def failing(results: list[dict], kinds) -> set[str]:
+    """The names of the checks with a problem of one of `kinds`."""
+    return {r["name"] for r in results if any(p["kind"] in kinds for p in r["problems"])}
+
+
+def compare(size: str, before: list[dict], after: list[dict]) -> str:
+    """What changed between two runs of one size, as Markdown: per problem, how many checks have
+    it before and after; then the checks whose numbers no longer all show (hidden or lost
+    after, not before) and the ones that show now. Pure: tested in tests/test_check_map_pins.py."""
+    width, height = SIZES[size]
+    lines = [f"### Map pins, {size} ({width} × {height}): {len(before)} checks before, {len(after)} after", "",
+             "| Problem | Before | After |", "|---|---|---|"]
+    lines += [f"| {kind} | {len(failing(before, {kind}))} | {len(failing(after, {kind}))} |" for kind in KINDS]
+    lost_now = sorted(failing(after, NOT_SHOWN) - failing(before, NOT_SHOWN))
+    shown_now = sorted(failing(before, NOT_SHOWN) - failing(after, NOT_SHOWN))
+    lines += ["", f"No longer fit ({len(lost_now)}): {', '.join(lost_now) or 'none'}",
+              "", f"Fit now ({len(shown_now)}): {', '.join(shown_now) or 'none'}", ""]
+    return "\n".join(lines)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--only", choices=sorted(SIZES), help="one screen size only")
@@ -309,9 +344,15 @@ def main() -> None:
     parser.add_argument("--places", help="one extra check with these place ids, in rank order (comma-separated)")
     parser.add_argument("--site", type=Path, help="build the check page here and keep it (for screenshots)")
     parser.add_argument("--json", type=Path, help="also write every result to this file")
+    parser.add_argument("--compare", nargs=2, type=Path, metavar=("BEFORE", "AFTER"),
+                        help="print what changed between two --json files, as Markdown, and stop")
     args = parser.parse_args()
-    if not EDGE.exists():
-        raise SystemExit(f"Edge not found at {EDGE}")
+    if args.compare:
+        before, after = (json.loads(path.read_text(encoding="utf-8")) for path in args.compare)
+        print("\n".join(compare(size, before[size], after[size]) for size in before if size in after))
+        return
+    if shutil.which(BROWSER) is None:
+        raise SystemExit(f"Browser not found: {BROWSER} (set HAVEN_BROWSER)")
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         site = args.site or Path(tmp) / "site"

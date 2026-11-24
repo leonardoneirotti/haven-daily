@@ -1,6 +1,7 @@
-/* Haven Daily: where a numbered marker sits on the chart (#85), and who takes a swipe (#111).
-   Pure geometry in screen pixels: no Leaflet and no page access, so tests/test_pins_geometry.py
-   can run it in Node. map.js measures the markers and uses these to place, merge and nudge them. */
+/* Haven Daily: where a numbered marker sits on the chart (#85), who takes a swipe (#111), and the
+   card a clicked number opens (#134). Pure: no Leaflet and no page access, so tests/test_pins_geometry.py
+   and tests/test_map_upgrades.py can run it in Node. map.js measures the markers and uses these to
+   place, merge and nudge them, and to fill the pin card. */
 (function (root) {
   "use strict";
 
@@ -49,5 +50,36 @@
     return (dy > 0 ? room.north : room.south) > 1 ? "map" : "page";
   }
 
-  root.HavenPins = { boxAt: boxAt, overlaps: overlaps, onChart: onChart, nudgeInside: nudgeInside, swipeTaker: swipeTaker };
+  // The pin card (#134): what opens next to a number clicked on the chart. `item` is one of the
+  // page's map callouts (haven/render.py map_payload): title (the English headline if the AI wrote
+  // one), original, language, severity, summary or note, url, translate_url. Everything is escaped;
+  // a link that isn't there (no url) is left out. Pure text in, HTML out, so it runs in Node too.
+  function escapeText(text) {
+    return String(text).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function cardHtml(item, rank) {
+    var sev = escapeText(item.severity), links = [];
+    if (item.url) links.push('<a class="btn" href="' + escapeText(item.url) + '">Read original ↗</a>');
+    if (item.translate_url) links.push('<a class="btn" href="' + escapeText(item.translate_url) + '">Read in English ↗</a>');
+    links.push('<a class="btn" href="#item-' + rank + '">Full item ↓</a>');
+    var text = item.summary
+      ? '<p class="chart-card-summary">' + escapeText(item.summary) + "</p>"
+      : item.note ? '<p class="chart-card-summary is-empty">' + escapeText(item.note) + "</p>" : "";
+    var original = item.original
+      ? '<p class="chart-card-original">Headline translated by AI · original: <span lang="' +
+        escapeText(item.language || "nl") + '">' + escapeText(item.original) + "</span></p>"
+      : "";
+    return '<div class="chart-card-body" role="dialog" aria-labelledby="chart-card-title" tabindex="-1">' +
+      '<p class="chart-card-top"><span class="num num-' + sev + '">' + rank + '</span><span class="sev sev-' + sev + '">' +
+      sev + '</span><button type="button" class="btn chart-card-close" data-action="close-card" aria-label="Close" title="Close">' +
+      '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+      'aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></p>' +
+      '<h3 class="chart-card-title" id="chart-card-title">' + escapeText(item.title) + "</h3>" +
+      original + text + '<p class="chart-card-links">' + links.join("") + "</p></div>";
+  }
+
+  root.HavenPins = { boxAt: boxAt, overlaps: overlaps, onChart: onChart, nudgeInside: nudgeInside, swipeTaker: swipeTaker,
+    cardHtml: cardHtml };
 })(typeof window !== "undefined" ? window : globalThis);
