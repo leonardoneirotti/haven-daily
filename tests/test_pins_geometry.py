@@ -1,7 +1,7 @@
 """Where a numbered marker sits on the chart (static/pins.js, issue #85).
 
 The geometry is pure JavaScript (no Leaflet, no page), so it runs here in Node. The rest of
-the chart is checked in headless Edge with tools/check_map_pins.py (not in CI).
+the chart is checked in a headless browser with tools/check_map_pins.py (also in the speed run, speed.yml).
 Skipped when Node isn't installed (GitHub's Ubuntu runners have it).
 """
 
