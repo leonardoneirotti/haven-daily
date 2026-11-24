@@ -10,16 +10,21 @@ The summariser answers with one place id (or "none") and up to 5 "affects" tags.
   can see what to add (stored on the item's line in data/items/).
 
 Nothing the AI writes reaches the brief unless it is on a list.
+
+`prefer_specific()` runs first (#138, owner's review of PR #139): a road (the A15, A20) is only a
+fallback. When the AI picks a road but the item names a more specific listed place (Maasvlakte,
+Botlek, Europoort, a terminal …), that place is used instead.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Iterable
 
 from haven.config import SHEET_BBOX, Place, load_places, load_tags
 
-__all__ = ["MAX_TAGS", "SHEET_BBOX", "Pick", "pick"]
+__all__ = ["MAX_TAGS", "SHEET_BBOX", "Pick", "pick", "prefer_specific"]
 
 MAX_TAGS = 5
 NO_PLACE = "none"
@@ -88,3 +93,38 @@ def pick(place, tags: Iterable | None, places: tuple[Place, ...] | None = None,
     if unlisted_places or unlisted_tags:
         unlisted = {"places": unlisted_places, "tags": unlisted_tags}
     return Pick(map=map_, affects=affects, unlisted=unlisted)
+
+
+ROAD = "road"
+
+
+def _names(place: Place) -> list[str]:
+    """How an item can name a place: its label, and "2" for a label's "II" (Maasvlakte 2)."""
+    names = [place.label]
+    if place.label.endswith(" II"):
+        names.append(place.label[:-3] + " 2")
+    return names
+
+
+def prefer_specific(place, text: str, places: tuple[Place, ...] | None = None):
+    """The AI's place answer, unless it is a road and `text` names a more specific listed place.
+
+    `text` is what the reader sees of the item: its headline and our summary. Names are matched as
+    whole words with their capital letters (they are proper nouns: "scheur" is also a Dutch word);
+    the place named first wins, and at the same spot the longer name (Maasvlakte II over Maasvlakte).
+    Any other answer, "none" included, is returned as it is.
+    """
+    places = load_places() if places is None else places
+    answer = _text(place).casefold() if place is not None else ""
+    road = next((p for p in places if p.id == answer and p.kind == ROAD), None)
+    if road is None or not text:
+        return place
+    found: list[tuple[int, int, str]] = []
+    for candidate in places:
+        if candidate.kind == ROAD:
+            continue
+        for name in _names(candidate):
+            match = re.search(rf"(?<!\w){re.escape(name)}(?!\w)", text)
+            if match:
+                found.append((match.start(), -len(name), candidate.id))
+    return min(found)[2] if found else place

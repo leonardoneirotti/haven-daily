@@ -46,10 +46,11 @@ def wide_rules(selector: str) -> str:
 # --- the laptop chart: taller and less wide --------------------------------------------------
 
 
-def test_the_laptop_chart_keeps_mains_size_full_width_and_the_window_height_minus_the_top_bar():
-    # Option E (owner, 24 Nov 2026): the 80rem chart hid 36 more pin pairs at 1440 x 900.
+def test_the_laptop_chart_is_full_width_and_the_window_height():
+    # Option E (owner, 24 Nov 2026): the 80rem chart hid 36 more pin pairs at 1440 x 900. The window's
+    # full height since #138 (owner's review of PR #139).
     stage = wide_rules(".stage")
-    assert "height: clamp(36rem, calc(100vh - 5.5rem), 62rem);" in stage
+    assert "height: clamp(36rem, 100vh, 62rem);" in stage
     assert "width:" not in stage and "margin-inline" not in stage  # full width
     assert "border-radius" not in stage and "box-shadow" not in stage  # no frame at the window's edges
     assert "min(80rem" not in CSS and "64rem);" not in stage

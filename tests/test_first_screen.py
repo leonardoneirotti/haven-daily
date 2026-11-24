@@ -139,15 +139,11 @@ def test_phones_no_longer_hide_the_panel_item_list():
 
 
 @pytest.mark.parametrize("items", [[], [news("medium", map=dict(PLACE))]])
-def test_v1_has_no_note_box_over_the_chart(tmp_path, items):
+def test_v1_has_no_note_box_over_the_chart_and_no_ships_line(tmp_path, items):
+    # Since #138 (owner's review of PR #139) v1 says nothing about ships until they are collected.
     html = render_day(tmp_path, make_brief(items=items))
     assert "chart-note" not in html
-    assert SHIPS_LATER_LINE in text_of(legend(html))
-
-
-def test_v1_ships_line_is_grey_text_in_the_legend(tmp_path):
-    html = legend(render_day(tmp_path, make_brief()))
-    assert re.search(r'<span class="legend-note">\s*' + re.escape(SHIPS_LATER_LINE), html)
+    assert SHIPS_LATER_LINE not in text_of(legend(html))
 
 
 def test_v1_day_with_ships_has_no_ships_line(tmp_path):

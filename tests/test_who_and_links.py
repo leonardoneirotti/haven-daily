@@ -75,13 +75,12 @@ def how(pages):
 
 # ---------- S1: the one-liner under the brand ----------
 
-def test_the_one_liner_is_exact_under_the_brand_on_every_page(pages):
+def test_the_one_liner_is_no_longer_on_the_page(pages):
+    # Owner, #138 (review of PR #139): off the page; the description for link previews and search
+    # (next test) and the social preview card keep its first sentence.
     for name, page in pages.items():
-        # Under the brand: the header bar holds the brand and the nav; since #102 the one-liner is the
-        # first thing right under it, so it stays put while the bar slides away on scrolling.
-        top = part(page, r'<header class="topbar">.*?</header>\s*<div class="masthead">.*?</div>')
-        assert ONE_LINER in text_of(top), name
-        assert text_of(top).index("Haven Daily") < text_of(top).index(ONE_LINER), name
+        body = page[page.index("<body"):]
+        assert ONE_LINER not in text_of(body), name
 
 
 def test_every_page_has_exactly_the_owners_description(pages):

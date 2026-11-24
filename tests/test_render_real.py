@@ -435,11 +435,10 @@ def test_item_with_no_published_time_renders(tmp_path):
 
 
 def test_no_ships_dial_in_v1(tmp_path):
-    """Hidden until ship positions are collected (owner, #138); the legend line under the chart
-    still says they aren't collected yet."""
+    """Hidden until ship positions are collected (owner, #138), and no line about them either."""
     html = render_day(tmp_path, make_brief())
     assert 'data-key="ships"' not in html
-    assert "Ship positions are not collected yet" in text_of(html)
+    assert "Ship positions are not collected yet" not in text_of(html)
     assert "The AIS snapshot failed" not in text_of(html)
 
 
