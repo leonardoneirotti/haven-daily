@@ -101,6 +101,7 @@ Thresholds (decided 31 Oct 2026; every number comes from a public source, cited 
 6. ~~**Under the brand on every page** (#86): the owner's one-liner, §7.8.~~ **Not on the page since #138** (owner, review of PR #139): its first sentence stays in the page description that link previews and search show (`site.description`, §7.8), and the social preview card still shows the whole line (§7.7).
 7. **A 404 page** (`404.html`, #117, §7.6): flag D, "Page not found", a friendly line and a link back to Today. GitHub Pages serves it at whatever address was missing, so its links start from the site's own path in `config/site.toml` (`/haven-daily/`), never relative.
 8. **Social preview tags on every page** (#28, §7.7): `og:title`, `og:description`, `og:url`, `og:type`, `og:site_name`, `twitter:card`; day pages with their date and top headline; `og:image` once the preview image exists.
+9. **A newspaper page for every day** (#101, §7.9): `newspaper.html` (Today) and `days/YYYY-MM-DD-newspaper.html`, the same brief as a front page, with no map. A switch "Map | Newspaper" at the top of a day's two pages; nothing is remembered between visits and nothing redirects (hard rule 14 unchanged). The archive links the Map pages.
 
 Each day page also shows: publication line ("Published 06:52 · Amsterdam time", taken from `built_at`; after a correction: "Published 06:52 · Corrected 09:14 · Amsterdam time", using the latest entry in `corrections`, with every correction note listed in "How this brief was made"), a collapsible table of all ships in the snapshot, and "How this brief was made" (sources checked, items collected, kept, shown, failures per source).
 
@@ -307,7 +308,7 @@ tests/                 pytest; run with `python -m pytest` (settings in pytest.i
 .github/dependabot.yml keeps the action pins current (monthly); Python security updates are a repo setting (§5.14)
 .github/rulesets/
   main.json            the ruleset on main: no force-push, no deletion (§5.1, §5.1.2)
-templates/             base.html, day.html, archive.html, about.html, 404.html, _macros.html
+templates/             base.html, day.html, newspaper.html (#101), _about_block.html, _build_notes.html (shared by the two views), archive.html, about.html, 404.html, _macros.html
 static/
   style.css            the whole design (tokens at the top)
   map.js               the chart (Leaflet + custom canvas basemap)
@@ -321,6 +322,7 @@ static/
 tools/build_basemap.py builds basemap.js from OpenStreetMap (run once)
 tools/make_social_preview.py  draws static/social-preview.png, the og:image card (§7.7, #95)
 tools/make_icons.py    draws the favicon and app icon, H over D (§7.6, #117, PR #120)
+tools/draw_illustrations.py  draws static/illustrations/*.svg, the newspaper view's 17 line drawings (§7.9, #101)
 data/basemap/          land.geojson + raw Overpass caches (caches git-ignored)
 data/sample/briefs/    4 sample briefs (fake, marked as sample; 26 Oct is a reduced brief)
 data/briefs/           real briefs, one per day (what the renderer reads)
@@ -1339,6 +1341,56 @@ The review (`docs/design-review.md`) found why the site didn't feel user-friendl
 
 **Screenshots for these issues:** only sample briefs or briefs with invented headlines are committed; screenshots of real headlines stay off the repo (owner, 2 Nov 2026, hard rule 13).
 
+### 7.9 Newspaper view (#101, built 25 Nov 2026)
+
+A second way to read the same day: **a front page**, next to the map page. *Owner's request and decisions, 25 Nov 2026 (#101; plan and decisions in the issue's comments).*
+
+**Pages and switch.**
+- Every day has **two real pages**: `index.html` + `newspaper.html` (Today) and `days/YYYY-MM-DD.html` + `days/YYYY-MM-DD-newspaper.html`. Same folder depth, so the relative links stay as they are.
+- **The switch** "Map | Newspaper" is two links of the shared button set (§7.5) in the top bar (`.view-switch`, `views` in `render_site`). The view shown is pressed (`aria-current="page"`, harbour blue). From 64rem it is centred in the bar; below, it has its own row under the brand and the nav, full width on a phone, and `--topbar-h` grows with it. It is only on a day's pages, not on the archive, How it works or the 404 page. It works with the keyboard and without JavaScript.
+- **Nothing is remembered and nothing redirects** (owner's option b, 25 Nov 2026): hard rule 14 is unchanged. Map is where Today and the archive open; the newspaper pages have their own addresses, so a reader can bookmark them.
+
+**The front page** (`templates/newspaper.html`, `_macros.paper_story`, `render.newspaper_view`):
+- **Head:** "Haven Daily · Morning brief · No. 004", the date as the page's `h1`, the publication line (with "See corrections") and the reduced-brief note. The site's own type, with no newspaper's masthead, logo or typeface (hard rule 6).
+- **The lead:** the **first item of the brief** (most severe first; within a severity, items with a summary first, §2) **that may be shown in full here**. It has a large headline (Manrope 800, `h2`), a drawing, the summary, the impact for planners in IBM Plex Serif (the card's own `impact-text`), Affects, "Read original" and "Read in English". An item with no summary as the lead keeps the short card's grey line.
+- **The other items in columns** (`h3` each; three columns from 64rem, two from 40rem, one on a phone), with a small drawing beside the text from 40rem and above it on a phone. Headline-only, unread and unrated items are shorter: headline, the short card's grey line, the links, no drawing. The numbers are the same as on the map page (`#item-N`).
+- **Same rules as the map page:** "Headline translated by AI · original (Dutch): …" for an English headline (#134); the publisher's permission note next to a summary written under permission; "Not enough information"; no impact block when the impact was left out; headline-only sources (K+N and the rest) stay headline-only.
+- **RTV Rijnmond:** headline-only here and never the lead, until it agrees in writing (§11, condition 5): `newspaper = true` in its permission line switches it on. Its line, *"Headline only in this view · the summary is on the Map page"* (`render.PAPER_HEADLINE_ONLY`), links the item on the Map page.
+- **A quiet day:** "Nothing significant today." in the lead's place. **A day whose every item is held back** (only Rijnmond items): no lead, the items in the columns.
+- **The port status** in a box at the side from 64rem (sticky below the bar), after the stories on a phone. It shows the map page's own status cards (weather, Rhine, strike; ships not in v1), because this page has no other weather dial: **every MeteoAlarm condition** (§2.2, §11) is on it.
+- **Below:** the About block (Today only), "How this brief was made" (the same partials as the map page) and the day navigation, which stays in the newspaper view.
+- **Reading order** (and phone order): head, lead, the other stories, port status, notes. Headings go down one level at a time.
+
+**No map.** The newspaper page loads **no** Leaflet, chart script, basemap, map preload or map data; its only script is `site.js` (tested). The Speed run measures the page (`newspaper` in `tools/measure_speed.mjs` and `speed.yml`): **"News and status visible" ≤ 1.5 s** on the throttled phone, and **"Map files requested" = 0** (`tools/speed_compare.mjs`).
+
+**Illustrations** (§7.7): **17 original line drawings**, one per "affects" tag (`config/tags.toml`) plus a general port drawing, drawn as SVG by `tools/draw_illustrations.py` into `static/illustrations/` and reused every day. There are no news photos, and no real event, ship, company, logo or text. Each is 160 × 100, ink lines with one harbour-blue detail on a light-blue tile, **only the site's colour tokens and never a flag colour**, under 1 KB each.
+- An item with a summary gets **the drawing of its first tag that has one** (place tags have none), else the general one (`render.ILLUSTRATIONS`, `GENERAL_ILLUSTRATION`).
+- Each drawing has alt text starting "Illustration: …" and the caption **"Illustration"**.
+
+| Tag | Drawing |
+|---|---|
+| Containers | Containers stacked on a quay under a crane arm |
+| Dry bulk | A conveyor pouring onto a heap, a grab bucket above |
+| Liquid bulk | Three storage tanks joined by a pipe rack |
+| Breakbulk | A crane hook lifting a bundle of steel beams |
+| RoRo | A ship's stern ramp lowered, a trailer rolling on |
+| Shortsea | A small feeder ship with a few containers on deck |
+| Ferries | A ferry with one funnel and lifeboats on low waves |
+| Barge | A long inland barge, its wheelhouse at the back |
+| Rail | A freight train of container wagons on a double track |
+| Truck pickups | A container truck at a lifted gate barrier |
+| Rhine | A river bend with a water-level gauge board on the bank |
+| Hinterland | Road, rail and river lines leading inland from a quay |
+| Sea access | A channel buoy and a small lighthouse |
+| Customs | A sealed container door beside a stamped document |
+| Labour | A hard hat and a safety vest on a bollard |
+| IT systems | A screen showing a container terminal grid |
+| *(general)* | A quay with a bollard and a crane outline |
+
+**Fonts and security unchanged:** Manrope, IBM Plex Mono (status values) and IBM Plex Serif (impact), all already loaded, so the font budget stays at 4 files, 80 KB (§7.3). The Content-Security-Policy is unchanged: images and scripts from this site only, and no inline script.
+
+Tests: `tests/test_newspaper.py` (pages, switch, no map, lead and columns, Rijnmond, status box and MeteoAlarm, shared parts, drawings, layout, speed-run checks); the privacy, security, button-set and speed tests cover the new pages as every page.
+
 ---
 
 ## 8. The chart (how it works — interview material)
@@ -1546,7 +1598,7 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
     2. **Rijnmond always clearly credited, with a direct link to the original article:** every item shows the source name and a "Read original" link to the article itself; the permission note names RTV Rijnmond as well.
     3. **Summaries accurately reflect their reporting, without changing context or meaning:** the prompt says never invent anything and use only what the item says, and the summary is written from the article's own lead paragraph. Code can't check meaning: a wrong summary found afterwards is fixed with a visible correction (hard rule 11), and RTV Rijnmond is told.
     4. **Strictly non-commercial:** Haven Daily is a non-profit personal portfolio project that earns nothing; the owner pays the AI costs (owner's reply, 18 Nov 2026).
-    5. **Any expansion or change in how their content is used is discussed with them in advance:** e.g. opening their article pages, an impact line, or showing Rijnmond items in a new way (such as the v2 newspaper view, #101) needs their written OK first. An unanswered question counts as "no".
+    5. **Any expansion or change in how their content is used is discussed with them in advance:** e.g. opening their article pages, an impact line, or showing Rijnmond items in a new way (such as the v2 newspaper view, #101) needs their written OK first. An unanswered question counts as "no". **The newspaper view (#101, built 25 Nov 2026):** until RTV Rijnmond agrees in writing, its items are **headline-only there** (headline, source, the original and "Read in English" links, a line linking the item on the Map page; no summary, impact, permission note or tags) and **never the lead story** (owner, 25 Nov 2026). It is one setting: `newspaper = true` in RTV Rijnmond's `permission` line in `config/sources.toml` (left out = off; `config.Permission.newspaper`).
     6. **They may withdraw the permission at any time:** delete the one `permission` line for RTV Rijnmond in `config/sources.toml`, and move its row back under Headline-only in `SOURCES.md` (the tests check that both agree). From the next run its robots.txt AI block applies again and it is headline-only, as before. **Past briefs lose their Rijnmond summaries too** *(owner's decision, 19 Nov 2026, PR #108 review)*: every published brief shows its Rijnmond items as headline-only (headline and link, no summary and no note). Each brief that changes gets a correction, as for any change to a published brief (hard rule 11). **Not built now: it is built only if a withdrawal ever happens.**
     - Plus their request: **it is clear that Haven Daily is an independent project and that RTV Rijnmond is not responsible for the AI-generated summaries**: next to every Rijnmond summary on its card (in the panel's list too until #138) and on How it works (§7.5).
   - **The impact line for Rijnmond items: allowed, 23 Nov 2026** (Daan Verberne; `docs/permissions/2026-11-23-rtv-rijnmond.md`; #115), on three conditions; `impact = true` in the permission line since then. How each is met:
