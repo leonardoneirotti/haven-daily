@@ -536,11 +536,14 @@ def test_not_enough_information_stays_possible():
         "granted": "2026-11-19", "max_sentences": 2, "impact": True}
 
 
-def test_the_wording_check_is_for_permission_sources_only():
+def test_the_wording_check_applies_to_other_sources_too():
+    """Since #123 (owner, 24 Nov 2026): every source's impact is checked, not only Rijnmond's."""
     data = {"summary": "Invented summary.", "impact": CONFIRMED, "severity": "low", "place": "none",
             "tags": [], "strike": None}
-    result, client = run([ect_item()], answer(json.dumps(data)), sources=(rijnmond(WITH_IMPACT),))
-    assert result.items[0].ai["impact"] == CONFIRMED and len(client.messages.calls) == 1
+    hedged = dict(data, impact=HEDGED)
+    result, client = run([ect_item()], answer(json.dumps(data)), answer(json.dumps(hedged)),
+                         sources=(rijnmond(WITH_IMPACT),))
+    assert result.items[0].ai["impact"] == HEDGED and len(client.messages.calls) == 2
 
 
 def test_the_batch_route_gets_the_same_retry_and_leaves_the_impact_out():
