@@ -1,3 +1,6 @@
+# The packages the daily build needs, as ranges (edit this file, not requirements.txt).
+# requirements.txt is the lock: exact versions with hashes, installed with --require-hashes (#125).
+# After changing this file:  uv pip compile requirements.in --universal --python-version 3.12 --generate-hashes -o requirements.txt
 jinja2>=3.1,<4
 # Reads the HTML news lists (haven/pages.py) with CSS selectors, on Python's built-in parser.
 beautifulsoup4>=4.12,<5
