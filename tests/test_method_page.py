@@ -81,8 +81,9 @@ def source(id, verdict, **fields):
 
 
 def test_footer_text_is_exact_on_every_page(site):
-    pages = [site / "index.html", site / "archive.html", site / "about.html", *sorted((site / "days").glob("*.html"))]
-    assert len(pages) == 3 + 4
+    pages = [site / "index.html", site / "newspaper.html", site / "archive.html", site / "about.html",
+             *sorted((site / "days").glob("*.html"))]
+    assert len(pages) == 4 + 4 * 2  # each of the 4 sample days twice: map and newspaper (#101)
     for page in pages:
         assert FOOTER in text_of(page.read_text(encoding="utf-8")), page.name
 

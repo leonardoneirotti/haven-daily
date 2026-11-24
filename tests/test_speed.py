@@ -44,7 +44,10 @@ def pages(site):
 
 
 def day_pages(site):
-    return [p for p in pages(site) if p.name == "index.html" or p.parent.name == "days"]
+    """The map pages: Today and each day's page. A day's newspaper page (#101) has no map, so it falls
+    under the pages that never fetch the basemap (test_other_pages_do_not_fetch_the_basemap)."""
+    return [p for p in pages(site) if (p.name == "index.html" or p.parent.name == "days")
+            and not p.name.endswith("-newspaper.html")]
 
 
 def soup_of(path):

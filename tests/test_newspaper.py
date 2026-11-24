@@ -110,6 +110,7 @@ def test_the_switch_sits_in_the_top_bar(tmp_path):
 
 def test_nothing_is_remembered_and_nothing_redirects():
     site_js = (ROOT / "static" / "site.js").read_text(encoding="utf-8")
+    site_js = re.sub(r"/\*.*?\*/|//[^\n]*", "", site_js, flags=re.S)  # code only, not comments
     for word in ("localStorage", "sessionStorage", "location.replace", "location.href =", "cookie"):
         assert word not in site_js
 
@@ -199,7 +200,7 @@ def test_a_rijnmond_item_is_headline_only_and_never_the_lead(tmp_path):
     for word in ("Invented Rijnmond summary.", "Invented Rijnmond impact", "permission", "Affects"):
         assert word not in text, word
     assert render.PAPER_HEADLINE_ONLY in text
-    assert f'href="{DAY}.html#item-1"' in story  # the summary is on the Map page
+    assert f'href="../days/{DAY}.html#item-1"' in story  # the summary is on the Map page
     assert "Read original (Dutch)" in text and "<img" not in story
 
 
@@ -393,3 +394,14 @@ def test_the_speed_run_measures_the_newspaper_page():
     assert re.search(r"PAGES: [\w,-]*\bnewspaper\b", workflow)
     compare = (ROOT / "tools" / "speed_compare.mjs").read_text(encoding="utf-8")
     assert "Map files requested" in compare
+
+
+def test_the_committed_drawings_are_what_the_script_draws():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("draw_illustrations", ROOT / "tools" / "draw_illustrations.py")
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    assert set(tool.DRAWINGS) == {p.name for p in ILLUSTRATIONS.glob("*.svg")}
+    for name in tool.DRAWINGS:
+        committed = (ILLUSTRATIONS / name).read_bytes().decode("utf-8").replace("\r\n", "\n")  # git may add CRs on Windows
+        assert committed == tool.svg(name), name
