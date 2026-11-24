@@ -333,6 +333,24 @@ const CHECKS = [
     const c = await cardState(t);
     return `${c.open ? `card opens: "${c.title}…"` : "no card"}; page scrolls ${c.scrollY - before.scrollY} px`;
   }],
+  // The card's top was under the ship filter and the item line on a phone (PR #136 screenshot).
+  ["Phone: the card clear of the bars on top and inside the chart", "phone", async (t) => {
+    await scrollChartToTop(t, -150);
+    const n = await centre(t, NUMBER);
+    if (!n) return "no numbered marker on this page";
+    await tap(t, n);
+    await sleep(2500);
+    const r = await t.ev(`(() => { const c = document.querySelector(".chart-card .leaflet-popup-content-wrapper");
+      if (!c) return null;
+      const b = c.getBoundingClientRect(), m = document.getElementById("port-map").getBoundingClientRect();
+      const bars = Array.from(document.querySelectorAll(".chart-filter, .chart-focus")).filter((e) => !e.hidden && e.offsetParent)
+        .reduce((low, e) => Math.max(low, e.getBoundingClientRect().bottom), m.top);
+      return { gap: Math.round(b.top - bars), inside: b.top >= m.top - 0.5 && b.bottom <= m.bottom + 0.5 &&
+        b.left >= m.left - 0.5 && b.right <= m.right + 0.5, size: Math.round(b.width) + " × " + Math.round(b.height) }; })()`);
+    if (!r) return "no card";
+    return `card ${r.size}, top ${r.gap >= 0 ? `${r.gap} px below the bars` : `${-r.gap} px under the bars`}; ` +
+      (r.inside ? "whole card inside the chart" : "card runs past the chart's edge");
+  }],
   ["Phone: full-screen button (expanded, as on an iPhone)", "phone", async (t) => {
     await scrollChartToTop(t, -150);
     const b = await centre(t, ".chart-fullscreen");

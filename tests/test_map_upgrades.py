@@ -167,6 +167,26 @@ def test_a_pin_click_opens_the_card_and_escape_or_a_click_outside_closes_it():
     assert "openCard(" in MAP_JS[MAP_JS.index("function selectItem("):MAP_JS.index("function showShips(")]
 
 
+def test_the_card_keeps_clear_of_the_bars_on_top_and_the_buttons_on_the_right():
+    # On a phone the card opened under the ship filter and the item line: its number, severity,
+    # close button and the start of its headline were hidden (screenshot on PR #136, 24 Nov 2026).
+    pick = block("Pin card")
+    room = pick[pick.index("function cardRoom()"):pick.index("function openCard(")]
+    assert ".chart-filter" in room and ".chart-focus" in room  # the bars on top of the chart
+    assert ".leaflet-control-zoom" in room                     # the buttons on the right
+    assert "maxHeight: room.height" in pick                    # never taller than the room left
+    assert "autoPanPaddingTopLeft: [room.left, room.top]" in pick
+    assert "autoPanPaddingBottomRight: [room.right, room.bottom]" in pick
+
+
+def test_on_a_phone_the_card_summary_is_cut_to_three_lines():
+    narrow = re.findall(r"@media \(max-width: 40rem\) \{(.*?)\n\}", CSS, flags=re.S)
+    rule = next((re.search(r"\.chart-card-summary \{(.*?)\}", b, flags=re.S) for b in narrow
+                 if ".chart-card-summary {" in b), None)
+    assert rule, "no phone rule for the card summary"
+    assert "-webkit-line-clamp: 3;" in rule.group(1) and "line-clamp: 3;" in rule.group(1)
+
+
 def test_a_phone_tap_on_a_pin_no_longer_scrolls_the_page_to_the_full_card():
     select = MAP_JS[MAP_JS.index("function selectItem("):MAP_JS.index("function showShips(")]
     assert 'item.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" })' not in select
@@ -190,6 +210,7 @@ def test_the_card_has_its_own_styles_and_no_inline_script():
     "Laptop: full-screen button",
     "Laptop: no browser full screen (expanded chart)",
     "Phone: tap on item 1's number",
+    "Phone: the card clear of the bars on top and inside the chart",
     "Phone: full-screen button (expanded, as on an iPhone)",
 ])
 def test_the_browser_check_has_a_row_for(name):
