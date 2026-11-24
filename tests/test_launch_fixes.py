@@ -321,3 +321,115 @@ def test_how_it_works_no_longer_says_the_ai_keeps_an_item_when_unsure(sample_sit
     assert "unsure whether it matters" not in text
     assert "it keeps the item" not in text
     assert "clear link" in text
+
+
+# === PR #139 review (owner, 24 Nov 2026) ========================================================
+
+# --- 1. No ship line in v1 ------------------------------------------------------------------------
+
+
+def test_v1_says_nothing_about_ships_on_the_day_page_or_how_it_works(tmp_path):
+    html = render_day(tmp_path, make_brief(items=[news()]))
+    assert "Ship positions are not collected yet" not in text_of(html)
+    how = (tmp_path / "site" / "about.html").read_text(encoding="utf-8")
+    assert "Ship positions are not collected yet" not in text_of(how)
+
+
+def test_from_v2_a_failed_snapshot_is_still_said_under_the_chart(tmp_path, monkeypatch):
+    monkeypatch.setattr(render, "AIS_SNAPSHOT_BUILT", True)
+    html = render_day(tmp_path, make_brief(items=[news()]))
+    assert "The AIS snapshot failed." in text_of(html)
+
+
+# --- 2. A road pin only when the item names nothing more specific ----------------------------------
+
+
+from haven import places as haven_places  # noqa: E402
+from test_summarise import full, item as summary_item, run  # noqa: E402
+
+
+@pytest.mark.parametrize("answer, text, chosen", [
+    ("a15", "Invented: A15 closed near the Maasvlakte tonight", "maasvlakte"),
+    ("a15", "Invented: works on the A15 at Maasvlakte 2", "maasvlakte-2"),          # "2" for "II"
+    ("a15", "Invented: A15 closed near Maasvlakte II", "maasvlakte-2"),             # the longer label wins
+    ("a20", "Invented: A20 lane closed. Trucks for Europoort and Botlek divert.", "europoort"),  # first named
+    ("a15", "Invented: closures on the A15, A20 and N59 this week", "a15"),          # nothing more specific
+    ("a15", "Invented: A15 works near Botlekbrug", "botlekbrug"),                     # whole words only
+    ("botlek", "Invented: Europoort and Botlek", "botlek"),                           # not a road: unchanged
+    ("none", "Invented: Botlek news", "none"),                                       # no pin stays no pin
+])
+def test_a_road_gives_way_to_a_more_specific_place_the_item_names(answer, text, chosen):
+    assert haven_places.prefer_specific(answer, text, load_places()) == chosen
+
+
+def test_the_prompt_tells_the_ai_to_prefer_the_more_specific_place():
+    prompt = system_prompt(load_places(), load_tag_list())
+    assert "a road only when the item names no more specific place" in prompt.lower()
+
+
+def test_the_summariser_applies_it_to_the_ai_answer():
+    headline = "Invented: A15 closed near Botlek tonight"
+    result, _ = run([summary_item(headline=headline)], full(place="a15", strike=None))
+    [done] = result.items
+    assert done.ai["map"]["label"] == "Botlek"
+
+
+def test_the_summariser_keeps_the_road_when_nothing_more_specific_is_named():
+    headline = "Invented: closures on the A15, A20 and N59 this week"
+    result, _ = run([summary_item(headline=headline)],
+                    full(place="a15", strike=None, summary="Invented: road works close two motorways."))
+    [done] = result.items
+    assert done.ai["map"]["label"] == "A15"
+
+
+def test_the_23_nov_brief_is_unchanged():
+    brief = (ROOT / "data" / "briefs" / "2026-11-23.json").read_text(encoding="utf-8")
+    road = [line for line in brief.splitlines() if "wegen gaan deze week dicht" in line]
+    assert road  # the item is still there, and the file has no correction about it
+    assert '"corrections": []' in brief
+
+
+# --- 9. The one-liner is not on the page; the description for link previews stays ------------------
+
+
+ONE_LINER = ("What affects the Port of Rotterdam today, and what it means for logistics planners. "
+             "Updated every morning.")
+
+
+def test_the_one_liner_is_on_no_page(sample_site, tmp_path):
+    real = render_day(tmp_path, make_brief(items=[news()]))
+    for page in [real, *(p.read_text(encoding="utf-8") for p in sample_site.rglob("*.html"))]:
+        assert ONE_LINER not in text_of(re.sub(r"<head>.*?</head>", "", page, flags=re.S))
+        assert 'class="tagline"' not in page
+
+
+def test_link_previews_and_search_keep_the_description(sample_site):
+    html = (sample_site / "index.html").read_text(encoding="utf-8")
+    first = "What affects the Port of Rotterdam today, and what it means for logistics planners."
+    assert re.search(r'<meta name="description" content="' + re.escape(first), html)
+    assert re.search(r'<meta property="og:description" content="' + re.escape(first), html)
+
+
+def test_a_real_page_has_no_strip_under_the_header_and_a_sample_page_keeps_its_note(sample_site, tmp_path):
+    real = render_day(tmp_path, make_brief(items=[news()]))
+    assert 'class="masthead"' not in real
+    sample = (sample_site / "index.html").read_text(encoding="utf-8")
+    assert 'class="masthead"' in sample and "Sample data." in text_of(sample)
+
+
+# --- 10. The laptop chart: full width, the window's full height -------------------------------------
+
+
+CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+
+
+def test_the_laptop_chart_is_the_full_window_height():
+    from test_map_upgrades import wide_rules
+    stage = wide_rules(".stage")
+    assert "height: clamp(36rem, 100vh, 62rem);" in stage
+    assert "width:" not in stage and "margin-inline" not in stage  # still full width
+
+
+def test_the_phone_chart_is_still_unchanged():
+    base = re.search(r"(?m)^\.chart-map \{(.*?)^\}", CSS, flags=re.S).group(1)
+    assert "height: 62vh;" in base and "min-height: 340px;" in base and "max-height: 560px;" in base
