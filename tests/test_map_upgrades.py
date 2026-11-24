@@ -187,6 +187,14 @@ def test_on_a_phone_the_card_summary_is_cut_to_three_lines():
     assert "-webkit-line-clamp: 3;" in rule.group(1) and "line-clamp: 3;" in rule.group(1)
 
 
+def test_on_a_phone_the_item_line_makes_way_for_the_open_card():
+    # The item line on top of the chart says what the card says; on a phone the card needs its room.
+    pick = block("Pin card")
+    assert 'frame.classList.add("has-card")' in pick and 'frame.classList.remove("has-card")' in pick
+    narrow = re.findall(r"@media \(max-width: 40rem\) \{(.*?)\n\}", CSS, flags=re.S)
+    assert any(re.search(r"\.chart-frame\.has-card \.chart-focus \{\s*display: none;", b) for b in narrow)
+
+
 def test_a_phone_tap_on_a_pin_no_longer_scrolls_the_page_to_the_full_card():
     select = MAP_JS[MAP_JS.index("function selectItem("):MAP_JS.index("function showShips(")]
     assert 'item.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" })' not in select
