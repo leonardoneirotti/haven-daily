@@ -129,6 +129,7 @@
       <p>Strikes are announced days ahead, so the flag doesn't look at today's news alone. When the AI summarises an item about a strike, it notes where the strike is and whether it is announced, ongoing or called off. It copies the words that give its dates, and the code works out the dates from them. A date the source doesn't state is never guessed. Each morning the flag reads these details from the kept items of the last 14 days, plus any strike dated today or later from up to 60 days back.</p>
       <ul>
         <li>Several items about the same strike: the newest one decides. A cancellation brings the flag back to Normal.</li>
+        <li>Only strikes at the port or on freight transport serving it count. A bus, tram or metro strike doesn't, even in Rotterdam. The flag goes to Alert only when the item's own summary (or its headline, if it has no summary) says the strike is at the port or on freight transport; otherwise it stays at Watch.</li>
         <li>A false alarm is better than a missed strike. Only an item the AI confidently matches to a strike can lower its level. When the match is unsure, the strike stays up and both items are shown, so the reader can judge.</li>
         <li>A strike reported as ongoing with no newer report after two days drops to Watch ("no newer report"), never to Normal by itself.</li>
         <li>The flag links the item that decided it, with its source and date.</li>
