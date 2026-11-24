@@ -330,7 +330,7 @@ def test_an_impact_the_ai_sends_anyway_is_never_kept():
 
 def test_the_sentence_limit_is_for_the_permission_source_only():
     """Other `use` sources keep the prompt's guidance only; nothing else changes for them (#107)."""
-    data = {"summary": THREE, "impact": "Invented impact.", "severity": "low", "place": "none",
+    data = {"summary": THREE, "impact": "Invented impact that could follow.", "severity": "low", "place": "none",
             "tags": [], "strike": None}
     result, _ = run([ect_item()], answer(json.dumps(data)), sources=(rijnmond(),))
     assert result.items[0].ai["summary"] == THREE

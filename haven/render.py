@@ -366,9 +366,12 @@ def severity_key(severity: str | None) -> str:
 def rank_items(items: list[dict]) -> list[dict]:
     """Most severe first, unrated last, at most MAX_ITEMS. Quiet days stay short: never pad.
 
-    The sort is stable, so items of the same severity keep the order they came in.
+    Within a severity, items with a summary (full-text sources) come before headline-only ones
+    (owner, 24 Nov 2026, #123): a summary tells a planner more. The sort is stable, so otherwise
+    items keep the order they came in.
     """
-    ranked = sorted(items, key=lambda item: SEVERITY_KEYS.index(severity_key(item["severity"])))
+    ranked = sorted(items, key=lambda item: (SEVERITY_KEYS.index(severity_key(item["severity"])),
+                                             not item.get("summary")))
     return ranked[:MAX_ITEMS]
 
 
@@ -529,7 +532,8 @@ def prepare_item(item: dict, brief_date: str) -> None:
     # No impact block when the publisher's permission doesn't cover one (#107), or when the impact was
     # left out because it sounded confirmed twice (#115): not "Not enough information".
     permission = item["permission"]
-    item["shows_impact"] = not permission or (bool(permission.get("impact")) and not permission.get("impact_left_out"))
+    item["shows_impact"] = not item.get("impact_left_out") and (
+        not permission or (bool(permission.get("impact")) and not permission.get("impact_left_out")))
     # Under a publisher's permission the label says whose interpretation it is (RTV Rijnmond's condition, #115).
     item["impact_whose"] = IMPACT_WHOSE.format(source=item["source"]) if permission else "interpretation"
     item["severity_key"] = severity_key(item["severity"])

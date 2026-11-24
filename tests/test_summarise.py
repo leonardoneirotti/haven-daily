@@ -72,7 +72,7 @@ def answer(text, stop_reason="end_turn", stop_details=None, input_tokens=2000, o
 
 GOOD = {
     "summary": "Dock staff at a Maasvlakte terminal plan a one-day walkout after wage talks failed.",
-    "impact": "Expect no container moves at that terminal on the day; plan pickups around it.",
+    "impact": "Container moves at that terminal could stop on the day; planners may want to plan pickups around it.",
     "severity": "high",
     "place": "ect-delta",
     "tags": ["Containers", "Labour"],

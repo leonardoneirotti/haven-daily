@@ -88,7 +88,7 @@ from haven.places import pick
 
 __all__ = ["BATCH_WAIT", "BREAKER", "CANCEL_WAIT", "FALLBACK_MODEL", "SUMMARY_MODEL", "BatchRun", "SummaryResult",
            "brief_item", "finish_batch", "known_strikes", "phrase_in", "published_day", "resolve_phrase",
-           "sentence_count", "sounds_confirmed", "start_batch", "summarise", "summarise_batch", "unrated"]
+           "sentence_count", "sounds_confirmed", "strike_elsewhere", "start_batch", "summarise", "summarise_batch", "unrated"]
 
 SUMMARY_MODEL = "claude-sonnet-5-5"  # spec §5.5: chosen by the owner after the side-by-side test (#17, 2 Nov 2026)
 FALLBACK_MODEL = "claude-haiku-5-5"  # items the batch didn't answer, whatever the batch model (§5.5 step 3)
@@ -169,8 +169,10 @@ a short English summary; do not translate the article.
 
 impact: what this means for a logistics planner working with Rotterdam (delays, costs, which \
 cargo, terminals or routes, what to do), in at most two short sentences (at most 50 words). It is \
-your interpretation, but it must follow from the item. If the item does not give enough \
-information to judge the impact, answer null (shown as "Not enough information"). Never guess.
+your interpretation, based only on what the item says. Write every consequence as possible, with \
+"could" or "may", never as certain or confirmed (no "will", "likely" or "expected to"). If the item \
+does not give enough information to judge the impact, answer null (shown as "Not enough \
+information"). Never guess.
 
 severity:
 - High: directly affects operations in the Port of Rotterdam and has a timeframe (for example a \
@@ -278,7 +280,8 @@ _RETRY_NOTE = (
     "and the impact in your own words: never more than a few words in a row from the article. The "
     "summary at most 45 words, the impact at most 50 words."
 )
-# Added for a publisher whose permission covers an impact on conditions (RTV Rijnmond, #115).
+# Added to every retry of an item with an impact: first a publisher's condition (RTV Rijnmond, #115),
+# for every source since #123 (owner, 24 Nov 2026).
 _RETRY_POSSIBLE = ("For the impact, write each consequence as possible, with \"could\" or \"may\", never as "
                    "certain or confirmed.")
 
@@ -316,7 +319,7 @@ def _request(item: Item, model: str, system: str, known: list[dict], today: date
     parts.append(_known_block(known))
     if retry_reason is not None:  # our own words, never the AI's or the article's
         note = _RETRY_NOTE.format(reason=retry_reason)
-        if not headline_only and permission is not None and permission.impact:  # #115
+        if not headline_only and _impact_allowed(permission):  # #115, every source since #123
             note += " " + _RETRY_POSSIBLE
         parts.append(note)
     return {
@@ -417,6 +420,8 @@ class _Run:
         except Exception as error:  # a bug of ours in the checks
             return self.fail(item, after(_problem(error)))
         if notice_ended(item, self.read_at):  # owner, 2 Nov 2026 (#67): an ended notice is Low, in code
+            ai["severity"] = "low"
+        if strike_elsewhere(ai):  # owner, 24 Nov 2026 (#123): a strike that doesn't affect Rotterdam is Low
             ai["severity"] = "low"
         ai["written_by"] = {"model": model, "api": api}
         self.failures.extend({"source": SUMMARISER, "error": f"{item.url}: {note}"} for note in notes)
@@ -653,8 +658,8 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
              permission: Permission | None = None, last_try: bool = False) -> dict:
     """The item's AI fields from a checked answer (strike id and written_by are added after).
 
-    `last_try`: this answer is already the one retry, so an impact that sounds confirmed under a
-    publisher's permission is left out instead of retried (#115).
+    `last_try`: this answer is already the one retry, so an impact that sounds confirmed is left out
+    instead of retried (#115; every source since #123).
     """
     impact_left_out = False
     headline_only = _headline_only(item)
@@ -674,9 +679,10 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
             raise _Rephrase(f"summary has more than {permission.max_sentences} sentences")
         if _impact_allowed(permission):  # otherwise an impact sent anyway is never kept (#107)
             impact = _own_words(data["impact"], "impact", IMPACT_MAX, item.article_text)
-        # The publisher's condition (RTV Rijnmond, 23 Nov 2026, #115): possible consequences are never
-        # presented as confirmed. One retry, then no impact line; the rest of the item stays.
-        problem = sounds_confirmed(impact) if permission is not None and impact is not None else None
+        # Possible consequences are never presented as confirmed: RTV Rijnmond's condition (23 Nov 2026,
+        # #115), for every source since #123 (owner, 24 Nov 2026). One retry, then no impact line;
+        # the rest of the item stays.
+        problem = sounds_confirmed(impact) if impact is not None else None
         if problem is not None:
             if not last_try:
                 raise _Rephrase(f"impact {problem}")
@@ -732,6 +738,14 @@ _CERTAIN = re.compile(r"\b(?:will|won't|shall|going to|definitely|certainly|cert
 # Words that make it possible. "may" not next to a number, so "5 May" or "May 5" (a date) don't count.
 _POSSIBLE = re.compile(r"\b(?:could|might|possibly|possible|potentially|perhaps)\b|(?<!\d\s)\bmay\b(?!\s\d)",
                        re.IGNORECASE)
+
+
+def strike_elsewhere(ai: dict) -> bool:
+    """True when the item's strike details say it doesn't affect Rotterdam (#123): such an item is
+    made Low in code, so a strike at another port or an airport can't top the page. The strike flag
+    already ignores it (§5.7)."""
+    strike = ai.get("strike")
+    return isinstance(strike, dict) and strike.get("affects_rotterdam") is False
 
 
 def sounds_confirmed(impact: str) -> str | None:
@@ -979,4 +993,6 @@ def brief_item(item: Item, sources: tuple[Source, ...]) -> dict:
         "map": ai["map"],
         "strike": ai["strike"],
         "permission": written_under,
+        # Only when the impact sounded confirmed twice: the page then shows no impact block (#123).
+        **({"impact_left_out": True} if ai.get("impact_left_out") else {}),
     }
