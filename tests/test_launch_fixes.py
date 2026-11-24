@@ -423,10 +423,13 @@ def test_a_real_page_has_no_strip_under_the_header_and_a_sample_page_keeps_its_n
 CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 
 
-def test_the_laptop_chart_is_the_full_window_height():
+def test_the_laptop_chart_is_the_window_height_minus_the_top_bar():
+    """Owner, review of PR #139: 844 px on a 1440 x 900 laptop (was 812), so the whole chart, its
+    buttons, legend, scale and credit, and the panel's last link are on screen when the page opens."""
     from test_map_upgrades import wide_rules
     stage = wide_rules(".stage")
-    assert "height: clamp(36rem, 100vh, 62rem);" in stage
+    assert "height: clamp(36rem, calc(100vh - var(--topbar-h)), 62rem);" in stage
+    assert re.search(r"--topbar-h:\s*3\.5rem;", CSS)  # the bar the chart sits under
     assert "width:" not in stage and "margin-inline" not in stage  # still full width
 
 
