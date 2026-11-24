@@ -50,7 +50,7 @@ def test_the_laptop_chart_is_full_width_and_the_window_height_minus_the_top_bar(
     # Option E (owner, 24 Nov 2026): the 80rem chart hid 36 more pin pairs at 1440 x 900. The window's
     # height minus the top bar since #138 (owner's review of PR #139: 844 px at 1440 x 900).
     stage = wide_rules(".stage")
-    assert "height: clamp(36rem, calc(100vh - var(--topbar-h)), 62rem);" in stage
+    assert "height: clamp(36rem, calc(100vh - var(--topbar-h) - 1px), 62rem);" in stage
     assert "width:" not in stage and "margin-inline" not in stage  # full width
     assert "border-radius" not in stage and "box-shadow" not in stage  # no frame at the window's edges
     assert "min(80rem" not in CSS and "64rem);" not in stage
