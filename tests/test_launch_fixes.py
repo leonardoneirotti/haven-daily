@@ -441,3 +441,34 @@ def test_the_laptop_chart_keeps_mains_height():
 def test_the_phone_chart_is_still_unchanged():
     base = re.search(r"(?m)^\.chart-map \{(.*?)^\}", CSS, flags=re.S).group(1)
     assert "height: 62vh;" in base and "min-height: 340px;" in base and "max-height: 560px;" in base
+
+
+# --- One map size on every day (owner, before merging PR #139) --------------------------------------
+# Wide screens: an empty day (nothing to pin, no ships) gets the same big map and floating panel as a
+# day with pins, with the "No item has a place on the chart" line visible. Phones keep their strip.
+
+
+def media_blocks(css: str, query: str) -> list[str]:
+    """The bodies of every `@media <query> { … }` block (top-level, closed by a line with only "}")."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    return re.findall(r"@media " + re.escape(query) + r" \{(.*?)\n\}", css, flags=re.S)
+
+
+def test_wide_screens_have_no_empty_day_layout():
+    for block in media_blocks(CSS, "(min-width: 64rem)"):
+        assert ".stage-empty" not in block
+
+
+def test_the_strip_is_for_phones_only():
+    outside = re.sub(r"@media [^{]+\{.*?\n\}", "", re.sub(r"/\*.*?\*/", "", CSS, flags=re.S), flags=re.S)
+    assert ".stage-empty" not in outside  # no rule for every width
+    phone = "".join(media_blocks(CSS, "(max-width: 63.99rem)"))
+    assert re.search(r"\.stage-empty \.chart-map \{[^}]*height: 30vh;[^}]*min-height: 15rem;[^}]*max-height: 20rem;",
+                     phone)
+
+
+def test_an_empty_day_keeps_its_panel_list_and_says_why_on_the_map(tmp_path):
+    html = render_day(tmp_path, make_brief(items=[news("medium")]))
+    assert 'class="panel-items"' in html
+    legend = html[html.index('class="chart-legend'):]
+    assert "No item has a place on the chart today." in text_of(legend[: legend.index("</div>")])
