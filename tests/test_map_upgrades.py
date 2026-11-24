@@ -1,7 +1,9 @@
 """Map upgrades (issue #134, part 2; spec §7.4, §7.5, §8.5).
 
-- Laptop: the chart taller and less wide: at most 80rem wide, centred in a rounded frame, as tall as
-  the window minus the top bar (40-64rem). Owner's choice, 24 Nov 2026. Phones unchanged.
+- Laptop: the chart keeps main's size, full width and the window's height minus the top bar. The
+  owner first chose a taller chart at most 80rem wide; it hid more pin pairs at the opening view
+  (36 more at 1440 x 900), so the owner went back to main's size (option E, 24 Nov 2026).
+  Phones unchanged.
 - A full-screen button on the chart. Where the browser has no full screen for a page element
   (iPhone Safari), an "expanded" chart that fills the window, with a close button. Escape closes it.
 - Clicking or tapping a pin opens a small card: number, severity, English headline (or the
@@ -44,13 +46,13 @@ def wide_rules(selector: str) -> str:
 # --- the laptop chart: taller and less wide --------------------------------------------------
 
 
-def test_the_laptop_stage_is_at_most_80rem_wide_centred_and_as_tall_as_the_window_minus_the_top_bar():
+def test_the_laptop_chart_keeps_mains_size_full_width_and_the_window_height_minus_the_top_bar():
+    # Option E (owner, 24 Nov 2026): the 80rem chart hid 36 more pin pairs at 1440 x 900.
     stage = wide_rules(".stage")
-    assert "height: clamp(40rem, calc(100vh - var(--topbar-h)), 64rem);" in stage
-    assert "width: min(80rem, calc(100% - 2 * var(--gutter)));" in stage
-    assert "margin-inline: auto;" in stage
-    assert "border-radius: var(--radius);" in stage
-    assert "clamp(36rem, calc(100vh - 5.5rem), 62rem)" not in CSS  # the old laptop height
+    assert "height: clamp(36rem, calc(100vh - 5.5rem), 62rem);" in stage
+    assert "width:" not in stage and "margin-inline" not in stage  # full width
+    assert "border-radius" not in stage and "box-shadow" not in stage  # no frame at the window's edges
+    assert "80rem" not in CSS and "64rem);" not in stage
 
 
 def test_the_phone_chart_is_unchanged():
@@ -226,4 +228,5 @@ def test_the_browser_check_has_a_row_for(name):
 
 
 def test_the_spec_describes_the_upgrades():
-    assert "80rem" in SPEC and "Full screen" in SPEC and "pin card" in SPEC.lower()
+    assert "Full screen" in SPEC and "pin card" in SPEC.lower()
+    assert "option E" in SPEC and "80rem wide, centred" not in SPEC  # the laptop chart: main's size again
