@@ -749,11 +749,12 @@ html.js .topbar {
 
 /* Wide screens: the chart fills the first screen and the panel floats over the open sea.
    Full width (owner's option E, 24 Nov 2026, #134: a chart at most 80rem wide hid more pin pairs
-   at the opening view). The window's full height since #138 (owner's review of PR #139: about 10%
-   taller, 900 px instead of 812 on a 1440 x 900 laptop, using the room the one-liner left). */
+   at the opening view). The window's height minus the top bar since #138 (owner's review of PR #139:
+   844 px instead of 812 on a 1440 x 900 laptop, using the room the one-liner left), so the whole
+   chart, with its buttons, legend, scale and credit, is on screen when the page opens. */
 @media (min-width: 64rem) {
   .stage {
-    height: clamp(36rem, 100vh, 62rem);
+    height: clamp(36rem, calc(100vh - var(--topbar-h)), 62rem);
   }
 
   .chart,
