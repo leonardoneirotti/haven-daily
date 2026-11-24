@@ -38,8 +38,8 @@ def item(state="announced", start=None, end=None, *, match="new", strike_id="str
     n = next(_urls)
     return {
         "source": source,
-        # A port strike in its own words: only such an item can turn the flag red (#130).
-        "headline": headline or f"Invented strike at a container terminal {n}",
+        # A port strike in its own words: only such an item can turn the flag red (#130, #132).
+        "headline": headline or f"Invented strike at a container terminal in Rotterdam {n}",
         "url": f"https://example.org/strike/{n}",
         "published": published,
         "language": "en",

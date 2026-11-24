@@ -190,11 +190,45 @@ def test_dutch_port_and_freight_words_are_port_words(word):
 
 @pytest.mark.parametrize("headline", [
     "Sjorders leggen werk neer in Rotterdamse haven",
-    "FNV Havens kondigt acties aan bij containerterminals",
+    "FNV Havens kondigt acties aan bij containerterminals in Rotterdam",  # where: Rotterdam (#132)
     "CNV: werkonderbreking bij sleepdienst in de Botlek",
     "Havenarbeiders in actie op de Maasvlakte",
-    "Douane-actie legt vrachtvervoer stil",
+    "Douanepersoneel staakt op de Maasvlakte",  # "douane-actie" often means a customs raid (#132)
 ])
 def test_a_dutch_port_strike_headline_still_gives_alert(headline):
     assert strike.port_or_freight_strike(record(headline), PLACES) is True
     assert flag(record(headline)).level == "red"
+
+
+# --- where: Rotterdam or a listed place (issue #132) ----------------------------------------------
+
+
+@pytest.mark.parametrize("headline", [
+    "Streik im Hamburger Hafen",
+    "Staking in de haven van Antwerpen",
+    "Dockers strike at the port of Antwerp-Bruges",
+    "Container terminal workers strike in Hamburg",
+])
+def test_a_port_strike_elsewhere_is_not_alert_even_if_the_ai_says_rotterdam(headline):
+    assert strike.port_or_freight_strike(record(headline), PLACES) is False
+    result = flag(record(headline))  # record() says affects_rotterdam: true
+    assert result.level == "amber"  # capped at Watch, still shown
+
+
+@pytest.mark.parametrize("headline", [
+    "Sjorders leggen werk neer in Rotterdamse haven",  # "Rotterdamse": Rotterdam with any ending
+    "Dockers strike in the port of Rotterdam today",
+    "Staking bij containerterminals op de Maasvlakte",  # a place from the place list
+])
+def test_a_port_strike_in_rotterdam_or_a_listed_place_still_gives_alert(headline):
+    assert strike.port_or_freight_strike(record(headline), PLACES) is True
+    assert flag(record(headline)).level == "red"
+
+
+def test_the_summary_must_name_where_too():
+    elsewhere = record("Dockers strike in Rotterdam", "Dock workers at a container terminal in Hamburg went on strike.")
+    assert strike.port_or_freight_strike(elsewhere, PLACES) is False
+
+
+def test_rotterdam_alone_is_not_enough_without_a_port_or_freight_word():
+    assert strike.port_or_freight_strike(record("Staking in Rotterdam vandaag"), PLACES) is False
