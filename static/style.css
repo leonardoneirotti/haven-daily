@@ -1576,6 +1576,23 @@ html.chart-expanded {
   margin-top: 0.75rem;
 }
 
+/* On a phone the chart is short: the card shows the first three lines of the summary
+   ("Full item" has the rest), so it stays small next to its number. */
+@media (max-width: 40rem) {
+  .chart-card-summary {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+
+  /* The item line on top says what the open card says: it makes way, and is back when the card closes. */
+  .chart-frame.has-card .chart-focus {
+    display: none;
+  }
+}
+
 .chart-popup .leaflet-popup-content-wrapper,
 .chart-popup .leaflet-popup-tip {
   background: var(--surface);

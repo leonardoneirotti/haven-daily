@@ -955,23 +955,44 @@
   // it. The keyboard focus goes into the card, and back to the number when it closes. The HTML
   // comes from pins.js (cardHtml, escaped, tested in Node); Leaflet's popup holds it.
   var card = null, cardRank = null;
+  // The room the card may use, in pixels from each edge of the chart: clear of the panel on the
+  // left, the ship filter and the item line on top, the buttons on the right and the attribution
+  // at the bottom. On a phone the bars on top hid the card's first lines (PR #136 screenshot).
+  function cardRoom() {
+    var box = el.getBoundingClientRect(), top = 0, right = 0, bottom = 0;
+    [".chart-filter", ".chart-focus"].forEach(function (selector) {
+      var bar = frame.querySelector(selector);
+      if (bar && !bar.hidden && bar.offsetParent) top = Math.max(top, bar.getBoundingClientRect().bottom - box.top);
+    });
+    var zoom = el.querySelector(".leaflet-control-zoom");
+    if (zoom) right = box.right - zoom.getBoundingClientRect().left;
+    var attribution = el.querySelector(".leaflet-control-attribution");
+    if (attribution) bottom = box.bottom - attribution.getBoundingClientRect().top;
+    // Below the card: its tip, the gap and the number itself (the card opens above the number).
+    var room = { left: panelCover() + 12, top: top + 12, right: right + 8, bottom: bottom + 8 + 2 * NUM_HALF + 24 };
+    room.height = Math.max(120, box.height - room.top - room.bottom - 30); // 30: the card's own margins and border
+    room.width = Math.max(180, box.width - room.left - room.right - 34); // 34: the card's own margins and border
+    return room;
+  }
   function openCard(rank) {
     var callout = callouts[rank];
     if (!callout) return;
     closeCard(false);
-    var cover = panelCover();
+    frame.classList.add("has-card"); // on a phone the item line makes way for the card (style.css)
+    var room = cardRoom();
     card = L.popup({
       className: "chart-popup chart-card",
       closeButton: false,
       closeOnEscapeKey: false, // Escape is handled below, so the focus can go back to the number
-      maxWidth: 300,
-      minWidth: 220,
+      maxWidth: Math.min(300, room.width),
+      minWidth: Math.min(220, room.width),
+      maxHeight: room.height, // a taller card scrolls inside itself
       offset: [0, -20],
-      autoPanPaddingTopLeft: [cover + 16, 16],
-      autoPanPaddingBottomRight: [16, 16],
+      autoPanPaddingTopLeft: [room.left, room.top],
+      autoPanPaddingBottomRight: [room.right, room.bottom],
     }).setLatLng([callout.data.lat, callout.data.lon]).setContent(pinGeometry.cardHtml(callout.data, rank));
     cardRank = rank;
-    card.on("remove", function () { card = null; });
+    card.on("remove", function () { card = null; frame.classList.remove("has-card"); });
     card.openOn(map);
     var body = card.getElement() && card.getElement().querySelector("[role=dialog]");
     if (body) body.focus({ preventScroll: true });
