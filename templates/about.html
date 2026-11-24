@@ -58,7 +58,7 @@
       <h2 id="steps">How a brief is made</h2>
       <ol class="steps">
         <li><strong>Collect, around 06:45 Amsterdam time.</strong> A scheduled job reads the sources listed below and keeps only items it hasn't seen in the last 14 days.</li>
-        <li><strong>Filter.</strong> Fixed rules go first: items older than 48 hours, port notices that ended more than 12 hours ago and clearly off-topic headlines (football, for example) are dropped. Items from Rotterdam-specific sources are kept. An AI model checks the rest: is this relevant to a planner working with the Port of Rotterdam? When unsure, it keeps the item.</li>
+        <li><strong>Filter.</strong> Fixed rules go first: items older than 48 hours, port notices that ended more than 12 hours ago, weekly port roundups for a week that ended more than 48 hours ago and clearly off-topic headlines (football, for example) are dropped. Items from Rotterdam-specific sources are kept. An AI model checks the rest: does it show a clear link to the port, its hinterland routes or the shipping that calls there? A possible knock-on effect is not enough. When an item has such a link and the AI is unsure whether it matters enough, it keeps the item.</li>
         <li><strong>Summarise.</strong> A second AI model writes a two-line summary, a planner impact and a severity for each kept item, following the rules below, and picks its place on the chart and its "affects" tags from fixed lists.</li>
         <li><strong>Status.</strong> The job reads the port status: weather warnings, the Rhine water level at Kaub and the strike flag.</li>
         <li><strong>Publish.</strong> The brief is saved and the site goes online straight away. A day is never skipped.</li>
@@ -72,10 +72,11 @@
       <dl class="rules">
         <div><dt><span class="swatch num-high"></span><span class="sev sev-high">High</span></dt><dd>Directly affects Rotterdam operations and has a timeframe. Example: a strike at a terminal this week.</dd></div>
         <div><dt><span class="swatch num-medium"></span><span class="sev sev-medium">Medium</span></dt><dd>Affects a European route, carrier or hinterland connection that serves Rotterdam.</dd></div>
-        <div><dt><span class="swatch num-low"></span><span class="sev sev-low">Low</span></dt><dd>Background trend or long-term news, or something already over when the brief is made (a closure lifted, a delay cleared). A port notice to shipping whose end date has passed is always Low, whatever the AI answered.</dd></div>
+        <div><dt><span class="swatch num-low"></span><span class="sev sev-low">Low</span></dt><dd>Background trend or long-term news, or something already over when the brief is made (a closure lifted, a delay cleared). A port notice to shipping whose end date has passed is always Low, whatever the AI answered, and so is an item about a strike that doesn't affect Rotterdam.</dd></div>
         <div><dt><span class="swatch num-unrated"></span><span class="sev sev-unrated">Unrated</span></dt><dd>The AI step failed for this item, so it has no severity, summary or impact: only the headline and a link. Unrated items come after all rated ones.</dd></div>
       </dl>
-      <p>The impact for planners is always an interpretation, which is why it is set in a different typeface. When the source does not support one, the item says <em>Not enough information</em> instead of guessing.</p>
+      <p>Within each severity, items with a summary come before headline-only ones.</p>
+      <p>The impact for planners is always an interpretation, which is why it is set in a different typeface. It is based only on what the item says, and it describes consequences as possible, never as certain: an impact that still reads as certain after one retry is left out. When the source does not support one, the item says <em>Not enough information</em> instead of guessing.</p>
       <p>Items from headline-only sources (see Sources) have no summary: the source is paywalled, or its terms don't allow one. The AI rates them from the headline alone, and the item says <em>severity rated from the headline</em>.</p>
       <p>If the AI is unavailable all morning, the job tries again an hour later. If it is still down at the last try, a reduced brief is published so no day is skipped: the port status, and only items from the Rotterdam-specific sources, all unrated, under the note <em>"The AI step was unavailable this morning: headlines only, no summaries."</em> The strike flag then shows No data, because it can't be judged without the AI.</p>
     </section>

@@ -172,7 +172,7 @@ def test_nothing_to_check_gives_nothing():
 
 
 def test_the_check_runs_on_summary_and_impact_against_headline_and_article():
-    said = sonnet_answer(summary="Dock staff at Antwerp plan a stoppage.", impact="Book 7 extra barges.")
+    said = sonnet_answer(summary="Dock staff at Antwerp plan a stoppage.", impact="Planners may need 7 extra barges.")
     client = Client(haiku=[full()], sonnet=[said])
     result = compare([item(1)], client, known=[], today=TODAY, read_at=READ_AT)
     assert result.checks[SONNET][0] == ["Antwerp", "7"]
