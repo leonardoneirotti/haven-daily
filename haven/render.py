@@ -336,7 +336,7 @@ def strike_link(link: dict, ranks: dict[str, int] | None, today: str) -> dict:
     if link.get("day") and link["day"] != today and rank:
         day_link = {"href": f"days/{link['day']}.html#item-{rank}",
                     "label": f"In the {_day_month(date.fromisoformat(link['day']))} brief"}
-    return {"headline": link.get("headline"), "url": link.get("url"), "role_label": label, "meta": meta,
+    return {"headline": link.get("headline"), "url": outside_url(link.get("url")), "role_label": label, "meta": meta,
             "day_link": day_link}
 
 
@@ -346,6 +346,19 @@ def failure_groups(failures: list[dict]) -> list[dict]:
     for failure in failures:
         groups.setdefault(failure.get("source") or "Unknown step", []).append(failure.get("error") or "")
     return [{"source": source, "errors": errors} for source, errors in groups.items()]
+
+
+def outside_url(url) -> str | None:
+    """The link itself when it is an http(s) address, else None: then the page shows the text with no
+    link (#125). The collectors already keep only http(s) links (haven/feeds.py, haven/pages.py); this
+    checks again when the page is built, so a hand-edited brief (a correction) or a future collector
+    can never put a `javascript:` or `data:` link on the page."""
+    if not isinstance(url, str):
+        return None
+    parts = urlparse(url)
+    if url != url.strip() or parts.scheme.lower() not in ("http", "https") or not parts.netloc:
+        return None
+    return url
 
 
 def translate_url(url: str, source_language: str) -> str:
@@ -467,8 +480,8 @@ def prepare_indicator(indicator: dict, previous: dict | None, is_first: bool, br
     indicator["meaning"] = status_meaning(indicator, thresholds, meanings)
     indicator["gauge_marks"] = gauge_marks(indicator, thresholds)
     indicator["gauge_label"] = gauge_label(indicator, thresholds) if indicator["gauge_marks"] else None
-    url = indicator["source_url"]
-    indicator["is_external"] = bool(url) and url.startswith("http")
+    indicator["source_url"] = outside_url(indicator["source_url"])  # #125: text only if not http(s)
+    indicator["is_external"] = indicator["source_url"] is not None
     indicator["is_weather"] = indicator["key"] == "weather"
     indicator["mapping"] = weather_mapping(indicator)
     indicator["issued"] = issue_time(indicator.get("issued_at"), brief_date)
@@ -539,7 +552,8 @@ def prepare_item(item: dict, brief_date: str) -> None:
     # headline-only source, or a `use` item whose article couldn't be read.
     item["rated_from_headline"] = item["severity"] is not None and not item["summary"]
     item["headline_note"] = headline_note(item)
-    if item["language"] == "en":
+    item["url"] = outside_url(item.get("url"))  # #125: the headline without a link if not http(s)
+    if item["language"] == "en" or item["url"] is None:
         item["translate_url"] = None
     else:
         item["translate_url"] = translate_url(item["url"], item["language"])

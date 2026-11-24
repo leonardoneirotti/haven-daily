@@ -3,6 +3,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+{# Security (#125): the browser itself enforces hard rule 14. Scripts, styles, fonts and images come
+   from this site only; no inline or evaluated script, no plugins, no forms, no <base>. Inline style
+   attributes are allowed (the gauges and the chart set CSS variables). A meta tag, because GitHub
+   Pages can't send headers. And no referrer: a clicked link doesn't tell the other site where the
+   visitor came from (fix 7). #}
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{% block title %}{{ site.name }}{% endblock %}</title>
 <meta name="description" content="{{ site.description }}">
