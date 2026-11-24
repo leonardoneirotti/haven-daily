@@ -5,4 +5,4 @@ pytest>=8.3,<10
 shapely>=2.0,<3
 # Only for tools/make_social_preview.py and its test (the social preview image). Pinned to one
 # version so the remade image is pixel-identical to the committed one (tests/test_social_preview.py).
-pillow==12.3.0
+pillow==13.0.0
