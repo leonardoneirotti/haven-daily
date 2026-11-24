@@ -161,7 +161,7 @@ def test_a_pin_click_opens_the_card_and_escape_or_a_click_outside_closes_it():
     assert "L.popup(" in pick and "closeButton: false" in pick and '"chart-popup chart-card"' in pick
     assert "pinGeometry.cardHtml(" in pick
     assert '"Escape"' in pick
-    assert "focus()" in pick  # into the card when it opens, back to the number when it closes
+    assert pick.count(".focus(") >= 2  # into the card when it opens, back to the number when it closes
     wiring = block("Wiring")
     assert "closeCardOutside(event)" in wiring  # a click outside the card closes it
     assert "openCard(" in MAP_JS[MAP_JS.index("function selectItem("):MAP_JS.index("function showShips(")]

@@ -43,10 +43,12 @@
   var bbox = basemap.bbox; // south, west, north, east
   var sheet = L.latLngBounds([bbox[0], bbox[1]], [bbox[2], bbox[3]]);
   var panel = document.querySelector(".panel");
+  var frame = el.parentNode; // .chart-frame: what goes full screen (#134)
 
-  // How many pixels of the chart the panel covers on the left (0 when it sits below the chart).
+  // How many pixels of the chart the panel covers on the left (0 when it sits below the chart,
+  // and while the chart is full screen or expanded: the panel isn't in it then, #134).
   function panelCover() {
-    if (!panel || getComputedStyle(panel).position !== "absolute") return 0;
+    if (isFull() || !panel || getComputedStyle(panel).position !== "absolute") return 0;
     return Math.max(0, panel.getBoundingClientRect().right - el.getBoundingClientRect().left);
   }
   function boundsOf(view) {
@@ -160,6 +162,109 @@
     },
   });
   new HomeControl().addTo(map);
+
+  // ---------- Full screen ----------
+  // Above "Whole port": the chart full screen (#134). Where the browser can't show a part of a page
+  // full screen (iPhone Safari), the chart is "expanded" instead: it fills the window over the
+  // page, which then doesn't scroll. A close button shows in both; Escape closes both (the browser
+  // closes its own full screen). The chart keeps its centre and takes its new size; the panel
+  // isn't in it, so panelCover() is 0 meanwhile. While expanded, Tab stays inside the chart.
+  var canFullscreen = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  var fullButton = null;
+  var closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "btn chart-close";
+  closeButton.title = "Close";
+  closeButton.setAttribute("aria-label", "Close the full-screen chart");
+  closeButton.innerHTML =
+    '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+    'aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+  frame.appendChild(closeButton);
+
+  function fullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+  function isFull() {
+    return fullscreenElement() === frame || frame.classList.contains("is-expanded");
+  }
+  function afterResize() {
+    var full = isFull();
+    frame.classList.toggle("is-full", full);
+    document.documentElement.classList.toggle("chart-expanded", frame.classList.contains("is-expanded"));
+    if (fullButton) {
+      fullButton.setAttribute("aria-pressed", String(full));
+      fullButton.setAttribute("aria-label", full ? "Leave full screen" : "Show the chart full screen");
+      fullButton.title = full ? "Leave full screen" : "Full screen";
+    }
+    map.invalidateSize(); // keeps the centre where it was
+  }
+  function expand() {
+    frame.classList.add("is-expanded");
+    afterResize();
+    closeButton.focus();
+  }
+  function openFull() {
+    if (!canFullscreen) return expand();
+    var request = frame.requestFullscreen || frame.webkitRequestFullscreen;
+    var asked = request.call(frame);
+    if (asked && asked.catch) asked.catch(expand); // refused: expanded instead
+  }
+  function closeFull() {
+    if (fullscreenElement() === frame) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else if (frame.classList.contains("is-expanded")) {
+      frame.classList.remove("is-expanded");
+      afterResize();
+    }
+    var button = fullButton;
+    if (button) button.focus();
+  }
+
+  var FullControl = L.Control.extend({
+    options: { position: "bottomright" },
+    onAdd: function () {
+      var button = L.DomUtil.create("button", "btn chart-fullscreen");
+      button.type = "button";
+      button.title = "Full screen";
+      button.setAttribute("aria-label", "Show the chart full screen");
+      button.setAttribute("aria-pressed", "false");
+      button.innerHTML =
+        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+        'stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>' +
+        '<path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
+      L.DomEvent.disableClickPropagation(button);
+      L.DomEvent.on(button, "click", function () {
+        if (isFull()) closeFull();
+        else openFull();
+      });
+      fullButton = button;
+      return button;
+    },
+  });
+  new FullControl().addTo(map);
+  L.DomEvent.disableClickPropagation(closeButton);
+  closeButton.addEventListener("click", closeFull);
+  document.addEventListener("fullscreenchange", afterResize);
+  document.addEventListener("webkitfullscreenchange", afterResize);
+  document.addEventListener("keydown", function (event) {
+    if (!frame.classList.contains("is-expanded")) return;
+    if (event.key === "Escape") {
+      closeFull();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    // Tab and Shift + Tab wrap inside the expanded chart, so the keyboard can't get lost behind it.
+    var stops = Array.prototype.filter.call(frame.querySelectorAll("button, a[href], [tabindex]:not([tabindex='-1'])"),
+      function (node) { return node.offsetWidth || node.offsetHeight; });
+    if (!stops.length) return;
+    var first = stops[0], last = stops[stops.length - 1];
+    if (event.shiftKey && (document.activeElement === first || !frame.contains(document.activeElement))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || !frame.contains(document.activeElement))) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
 
   // ---------- Basemap ----------
   // Painted by the browser on one canvas, in this order: the water; lines in the
@@ -816,18 +921,81 @@
         "<span><strong>" + escapeHtml(callout.data.label.replace(/\s*→$/, "")) + "</strong>" + detail + "</span>",
       "Chart shows item " + rank + ": " + callout.data.title + detail
     );
-    // Clicked on the chart: show the item next to it, in the panel when it floats over
-    // the chart, otherwise in the full brief below.
-    if (options.fromChart && entry && panelCover()) {
-      entry.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
-    } else if (options.fromChart && item) {
-      item.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+    // Clicked on the chart: the item's card opens next to its number once the chart has flown
+    // there (#134), and the panel, when it floats over the chart, shows the entry too. The page
+    // no longer scrolls down to the full card on a phone: the card is on the chart.
+    if (options.fromChart) {
+      if (entry && panelCover()) entry.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
+      whenStill(function () { openCard(rank); });
     } else if (!options.quiet) {
       revealChart();
     }
     flyTo(points, linked.length ? 13.6 : 11.8);
     setHash("item-" + rank);
   }
+
+  // Once the chart stops moving (or after 1.5 s, if it never moved), run `then` once.
+  function whenStill(then) {
+    var done = false, timer = 0;
+    function once() {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      map.off("moveend", once);
+      then();
+    }
+    map.on("moveend", once);
+    timer = setTimeout(once, 1500);
+  }
+
+  // ---------- Pin card ----------
+  // A number clicked or tapped on the chart opens a small card next to it (#134): number,
+  // severity, headline (the English one if the AI wrote one, the original below it), summary
+  // (or the short card's line) and links. Its close button, Escape, or a click outside it closes
+  // it. The keyboard focus goes into the card, and back to the number when it closes. The HTML
+  // comes from pins.js (cardHtml, escaped, tested in Node); Leaflet's popup holds it.
+  var card = null, cardRank = null;
+  function openCard(rank) {
+    var callout = callouts[rank];
+    if (!callout) return;
+    closeCard(false);
+    var cover = panelCover();
+    card = L.popup({
+      className: "chart-popup chart-card",
+      closeButton: false,
+      closeOnEscapeKey: false, // Escape is handled below, so the focus can go back to the number
+      maxWidth: 300,
+      minWidth: 220,
+      offset: [0, -20],
+      autoPanPaddingTopLeft: [cover + 16, 16],
+      autoPanPaddingBottomRight: [16, 16],
+    }).setLatLng([callout.data.lat, callout.data.lon]).setContent(pinGeometry.cardHtml(callout.data, rank));
+    cardRank = rank;
+    card.on("remove", function () { card = null; });
+    card.openOn(map);
+    var body = card.getElement() && card.getElement().querySelector("[role=dialog]");
+    if (body) body.focus({ preventScroll: true });
+  }
+  function closeCard(backToNumber) {
+    if (!card) return;
+    var rank = cardRank;
+    map.closePopup(card);
+    card = null;
+    if (!backToNumber) return;
+    var number = el.querySelector('.leaflet-marker-pane [data-action="show-item"][data-rank="' + rank + '"]');
+    if (number) number.focus({ preventScroll: true });
+  }
+  // A click anywhere outside the open card closes it (a number opens its own card after).
+  function closeCardOutside(event) {
+    if (card && !event.target.closest(".chart-card")) closeCard(false);
+  }
+  // Escape closes the card first; a second Escape closes an expanded chart. Capture: before
+  // anything else on the page sees the key.
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape" || !card) return;
+    event.stopPropagation();
+    closeCard(true);
+  }, true);
 
   function showShips(status) {
     var group = ships.filter(function (s) { return s.ship.status === status; });
@@ -971,9 +1139,14 @@
   document.addEventListener("click", function (event) {
     // A drag that started on a number and ended on it is a drag, not a pick (#111).
     if (event.target.closest(".leaflet-marker-pane") && map.dragging.moved()) return;
+    closeCardOutside(event);
     var target = event.target.closest("[data-action], [data-ship-filter]");
     if (target) {
       var action = target.getAttribute("data-action");
+      if (action === "close-card") {
+        closeCard(true);
+        return;
+      }
       // Panel entries are links to the full item, so they still work without the chart.
       if (target.tagName === "A") event.preventDefault();
       if (target.hasAttribute("data-ship-filter")) filterShips(target.getAttribute("data-ship-filter"));

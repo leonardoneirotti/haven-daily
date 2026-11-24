@@ -758,10 +758,17 @@ html.js .topbar {
   pointer-events: none;
 }
 
-/* Wide screens: the chart fills the first screen and the panel floats over the open sea */
+/* Wide screens: the chart fills the first screen and the panel floats over the open sea.
+   At most 80rem wide, centred in a rounded frame, as tall as the window minus the top bar (owner's
+   choice, 24 Nov 2026, #134; was the full window width and 100vh - 5.5rem, 36-62rem). */
 @media (min-width: 64rem) {
   .stage {
-    height: clamp(36rem, calc(100vh - 5.5rem), 62rem);
+    width: min(80rem, calc(100% - 2 * var(--gutter)));
+    height: clamp(40rem, calc(100vh - var(--topbar-h)), 64rem);
+    margin-inline: auto;
+    overflow: hidden;
+    border-radius: var(--radius);
+    box-shadow: 0 0 0 1px var(--rule);
   }
 
   .chart,
@@ -1454,6 +1461,119 @@ html.js .topbar {
 
 .leaflet-container .leaflet-control-attribution a {
   color: var(--ink);
+}
+
+/* ---------- Full screen and the expanded chart (#134) ----------
+   The button sits above "Whole port". Where the browser can't show the chart full screen
+   (iPhone Safari) the frame is fixed over the whole window instead, and the page behind it
+   doesn't scroll. A close button shows in both, top right; the ship filter moves to the left
+   edge (no panel in the way) and the focus box makes room for the close button. */
+.chart-fullscreen {
+  width: var(--btn-h);
+  padding: 0;
+}
+
+.chart-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 470;
+  display: none;
+  width: var(--btn-h);
+  padding: 0;
+  box-shadow: 0 4px 14px var(--shadow);
+}
+
+.chart-frame.is-full .chart-close {
+  display: inline-flex;
+}
+
+.chart-frame.is-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  background: var(--water);
+}
+
+html.chart-expanded {
+  overflow: hidden;
+}
+
+.chart-frame:fullscreen {
+  width: 100%;
+  height: 100%;
+  background: var(--water);
+}
+
+.chart-frame.is-full .chart-map {
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+}
+
+.chart-frame.is-full .chart-filter {
+  left: 10px;
+}
+
+.chart-frame.is-full .chart-focus {
+  right: calc(var(--btn-h) + 20px);
+}
+
+/* ---------- The pin card (#134): a clicked number's item, next to it on the chart ---------- */
+.chart-card .leaflet-popup-content {
+  margin: 0.8rem 0.9rem 0.9rem;
+}
+
+.chart-card-body:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.chart-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.chart-card-top .num {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 5px;
+  font-size: 0.95rem;
+}
+
+.chart-card-close {
+  width: var(--btn-h);
+  margin-left: auto;
+  padding: 0;
+}
+
+.chart-card-title {
+  margin-top: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.chart-card-original {
+  margin-top: 0.25rem;
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.chart-card-summary {
+  margin-top: 0.45rem;
+}
+
+.chart-card-summary.is-empty {
+  color: var(--ink-2);
+}
+
+.chart-card-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.75rem;
 }
 
 .chart-popup .leaflet-popup-content-wrapper,
