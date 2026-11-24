@@ -10,7 +10,7 @@
 
 ## About me (for context only)
 
-- 2nd-year BBA International Business (Supply Chain Management), Rotterdam University of Applied Sciences; looking for a 20-week internship from February 2027.
+- Second-year International Business student (Supply Chain Management) at Rotterdam University of Applied Sciences; looking for a 20-week internship from February 2027.
 - I build with Claude Code step by step. **Explain decisions briefly**: I need to be able to talk about every part of it in an interview.
 
 ## Key decisions (details in the spec)
