@@ -305,3 +305,20 @@ def test_the_spec_records_the_owners_decisions_of_24_november():
     assert "#123" in spec
     assert "replaces the PR #58 rule" in spec
     assert "24 Nov 2026" in spec
+
+
+# --- How it works says the same ---------------------------------------------------------------
+
+
+def test_how_it_works_explains_the_new_rules():
+    from haven.config import load_sources
+    from tests.test_method_page import render_method
+    from tests.test_render_real import text_of
+
+    text = text_of(render_method(sources=load_sources()))
+    assert "weekly port roundups for a week that ended more than 48 hours ago" in text
+    assert "A possible knock-on effect is not enough." in text
+    assert "so is an item about a strike that doesn't affect Rotterdam" in text
+    assert "Within each severity, items with a summary come before headline-only ones." in text
+    assert "describes consequences as possible, never as certain" in text
+    assert "When unsure, it keeps the item." not in text
