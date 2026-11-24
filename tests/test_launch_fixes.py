@@ -91,10 +91,14 @@ def test_road_is_a_place_kind():
     assert "road" in PLACE_KINDS
 
 
-@pytest.mark.parametrize("place_id, label, osm", [("a15", "A15", "node/1367173739"), ("a20", "A20", "node/44421242")])
-def test_the_a15_and_a20_are_on_the_place_list(place_id, label, osm):
+# On each road's stretch inside the port (owner's option A, PR #139 review): the A15 at exit 15 near
+# the Botlek, the A20 at exit 7 Maassluis. The junctions with the A4 (Benelux, Kethelplein) were further
+# east and hid 4 more pin pairs at the opening view.
+@pytest.mark.parametrize("place_id, label, osm, lat, lon", [("a15", "A15", "node/44155110", 51.8686, 4.2714),
+                                                            ("a20", "A20", "node/322088946", 51.9253, 4.2672)])
+def test_the_a15_and_a20_are_on_the_place_list(place_id, label, osm, lat, lon):
     place = next(p for p in load_places() if p.id == place_id)
-    assert (place.label, place.kind, place.osm) == (label, "road", osm)
+    assert (place.label, place.kind, place.osm, place.lat, place.lon) == (label, "road", osm, lat, lon)
 
 
 def test_the_summariser_is_offered_the_roads():
