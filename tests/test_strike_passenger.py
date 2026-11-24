@@ -172,3 +172,29 @@ def test_the_prompt_says_a_passenger_transport_strike_does_not_affect_rotterdam(
     for word in ("bus", "tram", "metro", '"ov"'):
         assert word in rule
     assert "false" in rule
+
+
+# --- Dutch port-strike wording (owner, 24 Nov 2026, PR #131) --------------------------------------
+
+
+@pytest.mark.parametrize("word", ["staking", "werkonderbreking", "actie", "acties", "FNV Havens", "CNV"])
+def test_dutch_labour_action_words_are_strike_words(word):
+    assert strike.off_topic_word(f"x {word} x", strike.STRIKE_WORDS) is not None
+
+
+@pytest.mark.parametrize("word", ["sjorders", "loodsen", "sleepdienst", "havenarbeiders", "FNV Havens",
+                                  "terminal", "containerterminal", "vrachtvervoer", "binnenvaart", "douane"])
+def test_dutch_port_and_freight_words_are_port_words(word):
+    assert strike.off_topic_word(f"x {word} x", strike.FREIGHT_WORDS) is not None
+
+
+@pytest.mark.parametrize("headline", [
+    "Sjorders leggen werk neer in Rotterdamse haven",
+    "FNV Havens kondigt acties aan bij containerterminals",
+    "CNV: werkonderbreking bij sleepdienst in de Botlek",
+    "Havenarbeiders in actie op de Maasvlakte",
+    "Douane-actie legt vrachtvervoer stil",
+])
+def test_a_dutch_port_strike_headline_still_gives_alert(headline):
+    assert strike.port_or_freight_strike(record(headline), PLACES) is True
+    assert flag(record(headline)).level == "red"
