@@ -49,7 +49,7 @@ site/                     output, not committed (GitHub Actions will build it)
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install --require-hashes -r requirements.txt
 .\.venv\Scripts\python.exe -m haven.render
 ```
 
@@ -58,7 +58,7 @@ Then open `site/index.html` in a browser. Without `--briefs` the renderer uses t
 Run all tests:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pip install --require-hashes -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m pytest
 ```
 
@@ -82,7 +82,7 @@ The morning pipeline (collect, filter, summarise, status, brief) writes today's 
 The basemap is already built. To rebuild it (for example after changing the map area or place names in `tools/build_basemap.py`):
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pip install --require-hashes -r requirements-dev.txt
 .\.venv\Scripts\python.exe tools\build_basemap.py
 ```
 
