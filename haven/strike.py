@@ -12,8 +12,9 @@ module only reads them back and applies the rules.
    collection day, then latest `published`, then later in the file).
 3. **Level from the newest item** (§5.7 table), only for `affects_rotterdam: true`. **Alert
    (red) needs the item's own words** (issue #130): its summary, or its headline when it has
-   none, must name a strike and the port or freight transport, and no passenger public
-   transport (`port_or_freight_strike`). Otherwise the strike is capped at Watch (amber).
+   none, must name a strike, the port or freight transport, and Rotterdam or a listed place
+   (#132), and no passenger public transport (`port_or_freight_strike`). Otherwise the strike
+   is capped at Watch (amber).
 4. **Safety rule:** only a confident match (`new` / `same`) can lower a level. An `unsure` item
    that would lower it (or keep it) leaves the strike as it was and is shown next to it; one that
    would **raise** it counts as a strike of its own, shown next to the strike it might be.
@@ -76,6 +77,8 @@ FREIGHT_WORDS = (
     "transporteur*", "FNV Havens",
     "hafen*", "güter*", "binnenschiff*", "lotsen",
 )
+# Where: Rotterdam with any ending ("Rotterdamse haven"); the place list's labels count too (#132).
+ROTTERDAM_WORDS = ("Rotterdam*",)
 # Passenger public transport: any of these and the strike can't be confirmed as a freight one.
 PASSENGER_WORDS = (
     "public transport", "openbaar vervoer", "ov", "bus", "buses", "busses", "bussen", "busstaking*",
@@ -273,15 +276,18 @@ def port_or_freight_strike(record: dict, places: tuple[Place, ...] = ()) -> bool
     headline alone may raise the flag, §2.1). They must name a strike and the port or freight
     transport (a word of `FREIGHT_WORDS` or a place name), and no passenger public transport:
     "te hoge vrachtwagens en ov-staking" names trucks, but its strike is a public-transport one
-    (issue #130). Nothing here asks the AI; it checks the AI's `affects_rotterdam`.
+    (issue #130). They must also say where: Rotterdam or a place from the place list, because
+    "port" or "Hafen" fits Antwerp and Hamburg too (issue #132). Nothing here asks the AI; it
+    checks the AI's `affects_rotterdam`.
     """
     summary = record.get("summary")
     text = summary if isinstance(summary, str) and summary.strip() else record.get("headline")
     if not isinstance(text, str) or not text.strip():
         return False
-    port = FREIGHT_WORDS + tuple(place.label for place in places)
+    names = tuple(place.label for place in places)
     return (off_topic_word(text, STRIKE_WORDS) is not None
-            and off_topic_word(text, port) is not None
+            and off_topic_word(text, FREIGHT_WORDS + names) is not None
+            and off_topic_word(text, ROTTERDAM_WORDS + names) is not None
             and off_topic_word(text, PASSENGER_WORDS) is None)
 
 
