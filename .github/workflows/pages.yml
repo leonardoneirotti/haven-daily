@@ -34,18 +34,18 @@ jobs:
     steps:
       # The latest main, not the commit that started this run: if the daily job pushed a brief
       # a moment after the owner's push, this deployment still includes it (and the reverse).
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
 
       # Install Python 3.12; cache pip downloads between runs to save time.
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
           cache: pip
 
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: python -m pip install --require-hashes -r requirements.txt
 
       # The real briefs in data/briefs/, or the samples until the first morning run has
       # committed one (haven.render.default_briefs_dir); never both.
@@ -53,14 +53,14 @@ jobs:
         run: python -m haven.render --out site
 
       # Read this repo's Pages settings (address, base path) for the deploy.
-      - uses: actions/configure-pages@v6
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       # Pack site/ into the artifact the deploy step publishes.
       # Since v4, dotfiles are left out; site/ has none, so nothing is lost.
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
 
       # Publish the artifact to GitHub Pages.
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

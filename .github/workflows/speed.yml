@@ -45,17 +45,17 @@ jobs:
       # merged, so each pull request is measured on its own changes.
       BEFORE: ${{ github.ref_name == 'issue-104-lighter-map' && 'origin/issue-104-load-first' || 'origin/main' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # main too, for the "before" site
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
           cache: pip
 
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: python -m pip install --require-hashes -r requirements.txt
 
       - name: Build the sample site, before and after (this branch)
         run: |
