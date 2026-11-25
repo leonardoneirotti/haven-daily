@@ -101,6 +101,17 @@ The social preview card (`static/social-preview.png`, what LinkedIn shows for a 
 .\.venv\Scripts\python.exe tools\make_social_preview.py
 ```
 
+## If the morning deploy fails
+
+The morning job ("Daily brief") commits the day's brief to `main` first and deploys the site after. So a failed deploy never loses the brief: the page is just late. GitHub sends a notification for the failed run.
+
+1. Open the failed run in the **Actions** tab. If only the **deploy** job is red (the site was built), click **Re-run failed jobs**. It re-runs the deploy alone, with the same upload; nothing is built or committed again. The deploy already tries twice by itself (#146), so this is a third try.
+2. Still red, or the **build** job failed: **Actions → Build and deploy site → Run workflow** (branch `main`). This builds the latest `main` (the brief included) and deploys it. It costs nothing, since no AI is used.
+3. Check https://havendaily.nl/: the date at the top should be today's.
+4. If it keeps failing, look at https://www.githubstatus.com/ (Pages or Actions): when GitHub reports a problem, wait and run step 2 later.
+
+**Never re-run the whole "Daily brief" for a deploy problem.** Today's brief is already on `main`, so its guard stops the run; and if it didn't, it would be a second paid AI run.
+
 ## Brief format (one file per day)
 
 | Field | Meaning |

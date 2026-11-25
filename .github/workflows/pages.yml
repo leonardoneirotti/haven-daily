@@ -2,7 +2,7 @@
 # Runs on every push to main (the owner's code changes and corrections), by hand from the
 # Actions tab ("Run workflow"), and at the end of the daily job (daily.yml calls it), because
 # the daily job's own push, made with GITHUB_TOKEN, doesn't start other workflows.
-# The built site/ folder is never committed: it only exists inside this job.
+# The built site/ folder is never committed: it only exists inside the build job and its upload.
 name: Build and deploy site
 
 on:
@@ -11,26 +11,19 @@ on:
   workflow_dispatch:
   workflow_call:
 
-# Only what deploying to Pages needs: read the code, publish Pages, prove the
-# deployment comes from this repository (id-token).
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+# Nothing by default; each job asks for what it needs (#146).
+permissions: {}
 
+# Two jobs, as in GitHub's own Pages workflow (#146). In one job the deploy sometimes asked for the
+# upload before GitHub listed it ("Found 0 artifact(s)", 3 of 4 failures on 24-25 Nov 2026), and
+# "Re-run failed jobs" re-ran the upload too, so the deploy then found two. Now the deploy starts
+# only after the build job has finished, and re-running the deploy job alone uploads nothing new.
 jobs:
-  site:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # One deployment at a time, shared by every way this job starts; a newer run never cancels one
-    # that is publishing. A waiting run may be replaced by a newer one, which is fine: every run
-    # renders the latest main (below), so the newest one always includes everything.
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
     steps:
       # The latest main, not the commit that started this run: if the daily job pushed a brief
       # a moment after the owner's push, this deployment still includes it (and the reverse).
@@ -57,12 +50,40 @@ jobs:
       # Read this repo's Pages settings (address, base path) for the deploy.
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
-      # Pack site/ into the artifact the deploy step publishes.
+      # Pack site/ into the artifact the deploy job publishes.
       # Since v4, dotfiles are left out; site/ has none, so nothing is lost.
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
 
-      # Publish the artifact to GitHub Pages.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Publish Pages, and prove the deployment comes from this repository (id-token).
+    permissions:
+      pages: write
+      id-token: write
+    # One deployment at a time, shared by every way this job starts; a newer run never cancels one
+    # that is publishing. A waiting run may be replaced by a newer one, which is fine: every run
+    # renders the latest main, so the newest one always includes everything.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url || steps.retry.outputs.page_url }}
+    steps:
+      # Publish the build job's upload. If GitHub answers with an error ("try again later"),
+      # wait and try once more with the same upload (#146).
       - id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+      - name: Wait before the one retry
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+
+      - id: retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
