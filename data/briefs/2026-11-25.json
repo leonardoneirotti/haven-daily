@@ -1,0 +1,369 @@
+{
+  "build": {
+    "ai_unavailable": false,
+    "ai_usage": {
+      "relevance_check": {
+        "calls": 54,
+        "input_tokens": 83260,
+        "output_tokens": 4021
+      },
+      "summariser": {
+        "batch_input_tokens": 49564,
+        "batch_output_tokens": 1449,
+        "calls": 2,
+        "input_tokens": 59693,
+        "output_tokens": 1823
+      }
+    },
+    "duplicates": 42,
+    "failures": [],
+    "feeds_read_at": "2026-11-25T18:50:47+01:00",
+    "items_collected": 66,
+    "items_kept": 11,
+    "sources_checked": 8,
+    "summaries": {
+      "batch": 9,
+      "fallback": 2
+    }
+  },
+  "built_at": "2026-11-25T18:55:05+01:00",
+  "corrections": [],
+  "date": "2026-11-25",
+  "items": [
+    {
+      "access": "full",
+      "affects": [],
+      "headline": "‘I'm particularly curious about what lies ahead’",
+      "impact": null,
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": "2026-11-24T10:56:21+01:00",
+      "severity": "low",
+      "source": "Port of Rotterdam Authority news & press releases",
+      "strike": null,
+      "summary": "The new director of PortXL, the maritime accelerator, talks about his career and approach. Eleven startups chosen for the 2026 programme will pitch at a Grand Finale on 3 December.",
+      "url": "https://www.portofrotterdam.com/en/news-and-press-releases/im-particularly-curious-about-what-lies-ahead",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "full",
+      "affects": [
+        "Containers",
+        "Barge",
+        "Shortsea",
+        "APMT Maasvlakte II"
+      ],
+      "headline": "APM Terminals Maasvlakte II and Port of Rotterdam Authority take next step in terminal development",
+      "impact": "Extra quay and capacity for deepsea, feeder and barge vessels could ease container handling at Rotterdam in the longer term. Nothing changes immediately, and construction work could affect the site from late 2027, so planners may simply monitor developments.",
+      "language": "en",
+      "map": {
+        "label": "APMT Maasvlakte II",
+        "lat": 51.9505,
+        "lon": 4.0068,
+        "side": "left"
+      },
+      "permission": null,
+      "published": "2026-11-24T10:31:47+01:00",
+      "severity": "low",
+      "source": "Port of Rotterdam Authority news & press releases",
+      "strike": null,
+      "summary": "APM Terminals Maasvlakte II and the port authority are preparing a further build-out of the Maasvlakte II container terminal, with extra land, a longer quay and more capacity. Approval is still pending, and construction is planned between October 2027 and January 2030.",
+      "url": "https://www.portofrotterdam.com/en/news-and-press-releases/apm-terminals-maasvlakte-ii-and-port-rotterdam-authority-take-next-step",
+      "written_by": {
+        "api": "standard",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "full",
+      "affects": [
+        "Sea access"
+      ],
+      "headline": "Capacity Arrangement Boluda Tugboats - Activate",
+      "impact": "Vessels using Boluda tugs may be placed on a waiting list, which could shift the timing of arrivals and departures. Tide-bound ships could get priority, and ordering tug services early may help scheduling.",
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": "2026-11-24T20:25:21+01:00",
+      "severity": "high",
+      "source": "PIN notices to shipping",
+      "strike": null,
+      "summary": "A capacity arrangement for Boluda tugboats was switched on on 24 November because of heavy traffic. It covers all areas of the port.",
+      "url": "https://pin.portofrotterdam.com/pin-16863",
+      "written_by": {
+        "api": "standard",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "full",
+      "affects": [
+        "Sea access",
+        "Barge",
+        "Botlekbrug"
+      ],
+      "headline": "Navigational information – Botlek bridge Disruption - De-activate",
+      "impact": null,
+      "language": "en",
+      "map": {
+        "label": "Botlekbrug",
+        "lat": 51.8713,
+        "lon": 4.3301,
+        "side": "right"
+      },
+      "permission": null,
+      "published": "2026-11-24T08:26:24+01:00",
+      "severity": "low",
+      "source": "PIN notices to shipping",
+      "strike": null,
+      "summary": "A notice from 24 November says the Botlek bridge is operating again after a disruption. The Harbour Coordination Center can be contacted for more information.",
+      "url": "https://pin.portofrotterdam.com/pin-16862",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "headline-only",
+      "affects": [
+        "Containers",
+        "APMT Maasvlakte II"
+      ],
+      "headline": "Rotterdam plans 711-metre quay extension to add 1.4 million TEU at APM Terminals Maasvlakte II",
+      "impact": null,
+      "language": "en",
+      "map": {
+        "label": "APMT Maasvlakte II",
+        "lat": 51.9505,
+        "lon": 4.0068,
+        "side": "left"
+      },
+      "permission": null,
+      "published": "2026-11-25T14:46:48+01:00",
+      "severity": "low",
+      "source": "PortsEurope",
+      "strike": null,
+      "summary": null,
+      "url": "https://www.portseurope.com/rotterdam-plans-711-metre-quay-extension-to-add-1-4-million-teu-at-apm-terminals-maasvlakte-ii/",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "headline-only",
+      "affects": [
+        "Containers",
+        "Maasvlakte II",
+        "APMT Maasvlakte II"
+      ],
+      "headline": "APM Terminals plans 1.4m teu expansion at Rotterdam’s Maasvlakte II",
+      "impact": null,
+      "language": "en",
+      "map": {
+        "label": "APMT Maasvlakte II",
+        "lat": 51.9505,
+        "lon": 4.0068,
+        "side": "left"
+      },
+      "permission": null,
+      "published": "2026-11-25T13:43:26+01:00",
+      "severity": "low",
+      "source": "The Loadstar",
+      "strike": null,
+      "summary": null,
+      "url": "https://theloadstar.com/apm-terminals-plans-1-4m-teu-expansion-at-rotterdams-maasvlakte-ii/",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "full",
+      "affects": [
+        "Truck pickups",
+        "Hinterland",
+        "A15"
+      ],
+      "headline": "Ongeluk in tunnel en vrachtwagen met pech vóór tunnel zorgen voor file",
+      "impact": "Trucks collecting or delivering cargo on the A15 towards Ridderkerk could have faced delays of up to an hour. The item suggests the disruption was temporary, so later effects on pickups may be limited.",
+      "language": "nl",
+      "map": {
+        "label": "A15",
+        "lat": 51.8686,
+        "lon": 4.2714,
+        "side": "right"
+      },
+      "permission": {
+        "granted": "2026-11-19",
+        "impact": true,
+        "max_sentences": 2
+      },
+      "published": "2026-11-25T14:29:57+01:00",
+      "severity": "low",
+      "source": "RTV Rijnmond",
+      "strike": null,
+      "summary": "An accident and a broken-down truck caused congestion near the Noordtunnel on Wednesday afternoon. Traffic on the A15 towards Ridderkerk was briefly delayed by about an hour.",
+      "url": "https://www.rijnmond.nl/nieuws/2288079/ongeluk-in-tunnel-en-vrachtwagen-met-pech-voor-tunnel-zorgen-voor-file",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "full",
+      "affects": [
+        "Truck pickups"
+      ],
+      "headline": "Opnieuw hoge vrachtwagen vast voor Drechttunnel: lange file tijdens ochtendspits",
+      "impact": "Trucks heading for Rotterdam via the A16 could face delays on the approach. Planners may want to allow extra time for pickups and deliveries, though the item gives no information on how long the jam lasts.",
+      "language": "nl",
+      "map": null,
+      "permission": {
+        "granted": "2026-11-19",
+        "impact": true,
+        "max_sentences": 2
+      },
+      "published": "2026-11-25T07:53:59+01:00",
+      "severity": "low",
+      "source": "RTV Rijnmond",
+      "strike": null,
+      "summary": "A vehicle that was too tall got stuck before the Drechttunnel on the A16 towards Rotterdam on Wednesday morning. A long traffic jam built up during the morning rush.",
+      "url": "https://www.rijnmond.nl/nieuws/2287915/opnieuw-hoge-vrachtwagen-vast-voor-drechttunnel-lange-file-tijdens-ochtendspits",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "full",
+      "affects": [
+        "Truck pickups"
+      ],
+      "headline": "Petitie tegen tolchaos op A24 en hoge boetes: 'Je kan niet betalen achter het stuur'",
+      "impact": "Truck drivers and carriers using the tunnel could receive reminders or fines if toll payment is missed afterwards, which may add admin work and costs. The item does not say how freight is affected specifically.",
+      "language": "nl",
+      "map": null,
+      "permission": {
+        "granted": "2026-11-19",
+        "impact": true,
+        "max_sentences": 2
+      },
+      "published": "2026-11-24T16:50:32+01:00",
+      "severity": "low",
+      "source": "RTV Rijnmond",
+      "strike": null,
+      "summary": "A petition has been started by former government commissioner Arre Zuurmond over confusion about paying the toll for the A24 tunnel between Vlaardingen and Rozenburg. Each month, about a hundred thousand payment reminders and tens of thousands of fines are sent to drivers who did not pay.",
+      "url": "https://www.rijnmond.nl/nieuws/2287230/petitie-tegen-tolchaos-op-a24-en-hoge-boetes-je-kan-niet-betalen-achter-het-stuur",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "full",
+      "affects": [
+        "Truck pickups"
+      ],
+      "headline": "Ravage na botsing en vrachtwagen met pech: veel files door ongelukken op A13, A16 en A29",
+      "impact": "Trucks heading to or from Rotterdam via the A13, A16 or A29 could face delays. However, the report dates from the morning of 24 November and does not say how long the disruption lasted, so planners may want to check current traffic.",
+      "language": "nl",
+      "map": null,
+      "permission": {
+        "granted": "2026-11-19",
+        "impact": true,
+        "max_sentences": 2
+      },
+      "published": "2026-11-24T07:33:38+01:00",
+      "severity": "low",
+      "source": "RTV Rijnmond",
+      "strike": null,
+      "summary": "Tuesday morning brought heavy congestion on several roads in the Rijnmond region. A crash involving two cars on the A13 and a broken-down truck on the A16 caused queues, which also backed up traffic onto the A29.",
+      "url": "https://www.rijnmond.nl/nieuws/2287222/ravage-na-botsing-en-vrachtwagen-met-pech-veel-files-door-ongelukken-op-a13-a16-en-a29",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    },
+    {
+      "access": "headline-only",
+      "affects": [],
+      "headline": "Port operational updates from around the world (18 Nov - 24 Nov 2026)",
+      "impact": null,
+      "language": "en",
+      "map": null,
+      "permission": null,
+      "published": null,
+      "severity": "low",
+      "source": "Kuehne+Nagel SeaNews",
+      "strike": null,
+      "summary": null,
+      "url": "https://mykn.kuehne-nagel.com/news/article/port-operational-updates-from-24-11-2026",
+      "written_by": {
+        "api": "batch",
+        "model": "claude-sonnet-5-5"
+      }
+    }
+  ],
+  "sample": false,
+  "ships": null,
+  "status": [
+    {
+      "hazards": [
+        "Wind"
+      ],
+      "icon": "wind",
+      "issued_at": "2026-11-25T17:37:33+01:00",
+      "key": "weather",
+      "knmi_level": "yellow",
+      "label": "Weather warnings",
+      "level": "amber",
+      "note": "Warnings at 18:52 · not live",
+      "observed_at": "2026-11-25T18:52:41+01:00",
+      "place": "Port of Rotterdam area",
+      "source_name": "KNMI via MeteoAlarm",
+      "source_url": "https://www.meteoalarm.org",
+      "value": "Code yellow · Wind",
+      "warnings": [
+        {
+          "expires": "2026-11-26T17:37:31+01:00",
+          "hazard": "Wind",
+          "issued_at": "2026-11-25T17:37:33+01:00",
+          "level": "yellow",
+          "onset": "2026-11-24T11:12:49+01:00"
+        }
+      ]
+    },
+    {
+      "gauge_max": 700,
+      "icon": "waves",
+      "key": "rhine",
+      "label": "Rhine water level",
+      "level": "green",
+      "note": null,
+      "observed_at": "2026-11-25T18:45:00+01:00",
+      "place": "Kaub gauge",
+      "source_name": "WSV via PEGELONLINE",
+      "source_url": "https://pegelonline.wsv.de/gast/stammdaten?pegelnr=25700100",
+      "unit": "cm",
+      "value": 240
+    },
+    {
+      "icon": "megaphone",
+      "items": [],
+      "key": "strike",
+      "label": "Strike flag",
+      "level": "green",
+      "note": null,
+      "observed_at": "2026-11-25T18:50:47+01:00",
+      "place": "From the news of the last 14 days",
+      "source_name": "Haven Daily's news sources",
+      "source_url": null,
+      "value": "No active strike"
+    }
+  ]
+}

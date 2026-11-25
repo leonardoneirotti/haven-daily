@@ -1,0 +1,67 @@
+[
+  {
+    "hazards": [
+      "Wind"
+    ],
+    "icon": "wind",
+    "issued_at": "2026-11-25T17:37:33+01:00",
+    "key": "weather",
+    "knmi_level": "yellow",
+    "label": "Weather warnings",
+    "level": "amber",
+    "note": "Warnings at 18:52 · not live",
+    "observed_at": "2026-11-25T18:52:41+01:00",
+    "place": "Port of Rotterdam area",
+    "source_name": "KNMI via MeteoAlarm",
+    "source_url": "https://www.meteoalarm.org",
+    "value": "Code yellow · Wind",
+    "warnings": [
+      {
+        "expires": "2026-11-26T17:37:31+01:00",
+        "hazard": "Wind",
+        "issued_at": "2026-11-25T17:37:33+01:00",
+        "level": "yellow",
+        "onset": "2026-11-24T11:12:49+01:00"
+      }
+    ]
+  },
+  {
+    "gauge_max": 700,
+    "icon": "waves",
+    "key": "rhine",
+    "label": "Rhine water level",
+    "level": "green",
+    "note": null,
+    "observed_at": "2026-11-25T18:45:00+01:00",
+    "place": "Kaub gauge",
+    "source_name": "WSV via PEGELONLINE",
+    "source_url": "https://pegelonline.wsv.de/gast/stammdaten?pegelnr=25700100",
+    "unit": "cm",
+    "value": 240
+  },
+  {
+    "icon": "waves",
+    "key": "rhine-lobith",
+    "label": "Rhine water level, Lobith",
+    "note": null,
+    "observed_at": "2026-11-25T18:30:00+01:00",
+    "place": "Lobith gauge (Tolkamer)",
+    "source_name": "Rijkswaterstaat",
+    "source_url": "https://rijkswaterstaatdata.nl/waterdata/",
+    "unit": "cm NAP",
+    "value": 920
+  },
+  {
+    "icon": "megaphone",
+    "items": [],
+    "key": "strike",
+    "label": "Strike flag",
+    "level": "green",
+    "note": null,
+    "observed_at": "2026-11-25T18:50:47+01:00",
+    "place": "From the news of the last 14 days",
+    "source_name": "Haven Daily's news sources",
+    "source_url": null,
+    "value": "No active strike"
+  }
+]
