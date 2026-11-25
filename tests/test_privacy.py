@@ -320,3 +320,20 @@ def test_method_page_has_a_privacy_section(site):
     hrefs = {a["href"] for a in section.find_all("a")}
     assert {GITHUB_PRIVACY, GITHUB_PAGES_DATA} <= hrefs
 
+
+
+# --- canonical links (owner, 25 Nov 2026): this site's own address only -----------------------------
+
+
+def test_a_canonical_link_to_this_sites_own_address_is_not_a_load():
+    from haven.config import load_site
+    base = load_site().base_url
+    assert page_problems(f'<link rel="canonical" href="{base}days/2026-11-25.html">') == []
+
+
+@pytest.mark.parametrize("snippet", [
+    '<link rel="canonical" href="https://elsewhere.example/page.html">',
+    '<link rel="stylesheet" href="https://leonardoneirotti.github.io/haven-daily/static/style.css">',
+])
+def test_any_other_outside_href_on_a_link_still_fails(snippet):
+    assert page_problems(snippet)
