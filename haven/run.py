@@ -281,9 +281,13 @@ def _usage(filtered: FilterResult, summary: SummaryResult | None) -> dict:
     return {
         "relevance_check": {"calls": filtered.ai_calls, "input_tokens": filtered.input_tokens,
                             "output_tokens": filtered.output_tokens},
+        # input/output_tokens are all the summariser's tokens; batch_* the half-price part and
+        # standard_* the full-price part (#143), so the cost is read per route.
         "summariser": {"calls": summary.calls, "input_tokens": summary.input_tokens,
                        "output_tokens": summary.output_tokens, "batch_input_tokens": summary.batch_input_tokens,
-                       "batch_output_tokens": summary.batch_output_tokens},
+                       "batch_output_tokens": summary.batch_output_tokens,
+                       "standard_input_tokens": summary.standard_input_tokens,
+                       "standard_output_tokens": summary.standard_output_tokens},
     }
 
 
@@ -306,8 +310,14 @@ def main(argv=None) -> int:
         usage = build["ai_usage"]
         print(f"Summaries: {build['summaries']['batch']} batch, {build['summaries']['fallback']} fallback. "
               f"AI tokens: relevance check {usage['relevance_check']['input_tokens']:,} in / "
-              f"{usage['relevance_check']['output_tokens']:,} out; summariser "
-              f"{usage['summariser']['input_tokens']:,} in / {usage['summariser']['output_tokens']:,} out.")
+              f"{usage['relevance_check']['output_tokens']:,} out; summariser batch "
+              f"{usage['summariser']['batch_input_tokens']:,} in / {usage['summariser']['batch_output_tokens']:,} out, "
+              f"standard {usage['summariser']['standard_input_tokens']:,} in / "
+              f"{usage['summariser']['standard_output_tokens']:,} out.")
+        for item in outcome.brief["items"]:  # why an item was written outside the batch (#143)
+            written = item.get("written_by") or {}
+            if written.get("why"):
+                print(f"Outside the batch: {item['url']}: {written['why']}")
         for failure in build["failures"]:
             print(f"FAILURE  {failure['source']}: {failure['error']}")
         for path in outcome.paths:
