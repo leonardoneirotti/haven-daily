@@ -59,9 +59,11 @@ def test_the_only_secret_anywhere_is_the_claude_key_in_the_daily_runner_step():
 
 
 def test_pages_renders_real_briefs_or_samples_never_samples_by_name():
+    # The renderer picks the briefs (real once there is one, else the samples); the workflow never
+    # names a briefs folder. --with-sample adds the sample site at sample/ (owner, 25 Nov 2026).
     code = code_lines(PAGES)
-    assert "python -m haven.render --out site" in code
-    assert "sample" not in code
+    assert "python -m haven.render --out site --with-sample" in code
+    assert "--briefs" not in code and "data/sample" not in code
 
 
 def test_pages_is_reused_by_the_daily_job_and_deploys_from_the_latest_main():
