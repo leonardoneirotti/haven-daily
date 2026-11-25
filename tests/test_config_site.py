@@ -41,7 +41,7 @@ def png(path, width, height):
 def test_the_repo_file_has_the_sites_addresses():
     site = load_site()
     assert site == SiteConfig(
-        base_url="https://leonardoneirotti.github.io/haven-daily/",
+        base_url="https://havendaily.nl/",  # the site's own domain since 25 Nov 2026
         linkedin_url="https://www.linkedin.com/in/leonardo-neirotti",
         repo_url="https://github.com/leonardoneirotti/haven-daily",
         social_image="social-preview.png",

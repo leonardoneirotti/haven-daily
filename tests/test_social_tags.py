@@ -22,7 +22,7 @@ from test_render_real import make_brief, news
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 SAMPLE_BRIEFS = PROJECT_DIR / "data" / "sample" / "briefs"
-BASE = "https://leonardoneirotti.github.io/haven-daily/"
+BASE = "https://havendaily.nl/"
 DESCRIPTION = ("What affects the Port of Rotterdam today, and what it means for logistics planners. "
                "Independent, unofficial portfolio project.")
 SAMPLE_NOTE = "Sample data. The ships, news and readings on this page are invented to preview the design."
