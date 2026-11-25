@@ -19,7 +19,7 @@ from haven import run as haven_run
 from haven.feeds import ARTICLE_TEXT_MAX
 from haven.summarise import FALLBACK_MODEL, SUMMARY_MODEL, SummaryResult, _request, system_prompt
 from haven.config import load_places, load_tag_list
-from test_summarise import COPIED, READ_AT, TODAY, full, item, user_text
+from test_summarise import ARTICLE, COPIED, READ_AT, TODAY, full, item, user_text
 from test_summarise_batch import NEVER, no_answer, run_batch, succeeded
 
 SONNET = SUMMARY_MODEL
@@ -39,7 +39,7 @@ def test_the_summariser_caps_the_article_text_itself():
 
 
 def test_a_long_article_costs_the_same_in_the_batch_and_in_the_retry():
-    long = item(1, text="Invented sentence about a terminal. " * 1000)
+    long = item(1, text=ARTICLE + " " + "Invented sentence about a terminal. " * 1000)  # COPIED copies ARTICLE
     _, client, batches, _ = run_batch([long], full(strike=None), model=SONNET,
                                       results={0: succeeded(full(summary=COPIED, strike=None))})
     batch_text = user_text(batches.created[0][0]["params"])

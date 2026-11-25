@@ -159,7 +159,10 @@ def run_batch(items, *answers, known=(), model=SUMMARY_MODEL, **batch_kw):
 
 
 def written_by(result):
-    return [i.ai["written_by"] for i in result.items]
+    """Model and route of each item; why an item left the batch (`why`, #143) is checked in
+    tests/test_summary_cost.py."""
+    return [None if i.ai["written_by"] is None else {k: v for k, v in i.ai["written_by"].items() if k != "why"}
+            for i in result.items]
 
 
 BATCH = {"model": SUMMARY_MODEL, "api": "batch"}
