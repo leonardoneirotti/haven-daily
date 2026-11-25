@@ -15,6 +15,11 @@
   var basemap = window.HAVEN_BASEMAP;
   var pinGeometry = window.HavenPins; // marker geometry: static/pins.js (the home view uses it too)
   var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Named timings for the speed run (#150): how long the work done when the chart lands takes
+  // (basemap, markers, water, pin card). User Timing only: nothing is sent or stored.
+  function timing(name, start) {
+    try { performance.measure("haven:" + name, { start: start, end: performance.now() }); } catch (e) { /* older browsers */ }
+  }
   var chart = document.getElementById("chart");
   var focusBox = document.getElementById("chart-focus");
   var focusText = document.getElementById("chart-focus-text");
@@ -398,8 +403,10 @@
   // page's thread), or copied in where the browser has no "bitmaprenderer". Then placed, and asked
   // for again if the chart has moved on meanwhile.
   function takeWater(event) {
+    var started = performance.now();
     var done = event.data, image = new ImageData(done.pixels, done.w, done.h);
     function show(picture) {
+      var shown = performance.now();
       waterEl.width = done.w;
       waterEl.height = done.h;
       waterEl.style.width = done.w + "px";
@@ -410,10 +417,12 @@
       waterJob = null;
       placeWater(map.getZoom(), map.getPixelOrigin());
       checkWater();
+      timing("water", shown);
     }
     if (!waterShow) waterShow = (window.createImageBitmap && waterEl.getContext("bitmaprenderer")) || waterEl.getContext("2d");
     if (waterShow.transferFromImageBitmap) createImageBitmap(image).then(show, function () { waterJob = null; });
     else show(null);
+    timing("water", started);
   }
 
   // The picture on the chart at `zoom`, for a view whose top left is `origin` (world pixels at that
@@ -480,6 +489,10 @@
   }
 
   function paint(ctx) {
+    var started = performance.now();
+    try { paintBasemap(ctx); } finally { timing("paint", started); }
+  }
+  function paintBasemap(ctx) {
     var zoom = map.getZoom();
     var s = map.getZoomScale(zoom, 0);
     var origin = map.getPixelOrigin();
@@ -800,6 +813,10 @@
 
   var shownPlan = null;
   function showCallouts(remeasure) {
+    var started = performance.now();
+    try { placeCallouts(remeasure); } finally { timing("markers", started); }
+  }
+  function placeCallouts(remeasure) {
     if (!ranks.length) return;
     if (remeasure) sizes = {};
     var plan = planMarkers().sort(function (a, b) { return a.ranks[0] - b.ranks[0]; }); // keyboard order: item 1 first
@@ -1004,6 +1021,10 @@
     return room;
   }
   function openCard(rank) {
+    var started = performance.now();
+    try { showCard(rank); } finally { timing("card", started); }
+  }
+  function showCard(rank) {
     var callout = callouts[rank];
     if (!callout) return;
     closeCard(false);

@@ -385,7 +385,12 @@ const FLIGHT_PROBE = `(() => {
   const markers = document.querySelector(".leaflet-marker-pane");
   const popups = document.querySelector(".leaflet-popup-pane");
   const panelList = document.querySelector(".panel-items");
-  const matrix = (el) => { const t = el ? getComputedStyle(el).transform : "none"; return new DOMMatrixReadOnly(t === "none" ? undefined : t); };
+  // Leaflet moves and scales its layers with an inline transform ("translate3d(x px, y px, 0) scale(k)"):
+  // read from el.style.transform, which makes the browser do no style work (#150).
+  const matrix = (el) => {
+    const t = el ? el.style.transform : "", sc = /scale\\(([-\\d.e]+)\\)/.exec(t), tr = /translate3d\\(([-\\d.e]+)px,\\s*([-\\d.e]+)px/.exec(t);
+    return { a: sc ? Number(sc[1]) : 1, e: tr ? Number(tr[1]) : 0, f: tr ? Number(tr[2]) : 0 };
+  };
   if (markers) new MutationObserver((records) => p.mutations.push([performance.now(), records.length])).observe(markers, { childList: true });
   if (popups) new MutationObserver(() => { if (!p.card && popups.querySelector(".leaflet-popup")) p.card = performance.now(); })
     .observe(popups, { childList: true, subtree: true });
@@ -429,6 +434,11 @@ function flightSummary(raw) {
     markerRebuildsDuring: raw.mutations.filter((m) => during(m[0])).reduce((a, m) => a + m[1], 0),
     markerRebuildsAfter: raw.mutations.filter((m) => after(m[0])).reduce((a, m) => a + m[1], 0),
     cardAfterFlightMs: raw.card === null ? null : Math.round(raw.card - end),
+    // The work named in map.js (timing()), from the start of the flight to 1.5 s after it:
+    // name -> [times, longest ms, total ms].
+    timings: Object.fromEntries(Object.entries((raw.measures || []).filter((m) => m[1] >= start - 50 && m[1] <= end + 1500)
+      .reduce((all, m) => { (all[m[0]] = all[m[0]] || []).push(m[2]); return all; }, {}))
+      .map(([name, ds]) => [name, [ds.length, Math.round(Math.max(...ds)), Math.round(ds.reduce((a, d) => a + d, 0))]])),
     pageScrollPx: scroll(4),
     panelScrollPx: scroll(5),
   };
@@ -487,22 +497,34 @@ async function interact(tab, profileName, diag) {
   }, 2500);
   // A fly-to, from the whole port each time, recorded frame by frame (#150): a number on the chart,
   // then an entry in the panel (an item with a place). The card that opens is closed after.
-  async function flight(name, clickExpression) {
+  async function flight(name, start) {
     await evaluate(s, `(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       const home = document.querySelector(".chart-home"); home && home.click(); return 1; })()`);
     await sleep(2000);
     await evaluate(s, FLIGHT_PROBE);
-    await phase(name, async () => { await evaluate(s, clickExpression); }, 4000);
+    await phase(name, start, 4000);
     const raw = await evaluate(s, `(() => { const p = window.__flight; p.stop = true;
-      return { samples: p.samples, mutations: p.mutations, card: p.card, lt: __perf.lt.filter((x) => x[0] >= p.start) }; })()`);
+      return { samples: p.samples, mutations: p.mutations, card: p.card, lt: __perf.lt.filter((x) => x[0] >= p.start),
+        measures: performance.getEntriesByType("measure").filter((m) => m.name.startsWith("haven:") && m.startTime >= p.start)
+          .map((m) => [m.name.slice(6), m.startTime, m.duration]) }; })()`);
     results[name].flight = flightSummary(raw);
   }
-  await flight("select an item (chart flies)", `(() => { const b = document.querySelector('.callout-item[data-action="show-item"]');
-    b && b.click(); return !!b; })()`);
-  await flight("select an item in the panel (chart flies)", `(() => {
-    const pinned = Array.from(document.querySelectorAll(".callout-item[data-rank]")).map((b) => b.getAttribute("data-rank"));
-    const rank = pinned[pinned.length - 1], b = rank && document.querySelector('.panel-item[data-rank="' + rank + '"]');
-    b && b.click(); return !!b; })()`);
+  // A number on the chart gets real mouse presses: map.js tells a click from a drag by them, so
+  // element.click() starts no flight (found in the first measuring run, #150).
+  await flight("select an item (chart flies)", async () => {
+    const at = await evaluate(s, `(() => { const n = document.querySelector('.callout-item[data-action="show-item"] .num');
+      if (!n) return null; const r = n.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
+    if (!at) return;
+    await mouse("mouseMoved", at.x, at.y);
+    await mouse("mousePressed", at.x, at.y, { clickCount: 1 });
+    await mouse("mouseReleased", at.x, at.y, { clickCount: 1 });
+  });
+  await flight("select an item in the panel (chart flies)", async () => {
+    await evaluate(s, `(() => {
+      const pinned = Array.from(document.querySelectorAll(".callout-item[data-rank]")).map((b) => b.getAttribute("data-rank"));
+      const rank = pinned[pinned.length - 1], b = rank && document.querySelector('.panel-item[data-rank="' + rank + '"]');
+      b && b.click(); return !!b; })()`);
+  });
   await evaluate(s, "window.scrollTo(0, 0); 1");
   await sleep(500);
   await phase("scroll the page", async () => {
