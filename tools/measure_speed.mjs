@@ -373,6 +373,67 @@ async function load(pageName, profileName, diag) {
 }
 
 // ---------- Interactions on a page with a chart ----------
+// ---------- A fly-to, frame by frame (#150) ----------
+// Installed just before an item is clicked. Each frame it samples: the basemap canvas's scale (while
+// the chart moves, Leaflet stretches the last drawing: scale 2 = one zoom level in; it goes back to 1
+// when the chart is redrawn at the end), the map pane's position, the page's and the panel's scroll.
+// It also notes every rebuild of the markers and when the pin card appears.
+const FLIGHT_PROBE = `(() => {
+  const p = window.__flight = { start: performance.now(), samples: [], mutations: [], card: null, stop: false };
+  const canvas = document.querySelector(".leaflet-basemap-pane canvas");
+  const mapPane = document.querySelector(".leaflet-map-pane");
+  const markers = document.querySelector(".leaflet-marker-pane");
+  const popups = document.querySelector(".leaflet-popup-pane");
+  const panelList = document.querySelector(".panel-items");
+  const matrix = (el) => { const t = el ? getComputedStyle(el).transform : "none"; return new DOMMatrixReadOnly(t === "none" ? undefined : t); };
+  if (markers) new MutationObserver((records) => p.mutations.push([performance.now(), records.length])).observe(markers, { childList: true });
+  if (popups) new MutationObserver(() => { if (!p.card && popups.querySelector(".leaflet-popup")) p.card = performance.now(); })
+    .observe(popups, { childList: true, subtree: true });
+  (function loop(t) {
+    const c = matrix(canvas), m = matrix(mapPane);
+    p.samples.push([t, c.a, c.e + m.e, c.f + m.f, window.scrollY, panelList ? panelList.scrollTop : 0]);
+    if (!p.stop && t - p.start < 6000) requestAnimationFrame(loop);
+  })(performance.now());
+  return 1;
+})()`;
+
+// What the samples say about one flight. Moving = the canvas's scale or position changed since the
+// frame before. The zoom path is log2(scale) until the redraw at the end puts the scale back to 1.
+function flightSummary(raw) {
+  const s = raw.samples, moving = [];
+  for (let i = 1; i < s.length; i++) {
+    if (Math.abs(s[i][1] - s[i - 1][1]) > 0.001 || Math.abs(s[i][2] - s[i - 1][2]) > 0.5 || Math.abs(s[i][3] - s[i - 1][3]) > 0.5) moving.push(i);
+  }
+  if (!moving.length) return { flightMs: 0, moved: false };
+  const first = moving[0] - 1, last = moving[moving.length - 1], start = s[first][0], end = s[last][0];
+  const path = s.slice(first, last + 1).filter((x, i, all) => i < all.length - 1 || Math.abs(x[1] - 1) > 0.001)
+    .map((x) => Math.log2(x[1]));
+  const final = path.length ? path[path.length - 1] : 0, lowest = Math.min(0, ...path), highest = Math.max(0, ...path);
+  const gaps = [];
+  for (let i = first + 1; i <= last; i++) gaps.push(s[i][0] - s[i - 1][0]);
+  const during = (t) => t >= start && t < end, after = (t) => t >= end && t <= end + 1000;
+  const scroll = (k) => Math.round(Math.max(...s.slice(first, last + 1).map((x) => x[k])) - Math.min(...s.slice(first, last + 1).map((x) => x[k])));
+  return {
+    moved: true,
+    flightMs: Math.round(end - start),
+    frames: gaps.length,
+    longestFrame: Math.round(Math.max(0, ...gaps)),
+    framesOver25: gaps.filter((g) => g > 25).length,
+    framesOver50: gaps.filter((g) => g > 50).length,
+    longTasks: raw.lt.filter((x) => x[0] >= start - 50 && x[0] <= end + 300).length,
+    longestTask: Math.round(Math.max(0, ...raw.lt.filter((x) => x[0] >= start - 50 && x[0] <= end + 300).map((x) => x[1]))),
+    zoomLevels: Math.round(final * 100) / 100,
+    zoomsOutFirst: final > 0.05 && lowest < -0.05,
+    lowestZoom: Math.round(lowest * 100) / 100,
+    overshoot: highest > final + 0.05 && final > 0,
+    markerRebuildsDuring: raw.mutations.filter((m) => during(m[0])).reduce((a, m) => a + m[1], 0),
+    markerRebuildsAfter: raw.mutations.filter((m) => after(m[0])).reduce((a, m) => a + m[1], 0),
+    cardAfterFlightMs: raw.card === null ? null : Math.round(raw.card - end),
+    pageScrollPx: scroll(4),
+    panelScrollPx: scroll(5),
+  };
+}
+
 async function interact(tab, profileName, diag) {
   const { s } = tab;
   const profile = PROFILES[profileName];
@@ -424,10 +485,24 @@ async function interact(tab, profileName, diag) {
   await phase("zoom out (button)", async () => {
     await evaluate(s, `document.querySelector(".leaflet-control-zoom-out").click(); 1`);
   }, 2500);
-  await phase("select an item (chart flies)", async () => {
-    await evaluate(s, `(() => { const b = document.querySelector('.callout-item[data-action="show-item"]') ||
-      document.querySelector('.panel-item'); b && b.click(); return !!b; })()`);
-  }, 4000);
+  // A fly-to, from the whole port each time, recorded frame by frame (#150): a number on the chart,
+  // then an entry in the panel (an item with a place). The card that opens is closed after.
+  async function flight(name, clickExpression) {
+    await evaluate(s, `(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      const home = document.querySelector(".chart-home"); home && home.click(); return 1; })()`);
+    await sleep(2000);
+    await evaluate(s, FLIGHT_PROBE);
+    await phase(name, async () => { await evaluate(s, clickExpression); }, 4000);
+    const raw = await evaluate(s, `(() => { const p = window.__flight; p.stop = true;
+      return { samples: p.samples, mutations: p.mutations, card: p.card, lt: __perf.lt.filter((x) => x[0] >= p.start) }; })()`);
+    results[name].flight = flightSummary(raw);
+  }
+  await flight("select an item (chart flies)", `(() => { const b = document.querySelector('.callout-item[data-action="show-item"]');
+    b && b.click(); return !!b; })()`);
+  await flight("select an item in the panel (chart flies)", `(() => {
+    const pinned = Array.from(document.querySelectorAll(".callout-item[data-rank]")).map((b) => b.getAttribute("data-rank"));
+    const rank = pinned[pinned.length - 1], b = rank && document.querySelector('.panel-item[data-rank="' + rank + '"]');
+    b && b.click(); return !!b; })()`);
   await evaluate(s, "window.scrollTo(0, 0); 1");
   await sleep(500);
   await phase("scroll the page", async () => {
@@ -506,6 +581,7 @@ for (const [pageName] of Object.entries(PAGES)) {
           `longest task ${r.longestTask} ms; busy ${r.busy.task} ms`);
         if (d.trace) console.log(`      trace: ${d.trace.work.slice(0, 6).map(([k, v]) => `${k} ${v}`).join(", ")}; layouts ${d.trace.layouts} (${d.trace.layoutMs} ms) by ${d.trace.layoutBy.slice(0, 3).map(([k, n, ms]) => `${k} x${n} ${ms}ms`).join("; ")}`);
         console.log(`      JS: ${d.hot.slice(0, 5).map(([k, v]) => `${k} ${v}`).join(", ")}`);
+        if (r.flight) console.log(`      flight: ${JSON.stringify(r.flight)}`);
       }
     }
   }

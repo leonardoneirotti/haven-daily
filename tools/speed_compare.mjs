@@ -11,7 +11,7 @@ const profile = args.includes("--profile") ? args[args.indexOf("--profile") + 1]
 
 // Targets on the throttled phone (owner, 18 Nov 2026); on the laptop, no task over 100 ms
 // per zoom step (owner, #111, 21 Nov 2026).
-const TARGETS = profile === "laptop" ? { zoom: 100 } : { text: 1500, map: 2500, move: 1000 };
+const TARGETS = profile === "laptop" ? { zoom: 100, flyFrame: 50 } : { text: 1500, map: 2500, move: 1000 };
 
 const kb = (bytes) => (bytes == null ? "–" : `${Math.round(bytes / 1024)} KB`);
 const ms = (value) => (value == null ? "–" : `${(value / 1000).toFixed(2)} s`);
@@ -28,6 +28,14 @@ const zoom = (entry) => entry.interactions
   ? Math.max(...ZOOMS.map((name) => entry.interactions[name]?.longestTask ?? 0))
   : null;
 
+// A fly-to (#150): both ways of starting one, a number on the chart and an entry in the panel.
+const FLIGHTS = ["select an item (chart flies)", "select an item in the panel (chart flies)"];
+const flights = (entry) => FLIGHTS.map((name) => entry.interactions?.[name]?.flight).filter((f) => f && f.moved);
+const flyMax = (key) => (entry) => (flights(entry).length ? Math.max(...flights(entry).map((f) => f[key] ?? 0)) : null);
+const flySum = (key) => (entry) => (flights(entry).length ? flights(entry).reduce((a, f) => a + (f[key] ?? 0), 0) : null);
+const flyAny = (key) => (entry) => (flights(entry).length ? flights(entry).some((f) => f[key]) : null);
+const chartCard = (entry) => entry.interactions?.[FLIGHTS[0]]?.flight?.cardAfterFlightMs ?? null;
+
 const ROWS = [
   ["Sent", (e) => e.sent, kb],
   ["Fonts", (e) => fonts(e), (v, e) => `${kb(v)} (${fontFiles(e)} files)`],
@@ -40,6 +48,17 @@ const ROWS = [
   ["Longest task while loading", (e) => e.timing.longest, ms],
   ["Map move: longest freeze", move, ms, TARGETS.move],
   ["Zoom step: longest task", zoom, ms, TARGETS.zoom],
+  ["Fly-to: time", flyMax("flightMs"), ms],
+  ["Fly-to: longest frame", flyMax("longestFrame"), ms, TARGETS.flyFrame],
+  ["Fly-to: frames > 25 ms", flySum("framesOver25"), (v) => (v == null ? "–" : String(v))],
+  ["Fly-to: frames > 50 ms", flySum("framesOver50"), (v) => (v == null ? "–" : String(v))],
+  ["Fly-to: long tasks", flySum("longTasks"), (v) => (v == null ? "–" : String(v))],
+  ["Fly-to: zooms out first", flyAny("zoomsOutFirst"), (v) => (v == null ? "–" : v ? "yes" : "no")],
+  ["Fly-to: overshoots", flyAny("overshoot"), (v) => (v == null ? "–" : v ? "yes" : "no")],
+  ["Fly-to: markers rebuilt during the flight", flySum("markerRebuildsDuring"), (v) => (v == null ? "–" : String(v))],
+  ["Fly-to: card opens after the flight", chartCard, (v) => (v == null ? "–" : `${v} ms`)],
+  ["Fly-to: page/panel scroll during it", (e) => (flights(e).length ? flights(e).reduce((a, f) => a + f.pageScrollPx + f.panelScrollPx, 0) : null),
+    (v) => (v == null ? "–" : `${v} px`)],
 ];
 
 const out = [];
