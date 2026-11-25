@@ -49,3 +49,34 @@ def test_the_comparison_shows_the_flight_with_the_laptop_target():
     for row in ("Fly-to: longest frame", "Fly-to: frames > 50 ms", "Fly-to: zooms out first",
                 "Fly-to: markers rebuilt during the flight", "Fly-to: card opens after the flight"):
         assert row in COMPARE, row
+
+
+# --- measuring right: no extra work from the probe, real clicks, named timings ----------------------
+
+MAP_JS = (ROOT / "static" / "map.js").read_text(encoding="utf-8")
+
+
+def test_the_probe_reads_leaflets_inline_transform_not_the_computed_style():
+    probe = MEASURE[MEASURE.index("const FLIGHT_PROBE"):]
+    probe = probe[: probe.index("`;") + 2]
+    assert "getComputedStyle" not in probe  # it made the browser recalculate styles on every frame
+    assert ".style.transform" in probe
+
+
+def test_a_number_on_the_chart_is_clicked_with_real_mouse_events():
+    # map.js tells a click from a drag by the mouse presses, so element.click() starts no flight.
+    block = MEASURE[MEASURE.index('await flight("select an item (chart flies)"'):]
+    block = block[: block.index("await flight(", 10)]
+    assert "mousePressed" in block and "mouseReleased" in block
+
+
+def test_map_js_names_the_work_done_when_a_flight_lands():
+    for name in ("paint", "markers", "water", "card"):
+        assert f'timing("{name}"' in MAP_JS, name
+    assert "performance.measure(" in MAP_JS
+
+
+def test_the_flight_summary_attributes_the_landing_work():
+    summary = MEASURE[MEASURE.index("function flightSummary"):]
+    summary = summary[: summary.index("\n}\n")]
+    assert "timings" in summary
