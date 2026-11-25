@@ -905,6 +905,7 @@ def make_environment() -> Environment:
         # The owner's texts (SITE) and the addresses from config/site.toml, as one `site`.
         site={**SITE, "base_url": site.base_url, "linkedin_url": site.linkedin_url, "repo_url": site.repo_url},
         social_image=social_image(site),
+        page_base=site.base_url,  # every page's own address starts here; render_site adds "sample/" there
         icons=ICONS,
         severity_keys=SEVERITY_KEYS,
         level_icons=LEVEL_ICONS,
@@ -927,13 +928,19 @@ def write_page(env: Environment, template: str, path: Path, **context) -> None:
     path.write_text(html, encoding="utf-8")
 
 
-def render_site(briefs_dir: Path, out_dir: Path, rhine_path: Path | None = None) -> int:
+def render_site(briefs_dir: Path, out_dir: Path, rhine_path: Path | None = None, *, sub_path: str = "",
+                link_sample: bool = False) -> int:
+    """The site from `briefs_dir` into `out_dir`. `sub_path` is where it is published below the
+    site's address (`base_url`): "" for the real site, "sample/" for the sample site, so each page's
+    canonical and preview address is right. `link_sample`: How it works links the sample site."""
     rhine_path = rhine_path or CONFIG_DIR / "rhine.toml"
     briefs = prepare_briefs(load_briefs(briefs_dir), rhine_path)
     if not briefs:
         raise SystemExit(f"No briefs found in {briefs_dir}")
 
     env = make_environment()
+    # Every page's own address (canonical link, og:url): the one setting, base_url, + where this site is.
+    env.globals["page_base"] = load_site().base_url + sub_path
     shutil.copytree(STATIC_DIR, out_dir / "static", dirs_exist_ok=True)
     sample = any(brief["sample"] for brief in briefs)
 
@@ -962,13 +969,41 @@ def render_site(briefs_dir: Path, out_dir: Path, rhine_path: Path | None = None)
         preview=site_preview("archive.html", "Archive"),
     )
     write_page(env, "about.html", out_dir / "about.html", root="", active="method", sample=sample,
-               method=method_page(load_sources(), load_rhine(rhine_path)),
+               method=method_page(load_sources(), load_rhine(rhine_path)), sample_link=link_sample and not sample,
                preview=site_preview("about.html", "How it works"))
     # GitHub Pages serves 404.html at whatever address was missing (#117), so its links start from
     # the site's own path ("/haven-daily/"), not from where the page happens to be.
     write_page(env, "404.html", out_dir / "404.html", root=urlparse(load_site().base_url).path, active=None,
                sample=sample, preview=site_preview("404.html", "Page not found"))
+    if not sample and not sub_path:  # search engines: the real site's pages only
+        write_search_files(out_dir, briefs)
     return len(briefs)
+
+
+def write_search_files(out_dir: Path, briefs: list[dict]) -> None:
+    """sitemap.xml (Today, Archive, How it works, every day page) and robots.txt pointing at it,
+    both from base_url. The sample site has neither, and its pages are noindex."""
+    base = load_site().base_url
+    addresses = [base, f"{base}archive.html", f"{base}about.html"] + [f"{base}days/{b['date']}.html" for b in briefs]
+    sitemap = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    sitemap += [f"  <url><loc>{address}</loc></url>" for address in addresses] + ["</urlset>", ""]
+    (out_dir / "sitemap.xml").write_text("\n".join(sitemap), encoding="utf-8", newline="\n")
+    (out_dir / "robots.txt").write_text(f"User-agent: *\nAllow: /\nSitemap: {base}sitemap.xml\n", encoding="utf-8",
+                                        newline="\n")
+
+
+SAMPLE_PATH = "sample/"  # where the sample site is published, below base_url (owner, 25 Nov 2026)
+
+
+def render_published(briefs_dir: Path, out_dir: Path) -> int:
+    """What GitHub Pages publishes: the site, and the sample site at sample/ once the site is built
+    from real briefs (until then the site itself is the samples, so there is no second copy)."""
+    real = Path(briefs_dir).resolve() != (PROJECT_DIR / "data" / "sample" / "briefs").resolve()
+    count = render_site(briefs_dir, out_dir, link_sample=real)
+    if real:
+        render_site(PROJECT_DIR / "data" / "sample" / "briefs", Path(out_dir) / SAMPLE_PATH.rstrip("/"),
+                    sub_path=SAMPLE_PATH)
+    return count
 
 
 def default_briefs_dir(data_dir: Path = PROJECT_DIR / "data") -> Path:
@@ -988,9 +1023,11 @@ def main() -> None:
     parser.add_argument("--briefs", type=Path, default=None,
                         help="default: data/briefs once it holds a brief, else data/sample/briefs")
     parser.add_argument("--out", type=Path, default=PROJECT_DIR / "site")
+    parser.add_argument("--with-sample", action="store_true",
+                        help="also the sample site at sample/ (what GitHub Pages publishes)")
     args = parser.parse_args()
     briefs = args.briefs if args.briefs is not None else default_briefs_dir()
-    count = render_site(briefs, args.out)
+    count = render_published(briefs, args.out) if args.with_sample else render_site(briefs, args.out)
     print(f"Rendered {count} briefs from {briefs} to {args.out}")
 
 

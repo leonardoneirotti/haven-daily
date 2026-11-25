@@ -94,6 +94,16 @@ def js_problems(js: str) -> list[str]:
     return problems
 
 
+def canonical_with_own_address(tag, attribute, value) -> bool:
+    """A <link rel="canonical"> to this site's own address (base_url, owner, 25 Nov 2026). It names
+    the page's address for search engines; no browser fetches it. Any other <link href> outside fails."""
+    from haven.config import load_site
+    rel = tag.get("rel") or []
+    rel = rel if isinstance(rel, list) else str(rel).split()
+    return (tag.name == "link" and attribute == "href" and rel == ["canonical"]
+            and isinstance(value, str) and value.startswith(load_site().base_url))
+
+
 def page_problems(html: str) -> list[str]:
     """Everything on an HTML (or SVG) page that would contact another server, store or track."""
     soup = BeautifulSoup(html, "html.parser")
@@ -110,6 +120,8 @@ def page_problems(html: str) -> list[str]:
             elif attribute == "ping":
                 values = [v for joined in values for v in joined.split()]
             is_load = attribute in LOAD_ATTRIBUTES or (attribute == "href" and name not in LINK_ELEMENTS)
+            if is_load and canonical_with_own_address(tag, attribute, values[0] if values else ""):
+                continue  # the page's own address for search engines: the browser fetches nothing
             if is_load:
                 problems += [f"<{name} {attribute}> loads {v}" for v in values if OUTSIDE.match(v)]
             if attribute == "style":
@@ -270,7 +282,7 @@ def test_outside_addresses_on_the_pages_are_only_ordinary_links(site):
             for attribute, value in tag.attrs.items():
                 for v in (value if isinstance(value, list) else [value]):
                     if OUTSIDE.match(v) and not v.startswith(NAMESPACE):
-                        if social_tag_with_own_address(tag, attribute, v):
+                        if social_tag_with_own_address(tag, attribute, v) or canonical_with_own_address(tag, attribute, v):
                             continue
                         assert (tag.name, attribute) in {("a", "href")}, (path.name, tag.name, attribute, v)
 

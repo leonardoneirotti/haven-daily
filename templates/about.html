@@ -40,6 +40,8 @@
     <section aria-labelledby="what">
       <h2 id="what">What this is</h2>
       <p>Haven Daily is a short brief, published every morning, on what affects the Port of Rotterdam and what it means for logistics planners. It shows at most five items, most severe first, each with what happened, a link to the original source and an interpretation of the impact for a planner. Quiet days get a shorter brief, never padded. <em>Haven</em> means port in Dutch and a safe place in English.</p>
+      {# The one link from the real site to the sample site at sample/ (owner, 25 Nov 2026). #}
+      {% if sample_link is defined and sample_link %}<p class="sample-site">A sample version with invented data: <a href="{{ root }}sample/index.html">sample site</a>.</p>{% endif %}
     </section>
 
     {# Second, right after "What this is" (S3, #86): the owner's About text (L2, spec §7.8) and

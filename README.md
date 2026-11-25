@@ -2,6 +2,11 @@
 
 A public web page, updated every morning, that tells a logistics planner what is affecting the Port of Rotterdam today and what it means for them. Personal, unofficial portfolio project. See `CLAUDE.md` for all decisions.
 
+Live site: https://leonardoneirotti.github.io/haven-daily/
+Sample site (invented data): https://leonardoneirotti.github.io/haven-daily/sample/
+
+(Both addresses follow `base_url` in `config/site.toml`; `tests/test_beta_site.py` fails if they differ.)
+
 By Leonardo Neirotti · Second-year International Business student (Supply Chain Management) at Rotterdam University of Applied Sciences.
 
 ## What exists so far
