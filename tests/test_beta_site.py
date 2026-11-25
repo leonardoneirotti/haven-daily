@@ -181,3 +181,12 @@ def test_the_spec_says_how_to_move_to_the_domain():
     for needed in ("185.199.108.153", "185.199.111.153", "2606:50c0:8000::153", "_github-pages-challenge",
                    "Enforce HTTPS", 'base_url = "https://havendaily.nl/"', "www"):
         assert needed in steps, needed
+
+
+def test_the_site_lives_at_the_root_of_havendaily_nl(tmp_path):
+    """Owner, 25 Nov 2026: the domain is connected (GitHub Pages custom domain, HTTPS enforced);
+    github.io now redirects here. At the root, the 404 page's links start with "/"."""
+    assert BASE == "https://havendaily.nl/"
+    render.render_site(SAMPLES, tmp_path / "site")
+    not_found = read(tmp_path / "site" / "404.html")
+    assert 'href="/index.html"' in not_found and "/haven-daily/" not in not_found
