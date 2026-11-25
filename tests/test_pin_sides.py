@@ -97,4 +97,4 @@ def test_map_js_remembers_each_numbers_side_between_plans():
     place = MAP_JS[MAP_JS.index("function placeMarker("): MAP_JS.index("function planMarkers()")]
     assert "lastSide[" in place  # the side it had is the one it prefers now
     show = MAP_JS[MAP_JS.index("function showCallouts("):]
-    assert re.search(r"lastSide\[[^\]]+\]\s*=", show)  # the shown plan is remembered
+    assert "lastSide[m.ranks[0]] = m.side" in show  # the shown plan is remembered
