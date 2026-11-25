@@ -101,6 +101,8 @@ Thresholds (decided 31 Oct 2026; every number comes from a public source, cited 
 6. ~~**Under the brand on every page** (#86): the owner's one-liner, §7.8.~~ **Not on the page since #138** (owner, review of PR #139): its first sentence stays in the page description that link previews and search show (`site.description`, §7.8), and the social preview card still shows the whole line (§7.7).
 7. **A 404 page** (`404.html`, #117, §7.6): flag D, "Page not found", a friendly line and a link back to Today. GitHub Pages serves it at whatever address was missing, so its links start from the site's own path in `config/site.toml` (`/haven-daily/`), never relative.
 8. **Social preview tags on every page** (#28, §7.7): `og:title`, `og:description`, `og:url`, `og:type`, `og:site_name`, `twitter:card`; day pages with their date and top headline; `og:image` once the preview image exists.
+9. **The sample site at `sample/`** *(owner, 25 Nov 2026, for the beta)*: the four sample briefs, published beside the real site by the same command (`python -m haven.render --out site --with-sample`, `pages.yml`; `render.render_published`). Every page carries the "Sample data" strip (hard rule 10) and `<meta name="robots" content="noindex, nofollow">`; it isn't in the real archive or the sitemap; the real site links it **once**, a short line in How it works' "What this is" (*"A sample version with invented data: sample site."*). Its pages' canonical and preview addresses are `base_url` + `sample/`. Before the first real brief the site itself is the samples, so no second copy is built.
+10. **The site's address is one setting** *(owner, 25 Nov 2026)*: `base_url` in `config/site.toml` gives every page's `<link rel="canonical">` (not on the 404 page), `og:url` and `og:image`, `sitemap.xml` (Today, Archive, How it works, every day page) and `robots.txt` (pointing at the sitemap), both written only for the real site, and the fetcher's user agent. No other code file names the address; the README's two links must match it (both tested, `tests/test_beta_site.py`). The privacy check allows a canonical link to this site's own address and nothing else (a browser fetches nothing for it).
 
 Each day page also shows: publication line ("Published 06:52 · Amsterdam time", taken from `built_at`; after a correction: "Published 06:52 · Corrected 09:14 · Amsterdam time", using the latest entry in `corrections`, with every correction note listed in "How this brief was made"), a collapsible table of all ships in the snapshot, and "How this brief was made" (sources checked, items collected, kept, shown, failures per source).
 
@@ -1524,7 +1526,17 @@ Use `--dump-dom` with a small injected script that writes errors/timings into a 
 ## 11. Open items and before launch
 
 - ~~Code still on the old review model~~ **Done 1 Nov 2026 (issue #5):** renderer, day and Method templates, README field table and the sample briefs now use `built_at` + `corrections` (the 29 Oct sample has one correction; sample build times moved after 06:45). `BUILD_PLAN.md` is now only a pointer to the GitHub issues and §10.
-- Check `havendaily.nl` availability; buy once the first version works.
+- ~~Check `havendaily.nl` availability; buy once the first version works.~~ **Bought by the owner (Dynadot), not connected yet (25 Nov 2026).**
+- **Moving to havendaily.nl** (steps, in this order; the site stays on github.io until step 4):
+  1. **Verify the domain on GitHub first** (stops anyone else from claiming it on GitHub Pages): your GitHub profile → Settings → Pages → *Add a domain* → `havendaily.nl`. GitHub shows a TXT record: name `_github-pages-challenge-leonardoneirotti`, value a code. Add it in Dynadot (next step), wait a few minutes, click *Verify*.
+  2. **DNS in Dynadot**: My Domains → havendaily.nl → DNS settings → **Dynadot DNS**; remove the parking or forwarding records Dynadot adds by default; then add:
+     - `A` records for `@` (the bare domain): `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`;
+     - `AAAA` records for `@`: `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153`;
+     - a `CNAME` record for `www` → `leonardoneirotti.github.io`;
+     - the `TXT` record from step 1.
+  3. **GitHub Pages**: repository → Settings → Pages → *Custom domain*: `havendaily.nl` → Save. Wait for "DNS check successful" (minutes to a few hours), then for the certificate, then tick **Enforce HTTPS**. The site is deployed by Actions, so no `CNAME` file is needed in the repo. `leonardoneirotti.github.io/haven-daily/` then redirects to the domain, so old links keep working.
+  4. **Flip the one setting**, in a pull request: `base_url = "https://havendaily.nl/"` in `config/site.toml`, and the README's two links (the test says so). Merging deploys it: canonical links, previews, sitemap, robots.txt and the 404 page's links (`/` instead of `/haven-daily/`) all follow.
+  5. **Check**: https://havendaily.nl/ and https://havendaily.nl/sample/ open over HTTPS; the old github.io address redirects; a link preview (e.g. LinkedIn Post Inspector) shows the card with the new address.
 - Test every candidate source (§4) before building on it.
 - Summariser model: ~~run the Haiku 5.5 vs Sonnet 5.5 comparison~~ **run 2 Nov 2026 (#17), written up in `docs/model-comparison.md`; the owner chose Sonnet 5.5 through the batch** (§5.5).
 - **After the first week of daily runs: check real AI costs** in the Anthropic Console against the §5.4 estimates.
