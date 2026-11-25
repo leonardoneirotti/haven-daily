@@ -4,8 +4,9 @@
 # "How it works"). Templates never have these written in.
 
 # Where the site is published, ending with "/": page addresses are this + "days/2026-10-29.html".
-# GitHub Pages for now; change it here if the site moves to its own domain (havendaily.nl, §11).
-base_url = "https://leonardoneirotti.github.io/haven-daily/"
+# The site's own domain since 25 Nov 2026 (GitHub Pages custom domain, HTTPS enforced; the old
+# github.io address redirects here). Spec §11 "Moving to havendaily.nl".
+base_url = "https://havendaily.nl/"
 
 # The owner's links (given 2 Nov 2026, PR #80; shown since #86).
 linkedin_url = "https://www.linkedin.com/in/leonardo-neirotti"
