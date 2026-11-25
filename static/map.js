@@ -640,6 +640,8 @@
   var ranks = Object.keys(callouts).map(Number).sort(function (a, b) { return a - b; });
   var calloutLayer = L.layerGroup().addTo(map);
   var MARKER_GAP = 4; // pixels kept free between two markers, and between a marker and the chart's edge
+  var CLEAR_GAP = 12; // pixels between two close markers kept apart instead of merged (#148)
+  var lastSide = {}; // rank -> the side its number had in the shown plan: kept while zooming and flying (#148)
   var activeRank = null, hoverRank = null; // kept here, because markers are rebuilt when they merge or split
 
   // A group's items in marker order: by rank, but items at the same place side by side
@@ -723,17 +725,25 @@
   }
 
 
-  // Each marker on the side its place prefers (`side` in config/places.toml), on one line.
+  // Each marker on the side it had in the shown plan (a number keeps its side while zooming and
+  // flying, #148), else the side its place prefers (`side` in config/places.toml), on one line.
   // If it would run off the chart or under the panel: the other side; then, for a shared
   // marker, rows on either side; if nothing fits, the narrowest of these. Last, a marker at
   // the chart's edge moves inward just enough that no number is cut (owner, PR #91).
-  function placeMarker(marker) {
+  // `forced`: a side chosen to keep two close markers apart (planMarkers), tried alone.
+  function freeChart() {
+    var size = map.getSize();
+    return { left: panelCover(), top: 0, right: size.x, bottom: size.y };
+  }
+  function placeMarker(marker, forced) {
     var anchor = callouts[marker.ranks[0]].data;
     var point = map.latLngToContainerPoint([anchor.lat, anchor.lon]);
-    var size = map.getSize(), chart = { left: panelCover(), top: 0, right: size.x, bottom: size.y };
+    var chart = freeChart();
     var left = chart.left + MARKER_GAP, right = chart.right - MARKER_GAP;
-    var preferred = anchor.side === "left" ? "left" : "right", other = preferred === "left" ? "right" : "left";
-    var layouts = [[preferred, false], [other, false]];
+    var had = marker.ranks.length === 1 ? lastSide[marker.ranks[0]] : null;
+    var preferred = forced || had || (anchor.side === "left" ? "left" : "right");
+    var other = preferred === "left" ? "right" : "left";
+    var layouts = forced ? [[forced, false]] : [[preferred, false], [other, false]];
     if (marker.ranks.length > 1) layouts.push([preferred, true], [other, true]);
     var best = null;
     layouts.forEach(function (layout) {
@@ -754,9 +764,13 @@
     return marker;
   }
 
-  // Start with one marker per item; while two overlap, merge them, and check again.
+  // Start with one marker per item; while two overlap, first try sides that keep them apart with
+  // a clear gap (#148: two close single markers, the western label to the left), and merge them
+  // only if no sides do, then check again. A pair is kept apart once; if it overlaps again (an
+  // edge nudge), it merges, so the loop always ends.
   function planMarkers() {
     var markers = ranks.map(function (rank) { return placeMarker({ ranks: [rank] }); });
+    var separated = {};
     for (;;) {
       var pair = null;
       for (var i = 0; i < markers.length && !pair; i++) {
@@ -765,8 +779,22 @@
         }
       }
       if (!pair) return markers;
-      markers = markers.filter(function (m) { return m !== pair[0] && m !== pair[1]; });
-      markers.push(placeMarker({ ranks: inPlaceOrder(pair[0].ranks.concat(pair[1].ranks)) }));
+      var rest = markers.filter(function (m) { return m !== pair[0] && m !== pair[1]; });
+      var key = pair[0].ranks.concat(pair[1].ranks).sort().join(",");
+      if (pair[0].ranks.length === 1 && pair[1].ranks.length === 1 && !separated[key]) {
+        separated[key] = true;
+        var a = callouts[pair[0].ranks[0]].data, b = callouts[pair[1].ranks[0]].data;
+        var sides = pinGeometry.separateSides(
+          map.latLngToContainerPoint([a.lat, a.lon]), map.latLngToContainerPoint([b.lat, b.lon]),
+          sizeOf(pair[0].ranks, false), sizeOf(pair[1].ranks, false), [pair[0].side, pair[1].side],
+          freeChart(), CLEAR_GAP, MARKER_GAP, rest.map(function (m) { return m.box; }));
+        if (sides) {
+          markers = rest.concat([placeMarker({ ranks: pair[0].ranks }, sides[0]),
+                                 placeMarker({ ranks: pair[1].ranks }, sides[1])]);
+          continue;
+        }
+      }
+      markers = rest.concat([placeMarker({ ranks: inPlaceOrder(pair[0].ranks.concat(pair[1].ranks)) })]);
     }
   }
 
@@ -775,6 +803,7 @@
     if (!ranks.length) return;
     if (remeasure) sizes = {};
     var plan = planMarkers().sort(function (a, b) { return a.ranks[0] - b.ranks[0]; }); // keyboard order: item 1 first
+    plan.forEach(function (m) { if (m.ranks.length === 1) lastSide[m.ranks[0]] = m.side; }); // kept next time (#148)
     var key = plan.map(function (m) {
       return m.ranks.join(",") + m.side + (m.rows ? " rows" : "") + " " + m.nudge.x + "," + m.nudge.y;
     }).sort().join("|");
