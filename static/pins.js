@@ -19,6 +19,31 @@
     return a.left < b.right + gap && b.left < a.right + gap && a.top < b.bottom + gap && b.top < a.bottom + gap;
   }
 
+  // Two single markers that would overlap (#148): sides that keep them apart, or null, and then
+  // map.js merges them. First the sides they prefer (the ones they had: a number keeps its side),
+  // then the outer sides (the western pin's label to the left, the eastern pin's to the right),
+  // then the rest. A choice must leave `gap` px between the two, keep both inside the chart's free
+  // area (`margin` px from its left and right edges, as map.js places markers) and clear every box
+  // in `others`. a, b: the two places on screen; sizeA, sizeB: their marker sizes (see boxAt);
+  // preferred: [side of a, side of b]. Returns [side of a, side of b].
+  function separateSides(a, b, sizeA, sizeB, preferred, chart, gap, margin, others) {
+    var outer = a.x <= b.x ? ["left", "right"] : ["right", "left"];
+    var tries = [preferred, outer, ["right", "right"], ["left", "left"], ["left", "right"], ["right", "left"]];
+    var left = chart.left + margin, right = chart.right - margin, seen = {};
+    for (var i = 0; i < tries.length; i++) {
+      var sides = tries[i], key = sides.join(",");
+      if (seen[key]) continue;
+      seen[key] = true;
+      var boxA = boxAt(a, sizeA, sides[0], false), boxB = boxAt(b, sizeB, sides[1], false);
+      var fits = [boxA, boxB].every(function (box) { return box.left >= left && box.right <= right; });
+      var clear = (others || []).every(function (box) {
+        return !overlaps(boxA, box, margin) && !overlaps(boxB, box, margin);
+      });
+      if (fits && clear && !overlaps(boxA, boxB, gap)) return [sides[0], sides[1]];
+    }
+    return null;
+  }
+
   // A place on the chart's free area (edges included; left = right edge of the panel). Its marker
   // is shown with its whole number: nudgeInside moves it inward when it sticks out. The home view
   // uses this to decide which of the day's pins are on screen (owner, PR #91).
@@ -80,6 +105,7 @@
       original + text + '<p class="chart-card-links">' + links.join("") + "</p></div>";
   }
 
-  root.HavenPins = { boxAt: boxAt, overlaps: overlaps, onChart: onChart, nudgeInside: nudgeInside, swipeTaker: swipeTaker,
+  root.HavenPins = { boxAt: boxAt, overlaps: overlaps, separateSides: separateSides, onChart: onChart,
+    nudgeInside: nudgeInside, swipeTaker: swipeTaker,
     cardHtml: cardHtml };
 })(typeof window !== "undefined" ? window : globalThis);
