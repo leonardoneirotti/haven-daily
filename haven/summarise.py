@@ -82,7 +82,7 @@ import anthropic
 
 from haven.clock import AMSTERDAM
 from haven.config import Permission, Place, Source, Tag, load_places, load_sources, load_tag_list
-from haven.feeds import Item
+from haven.feeds import ARTICLE_TEXT_MAX, Item
 from haven.filter import BREAKER, NO_KEY, notice_ended
 from haven.places import pick, prefer_specific
 
@@ -126,6 +126,15 @@ class SummaryResult:
     output_tokens: int = 0
     batch_input_tokens: int = 0  # the part paid at the batch price (50% off, §5.5)
     batch_output_tokens: int = 0
+
+    # The standard API's own share, paid at the full price (#143: the totals above include the batch).
+    @property
+    def standard_input_tokens(self) -> int:
+        return self.input_tokens - self.batch_input_tokens
+
+    @property
+    def standard_output_tokens(self) -> int:
+        return self.output_tokens - self.batch_output_tokens
 
     @property
     def summaries(self) -> dict:
@@ -339,7 +348,9 @@ def _request(item: Item, model: str, system: str, known: list[dict], today: date
         f"<headline>{_escape(item.headline)}</headline>",
     ]
     if not headline_only:  # never for headline-only items (hard rule 12)
-        parts.append(f"<article>{_escape(item.article_text)}</article>")
+        # Capped here too (#143): every route (batch, rephrase retry, fallback) sends the same text,
+        # whatever a collector passed. The collectors cap at the same length (spec §5.8).
+        parts.append(f"<article>{_escape((item.article_text or '')[:ARTICLE_TEXT_MAX])}</article>")
         if permission is not None:
             parts.append(_permission_line(permission))
         if english_headline:
@@ -431,7 +442,8 @@ class _Run:
             self.batch_input_tokens += tokens_in
             self.batch_output_tokens += tokens_out
 
-    def accept(self, response, item: Item, model: str, api: str, retry_reason: str | None) -> Item | _Retry:
+    def accept(self, response, item: Item, model: str, api: str, retry_reason: str | None,
+               why: str | None = None) -> Item | _Retry:
         """The item with its checked AI fields, unrated with a failure line, or a _Retry."""
         def after(problem: str) -> str:
             return f"{problem} (after a retry)" if retry_reason is not None else problem
@@ -454,11 +466,14 @@ class _Run:
         if strike_elsewhere(ai):  # owner, 24 Nov 2026 (#123): a strike that doesn't affect Rotterdam is Low
             ai["severity"] = "low"
         ai["written_by"] = {"model": model, "api": api}
+        if why is not None:  # written outside the batch, and why (#143)
+            ai["written_by"]["why"] = why
         self.failures.extend({"source": SUMMARISER, "error": f"{item.url}: {note}"} for note in notes)
         return replace(item, ai=ai)
 
-    def standard(self, item: Item, model: str, retry_reason: str | None = None) -> Item:
-        """The item through the standard API (with its one rephrase retry). Raises _Unavailable."""
+    def standard(self, item: Item, model: str, retry_reason: str | None = None, why: str | None = None) -> Item:
+        """The item through the standard API (with its one rephrase retry). Raises _Unavailable.
+        `why`: the reason it is not written in the batch, stored as `written_by.why` (#143)."""
         if self.streak >= BREAKER:  # the API went down after answering earlier: don't wait on it again
             return self.fail(item, f"not tried: {BREAKER} calls in a row failed")
         while True:
@@ -477,7 +492,7 @@ class _Run:
             else:
                 self.answered, self.streak = True, 0
                 self.count(response, batch=False)
-                outcome = self.accept(response, item, model, "standard", retry_reason)
+                outcome = self.accept(response, item, model, "standard", retry_reason, why)
                 if isinstance(outcome, _Retry):
                     retry_reason = outcome.reason
                     continue
@@ -583,19 +598,24 @@ def finish_batch(pending: BatchRun, sleep: Callable[[float], None] | None = None
     if pending.unavailable is not None:
         return _unavailable(pending.items, pending.unavailable, calls=0)
     run = pending.run
-    answers = _collect(pending, sleep) if pending.batch_id is not None else {}
+    if pending.batch_id is not None:
+        answers, unanswered, otherwise = _collect(pending, sleep)
+    else:
+        answers, unanswered, otherwise = {}, {}, NOT_CREATED
     run.answered = bool(answers)
     try:
         done = []
         for index, item in enumerate(pending.items):
             message = answers.get(index)
             if message is None:
-                done.append(run.standard(item, FALLBACK_MODEL))
+                why = f"not answered by the batch ({unanswered[index]})" if index in unanswered else otherwise
+                done.append(run.standard(item, FALLBACK_MODEL, why=why))
                 continue
             run.count(message, batch=True)
             outcome = run.accept(message, item, pending.model, "batch", retry_reason=None)
             if isinstance(outcome, _Retry):  # the one rephrase retry: same model, standard API
-                outcome = run.standard(item, pending.model, retry_reason=outcome.reason)
+                outcome = run.standard(item, pending.model, retry_reason=outcome.reason,
+                                       why=f"rephrase retry: {outcome.reason}")
             done.append(outcome)
     except _Unavailable as why:
         return _unavailable(pending.items, str(why), run.calls)
@@ -613,8 +633,17 @@ def summarise_batch(items: list[Item], client, known: list[dict], today: date, m
     return finish_batch(pending, sleep)
 
 
-def _collect(pending: BatchRun, sleep: Callable[[float], None]) -> dict[int, object]:
-    """{item index: message} for every request the batch answered ("succeeded")."""
+# Why an item the batch didn't answer goes to the fallback (written_by.why, #143).
+NOT_CREATED = "the batch could not be created"
+NOT_ENDED = "the batch did not end in time"
+NOT_READ = "the batch results could not be read"
+NO_RESULT = "not answered by the batch"
+
+
+def _collect(pending: BatchRun, sleep: Callable[[float], None]) -> tuple[dict[int, object], dict[int, str], str]:
+    """{item index: message} for every request the batch answered ("succeeded"), {item index: result
+    type} for the ones it ended without answering ("errored", "expired", "canceled"), and the reason
+    for any other item."""
     run, batch_id = pending.run, pending.batch_id
     batches = run.client.messages.batches
     if not _wait_until_ended(batches, batch_id, pending.started + BATCH_WAIT, pending.clock, sleep):
@@ -624,18 +653,22 @@ def _collect(pending: BatchRun, sleep: Callable[[float], None]) -> dict[int, obj
             pass  # it may have ended just now; the check below decides
         if not _wait_until_ended(batches, batch_id, pending.clock() + CANCEL_WAIT, pending.clock, sleep):
             run.failures.append({"source": SUMMARISER, "error": BATCH_NOT_ENDED})
-            return {}
+            return {}, {}, NOT_ENDED
     ids = {_custom_id(i): i for i in range(len(pending.items))}
-    answers = {}
+    answers, unanswered = {}, {}
     try:
         for entry in batches.results(batch_id):  # in any order: matched by custom_id
             index = ids.get(entry.custom_id)
-            if index is not None and entry.result.type == "succeeded":
+            if index is None:
+                continue
+            if entry.result.type == "succeeded":
                 answers[index] = entry.result.message
+            else:
+                unanswered[index] = str(entry.result.type)
     except Exception as error:
         run.failures.append({"source": SUMMARISER, "error": BATCH_UNREADABLE.format(problem=_problem(error))})
-        return {}
-    return answers
+        return {}, {}, NOT_READ
+    return answers, unanswered, NO_RESULT
 
 
 def _wait_until_ended(batches, batch_id: str, deadline: float, clock: Callable[[], float],

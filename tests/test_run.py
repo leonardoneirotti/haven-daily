@@ -256,7 +256,8 @@ def test_build_block_records_ai_usage_for_the_cost_check(tmp_path):
     usage = storage.read("briefs", TODAY, tmp_path)["build"]["ai_usage"]
     assert usage["relevance_check"] == {"calls": 3, "input_tokens": 2580, "output_tokens": 156}
     assert usage["summariser"] == {"calls": 0, "input_tokens": 9000, "output_tokens": 1200,
-                                   "batch_input_tokens": 9000, "batch_output_tokens": 1200}
+                                   "batch_input_tokens": 9000, "batch_output_tokens": 1200,
+                                   "standard_input_tokens": 0, "standard_output_tokens": 0}  # #143
 
 
 def test_article_text_is_read_for_kept_items_only_and_never_stored(tmp_path):
