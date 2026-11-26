@@ -80,3 +80,64 @@ def test_the_flight_summary_attributes_the_landing_work():
     summary = MEASURE[MEASURE.index("function flightSummary"):]
     summary = summary[: summary.index("\n}\n")]
     assert "timings" in summary
+
+
+# --- part 2: the fixes ---------------------------------------------------------------------------------
+
+import json  # noqa: E402
+
+from test_pins_geometry import NODE, js  # noqa: E402,F401  (skipped without Node, as the geometry tests)
+
+
+def map_function(name):
+    start = MAP_JS.index(f"function {name}(")
+    return MAP_JS[start: MAP_JS.index("\n  }\n", start)]
+
+
+def test_the_easing_is_one_smooth_in_out_curve():
+    values = js("[0, 0.1, 0.25, 0.5, 0.75, 0.9, 1].map(P.glideEase)")
+    assert values[0] == 0 and values[-1] == 1 and abs(values[3] - 0.5) < 1e-9
+    assert values == sorted(values)                       # never goes back
+    assert values[1] < 0.1 and values[5] > 0.9             # starts and ends gently
+    assert abs(values[2] + values[4] - 1) < 1e-9           # the same in as out
+
+
+def test_the_duration_grows_with_the_distance_within_sensible_limits():
+    short, long, far = js("[P.glideDuration(40, 0), P.glideDuration(400, 1), P.glideDuration(5000, 6)]")
+    assert 450 <= short < long <= far <= 900
+
+
+def test_a_selection_glides_straight_without_leafets_fly_arc():
+    fly = map_function("flyTo")
+    assert "flyToBounds" not in fly and "map.flyTo(" not in fly
+    assert "glideTo(" in fly
+    assert "flyToBounds" not in MAP_JS and "map.flyTo(" not in MAP_JS
+
+
+def test_the_glide_uses_leaflets_own_move_steps_and_can_be_stopped():
+    glide = map_function("glideTo")
+    for step in ("map._moveStart(", "map._move(", "._moveEnd(", "map._flyToFrame =", "pinGeometry.glideEase(",
+                 "pinGeometry.glideDuration("):
+        assert step in glide, step
+
+
+def test_reduced_motion_jumps_without_moving():
+    fly = map_function("flyTo")
+    assert re.search(r"if \(reduceMotion\)[^\n]*(fitBounds|setView)[^\n]*", fly)
+
+
+def test_the_card_opens_after_the_landing_without_moving_the_chart_again():
+    select = map_function("selectItem")
+    assert "cardPadding(" in select                      # room for the card is part of the flight's target
+    still = map_function("whenStill")
+    assert "requestAnimationFrame" in still              # after the frames that land the chart
+
+
+def test_the_markers_are_placed_in_the_frame_after_the_basemap():
+    assert re.search(r'map\.on\("moveend", function \(\) \{[^}]*requestAnimationFrame', MAP_JS)
+
+
+def test_the_free_chart_is_measured_once_per_plan():
+    plan = map_function("planMarkers")
+    assert "planChart = " in plan
+    assert "planChart ||" in map_function("freeChart")
