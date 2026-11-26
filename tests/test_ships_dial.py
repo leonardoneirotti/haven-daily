@@ -100,6 +100,8 @@ def test_no_expected_line_without_arrivals_in_the_data(tmp_path):
 
 
 def test_the_dial_says_where_the_ships_come_from(tmp_path):
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
     ais = text_of(dial(preview_html(tmp_path / "a", make_brief(sample=True, ships=fleet()))))
     berths = text_of(dial(preview_html(tmp_path / "b", make_brief(sample=True, ships=dict(fleet(), kind="berths")))))
     assert "AIS positions" in ais and "berth list" in berths

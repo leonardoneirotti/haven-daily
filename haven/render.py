@@ -678,8 +678,17 @@ def summaries_line(items: list[dict], summaries: dict | None) -> str | None:
     return ", ".join(parts)
 
 
-def prepare_ships(brief: dict) -> None:
-    """Add labels and counts to the AIS snapshot. None means the snapshot failed."""
+# Where a ship layer's snapshot comes from, in the dial's words (#156): AIS positions, or a berth list.
+SHIP_SOURCE_WORDS = {"positions": "Seagoing cargo ships, from AIS positions",
+                     "berths": "Seagoing cargo ships, from the port's berth list"}
+# The dial's counts per place, by the place's kind (config/places.toml), in this order (#156).
+SHIP_PLACE_GROUPS = (("terminal", "At terminals"), ("anchorage", "At anchorages"), (None, "Elsewhere in the port"))
+
+
+def prepare_ships(brief: dict, ship_view: str | None = None) -> None:
+    """Add labels and counts to the AIS snapshot. None means the snapshot failed. In the ship layer
+    (#156) also the dial's counts per place, the ships at a berth, each ship's place name and the
+    expected arrivals."""
     ships = brief.setdefault("ships", None)
     if not ships:
         brief["ships"] = None
@@ -701,6 +710,37 @@ def prepare_ships(brief: dict) -> None:
     ships["underway"] = sum(1 for ship in vessels if ship["status"] == "underway")
     ships["linked"] = sum(1 for ship in vessels if ship["news_severity"])
     ships["vessels"] = sorted(vessels, key=lambda ship: (ship["area"], ship["name"]))
+    if ship_view:
+        places = {place.id: place for place in load_places()}
+        ships["at_berth"] = sum(1 for ship in vessels if ship["status"] == "moored")
+        ships["source_words"] = SHIP_SOURCE_WORDS[ships["kind"]]
+        ships["places"] = ship_places(vessels, places, items)
+        for ship in vessels:
+            ship["place_label"] = places[ship["place"]].label if ship.get("place") else None
+        expected = ships.get("expected")
+        ships["expected_list"] = None if expected is None else [
+            dict(ship, type_label=SHIP_TYPES[ship["type"]], eta_label=_time_on(_moment(ship["eta"]), brief["date"])
+                 if _moment(ship["eta"]) else ship["eta"],
+                 place_label=places[ship["place"]].label if ship.get("place") else None)
+            for ship in sorted(expected, key=lambda ship: ship["eta"])]
+
+
+def ship_places(vessels: list[dict], places: dict, items: list[dict]) -> list[dict]:
+    """The Ships dial's counts per place (#156): one group per kind (terminals, anchorages, the rest),
+    each place with its number of ships, most first (haven/ships.py by_place), and the news item linked
+    to a ship there. Groups without ships are left out."""
+    counted = ship_snapshot.by_place(vessels, places.values())
+    groups = []
+    for kind, heading in SHIP_PLACE_GROUPS:
+        kinds = {k for k, _ in SHIP_PLACE_GROUPS if k}
+        entries = [entry for entry in counted
+                   if (places[entry["place"]].kind == kind if kind else places[entry["place"]].kind not in kinds)]
+        for entry in entries:
+            rank = entry["news_item"]
+            entry["severity"] = items[rank - 1]["severity_key"] if rank and rank <= len(items) else None
+        if entries:
+            groups.append({"heading": heading, "places": entries})
+    return groups
 
 
 def map_payload(brief: dict, ship_view: str | None = None) -> dict:
@@ -797,7 +837,7 @@ def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.to
             key: sum(1 for item in brief["items"] if item["severity_key"] == key) for key in SEVERITY_KEYS
         }
         keep_ships(brief, ship_view)
-        prepare_ships(brief)
+        prepare_ships(brief, ship_view)
         brief["map"] = map_payload(brief, ship_view)
         # Nothing to show on the chart (no shown item has a place, no ships): the page draws
         # it as a short strip instead of a full screen of empty map (#81, spec §7.4).

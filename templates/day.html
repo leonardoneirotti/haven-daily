@@ -85,9 +85,16 @@
         {% if ships %}
         <div class="chart-filter needs-map" role="group" aria-label="Show ships">
           <button type="button" class="btn" data-ship-filter="all" aria-pressed="true">All <span>{{ ships.count }}</span></button>
+          {% if brief.map.get("ship_view") %}
+          {# The ship layer (#156): every type present, cargo too (AIS: All / Cargo / Tanker). #}
+          {% for kind, label in ship_layer_types.items() if ships.type_counts[kind] %}
+          <button type="button" class="btn" data-ship-filter="{{ kind }}" aria-pressed="false">{{ label }} <span>{{ ships.type_counts[kind] }}</span></button>
+          {% endfor %}
+          {% else %}
           {% for kind, count in ships.by_type.items() if count %}
           <button type="button" class="btn" data-ship-filter="{{ kind }}" aria-pressed="false">{{ ship_type_plurals[kind] }} <span>{{ count }}</span></button>
           {% endfor %}
+          {% endif %}
         </div>
         {% elif ais_snapshot_built %}
         {# A real failure (hard rule 9), so it stays on the chart, but in its corner, off the port. #}
@@ -160,14 +167,34 @@
             <div>
               {% if ships %}
               <p class="dial-value">{{ ships.count }}</p>
-              <p class="dial-place">Seagoing cargo ships, AIS snapshot</p>
+              <p class="dial-place">{% if brief.map.get("ship_view") %}{{ ships.source_words }}{% else %}Seagoing cargo ships, AIS snapshot{% endif %}</p>
               {% else %}
               <p class="dial-value is-text is-missing">No data</p>
               <p class="dial-place">{% if ais_snapshot_built %}The AIS snapshot failed{% else %}Ship positions are not collected yet{% endif %}</p>
               {% endif %}
             </div>
           </div>
-          {% if ships %}
+          {% if ships and brief.map.get("ship_view") %}
+          {# The ship layer (#156): where the ships are, then the counts per place, each finding its ships. #}
+          <p class="dial-status">
+            {% for status, count, words in [("moored", ships.at_berth, "at a berth"), ("anchored", ships.at_anchor, "at anchor"), ("underway", ships.underway, "under way")] %}
+            <button type="button" class="link-button needs-map" data-action="show-ships" data-status="{{ status }}">{% if status == "anchored" %}{{ m.icon("anchor") }}{% endif %}{{ count }} {{ words }}</button>
+            <span class="no-map">{{ count }} {{ words }}</span>
+            {% endfor %}
+          </p>
+          {% if ships.expected_list is not none %}<p class="dial-note">{{ ships.expected_list | length }} expected in the next 24 h</p>{% endif %}
+          <div class="dial-places">
+            {% for group in ships.places %}
+            <p class="dial-places-head">{{ group.heading }}</p>
+            <ul>
+              {% for place in group.places %}
+              <li><button type="button" class="link-button needs-map" data-action="show-place" data-place="{{ place.place }}" data-label="{{ place.label }}">{{ place.label }} <b>{{ place.count }}</b></button><span class="no-map">{{ place.label }} <b>{{ place.count }}</b></span>{% if place.news_item %} <a href="#item-{{ place.news_item }}" class="ship-news sev-{{ place.severity }}">item {{ place.news_item }}</a>{% endif %}</li>
+              {% endfor %}
+            </ul>
+            {% endfor %}
+          </div>
+          <p class="dial-meta"><span>Snapshot <time datetime="{{ ships.snapshot_start }}">{{ ships.snapshot_start | clock }}</time>–<time datetime="{{ ships.snapshot_end }}">{{ ships.snapshot_end | clock }}</time></span><span>{{ ships.source_name }}</span></p>
+          {% elif ships %}
           <p class="dial-status">
             <button type="button" class="link-button needs-map" data-action="show-ships" data-status="anchored">{{ m.icon("anchor") }}{{ ships.at_anchor }} at anchor</button>
             <span class="no-map">{{ ships.at_anchor }} at anchor</span>
@@ -209,7 +236,7 @@
       <div class="table-scroll" tabindex="0" role="region" aria-labelledby="ships-title">
         <table>
           <thead>
-            <tr><th scope="col">Ship</th><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Area</th><th scope="col">Destination</th><th scope="col">AIS text</th><th scope="col">Flag</th><th scope="col" class="num-col">Length</th></tr>
+            <tr><th scope="col">Ship</th><th scope="col">Type</th><th scope="col">Status</th><th scope="col">{% if brief.map.get("ship_view") %}Place{% else %}Area{% endif %}</th><th scope="col">Destination</th><th scope="col">AIS text</th><th scope="col">Flag</th><th scope="col" class="num-col">Length</th></tr>
           </thead>
           <tbody>
             {% for ship in ships.vessels %}
@@ -221,7 +248,7 @@
               </th>
               <td>{{ ship.type_label }}</td>
               <td>{{ ship.status_label }}{% if ship.status == "underway" %}, {{ ship.speed_kn }} kn{% endif %}</td>
-              <td>{{ ship.area }}</td>
+              <td>{% if brief.map.get("ship_view") %}{{ ship.place_label or ship.area }}{% else %}{{ ship.area }}{% endif %}</td>
               <td>{{ ship.destination or "Unknown" }}</td>
               <td class="ais-text">{{ ship.destination_raw or "(blank)" }}</td>
               <td>{{ ship.flag_name }}</td>
@@ -231,6 +258,22 @@
           </tbody>
         </table>
       </div>
+      {% if brief.map.get("ship_view") and ships.expected_list %}
+      {# Expected in the next 24 h (#156): berth data only. #}
+      <h3 id="expected-title" class="expected-title">Expected in the next 24 h</h3>
+      <div class="table-scroll" tabindex="0" role="region" aria-labelledby="expected-title">
+        <table>
+          <thead>
+            <tr><th scope="col">Ship</th><th scope="col">Type</th><th scope="col">Expected</th><th scope="col">Place</th><th scope="col" class="num-col">Length</th></tr>
+          </thead>
+          <tbody>
+            {% for ship in ships.expected_list %}
+            <tr><td>{{ ship.name }}</td><td>{{ ship.type_label }}</td><td>{{ ship.eta_label }}</td><td>{{ ship.place_label or "Unknown" }}</td><td class="num-col">{% if ship.length_m %}{{ ship.length_m }} m{% else %}–{% endif %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
     </details>
   </section>
   {% endif %}
