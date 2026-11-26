@@ -15,6 +15,11 @@
   var basemap = window.HAVEN_BASEMAP;
   var pinGeometry = window.HavenPins; // marker geometry: static/pins.js (the home view uses it too)
   var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Named timings for the speed run (#150): how long the work done when the chart lands takes
+  // (basemap, markers, water, pin card). User Timing only: nothing is sent or stored.
+  function timing(name, start) {
+    try { performance.measure("haven:" + name, { start: start, end: performance.now() }); } catch (e) { /* older browsers */ }
+  }
   var chart = document.getElementById("chart");
   var focusBox = document.getElementById("chart-focus");
   var focusText = document.getElementById("chart-focus-text");
@@ -398,8 +403,10 @@
   // page's thread), or copied in where the browser has no "bitmaprenderer". Then placed, and asked
   // for again if the chart has moved on meanwhile.
   function takeWater(event) {
+    var started = performance.now();
     var done = event.data, image = new ImageData(done.pixels, done.w, done.h);
     function show(picture) {
+      var shown = performance.now();
       waterEl.width = done.w;
       waterEl.height = done.h;
       waterEl.style.width = done.w + "px";
@@ -410,10 +417,12 @@
       waterJob = null;
       placeWater(map.getZoom(), map.getPixelOrigin());
       checkWater();
+      timing("water", shown);
     }
     if (!waterShow) waterShow = (window.createImageBitmap && waterEl.getContext("bitmaprenderer")) || waterEl.getContext("2d");
     if (waterShow.transferFromImageBitmap) createImageBitmap(image).then(show, function () { waterJob = null; });
     else show(null);
+    timing("water", started);
   }
 
   // The picture on the chart at `zoom`, for a view whose top left is `origin` (world pixels at that
@@ -480,6 +489,10 @@
   }
 
   function paint(ctx) {
+    var started = performance.now();
+    try { paintBasemap(ctx); } finally { timing("paint", started); }
+  }
+  function paintBasemap(ctx) {
     var zoom = map.getZoom();
     var s = map.getZoomScale(zoom, 0);
     var origin = map.getPixelOrigin();
@@ -731,9 +744,11 @@
   // marker, rows on either side; if nothing fits, the narrowest of these. Last, a marker at
   // the chart's edge moves inward just enough that no number is cut (owner, PR #91).
   // `forced`: a side chosen to keep two close markers apart (planMarkers), tried alone.
+  // Measured once per plan (#150): panelCover() reads the panel's layout, and every marker asked.
+  var planChart = null;
   function freeChart() {
     var size = map.getSize();
-    return { left: panelCover(), top: 0, right: size.x, bottom: size.y };
+    return planChart || { left: panelCover(), top: 0, right: size.x, bottom: size.y };
   }
   function placeMarker(marker, forced) {
     var anchor = callouts[marker.ranks[0]].data;
@@ -769,6 +784,8 @@
   // only if no sides do, then check again. A pair is kept apart once; if it overlaps again (an
   // edge nudge), it merges, so the loop always ends.
   function planMarkers() {
+    planChart = null;
+    planChart = freeChart();
     var markers = ranks.map(function (rank) { return placeMarker({ ranks: [rank] }); });
     var separated = {};
     for (;;) {
@@ -778,7 +795,10 @@
           if (pinGeometry.overlaps(markers[i].box, markers[j].box, MARKER_GAP)) pair = [markers[i], markers[j]];
         }
       }
-      if (!pair) return markers;
+      if (!pair) {
+        planChart = null;
+        return markers;
+      }
       var rest = markers.filter(function (m) { return m !== pair[0] && m !== pair[1]; });
       var key = pair[0].ranks.concat(pair[1].ranks).sort().join(",");
       if (pair[0].ranks.length === 1 && pair[1].ranks.length === 1 && !separated[key]) {
@@ -800,6 +820,10 @@
 
   var shownPlan = null;
   function showCallouts(remeasure) {
+    var started = performance.now();
+    try { placeCallouts(remeasure); } finally { timing("markers", started); }
+  }
+  function placeCallouts(remeasure) {
     if (!ranks.length) return;
     if (remeasure) sizes = {};
     var plan = planMarkers().sort(function (a, b) { return a.ranks[0] - b.ranks[0]; }); // keyboard order: item 1 first
@@ -856,7 +880,14 @@
   }
 
   showCallouts(false);
-  map.on("moveend", function () { showCallouts(false); });
+  // The basemap is redrawn when a move ends (Leaflet's renderer); the markers are placed in the
+  // next frame, so the two don't make one long task (#150).
+  var markersPending = false;
+  map.on("moveend", function () {
+    if (markersPending) return;
+    markersPending = true;
+    requestAnimationFrame(function () { markersPending = false; showCallouts(false); });
+  });
   // Measured once more when the fonts the markers use have arrived, not after every font (#104).
   if (document.fonts) document.fonts.ready.then(function () { showCallouts(true); });
 
@@ -890,11 +921,45 @@
     announcer.textContent = "";
   }
 
-  function flyTo(points, maxZoom) {
+  // To a selected item (#150): one straight, eased movement (glideTo) instead of Leaflet's fly-to
+  // (bounds), which zoomed out before zooming in even for a nearby item. `extra`: more room kept
+  // around the item (for its pin card). With "reduce motion" the chart jumps there.
+  function flyTo(points, maxZoom, extra) {
     var bounds = L.latLngBounds(points);
     var options = viewPadding(maxZoom);
-    if (reduceMotion) map.fitBounds(bounds, options);
-    else map.flyToBounds(bounds, L.extend({ duration: 0.9 }, options));
+    if (extra) {
+      options.paddingTopLeft = [Math.max(options.paddingTopLeft[0], extra.left), Math.max(options.paddingTopLeft[1], extra.top)];
+      options.paddingBottomRight = [Math.max(options.paddingBottomRight[0], extra.right),
+        Math.max(options.paddingBottomRight[1], extra.bottom)];
+    }
+    if (reduceMotion) map.fitBounds(bounds, L.extend({ animate: false }, options));
+    else {
+      var target = map._getBoundsCenterZoom(bounds, options);
+      glideTo(map._limitCenter(target.center, target.zoom, map.options.maxBounds), target.zoom);
+    }
+  }
+
+  // The movement itself: the same steps as Leaflet's own flyTo (_moveStart, one _move per frame,
+  // _moveEnd), so layers, markers and the work at the end behave as before, but zoom and position
+  // follow one ease-in-out curve (pins.js glideEase) over 450-900 ms (glideDuration). The frame
+  // is kept in map._flyToFrame, so a drag, a wheel or a new selection stops it as it stops a flyTo.
+  function glideTo(center, zoom) {
+    map._stop();
+    var z0 = map.getZoom(), from = map.project(map.getCenter(), z0), to = map.project(center, z0);
+    var duration = pinGeometry.glideDuration(from.distanceTo(to), zoom - z0);
+    var zoomChanged = Math.abs(zoom - z0) > 1e-6, start = performance.now();
+    map._moveStart(zoomChanged, false);
+    function frame() {
+      var t = Math.min(1, (performance.now() - start) / duration);
+      if (t < 1) {
+        var e = pinGeometry.glideEase(t);
+        map._flyToFrame = L.Util.requestAnimFrame(frame, map);
+        map._move(map.unproject(from.add(to.subtract(from).multiplyBy(e)), z0), z0 + (zoom - z0) * e, { flyTo: true });
+      } else {
+        map._move(center, zoom)._moveEnd(zoomChanged);
+      }
+    }
+    frame();
   }
 
   // Selecting from the full brief below: bring the chart back into view before it moves.
@@ -959,11 +1024,14 @@
     } else if (!options.quiet) {
       revealChart();
     }
-    flyTo(points, linked.length ? 13.6 : 11.8);
+    // From the chart, the card's room is part of where the chart goes (#150): it then opens without
+    // moving the chart a second time (its auto-pan stays only as a safety net).
+    flyTo(points, linked.length ? 13.6 : 11.8, options.fromChart ? cardPadding(rank) : null);
     setHash("item-" + rank);
   }
 
-  // Once the chart stops moving (or after 1.5 s, if it never moved), run `then` once.
+  // Once the chart stops moving (or after 1.5 s, if it never moved), run `then` once: two frames
+  // later, after the frames that redraw the basemap and place the markers (#150).
   function whenStill(then) {
     var done = false, timer = 0;
     function once() {
@@ -971,7 +1039,7 @@
       done = true;
       clearTimeout(timer);
       map.off("moveend", once);
-      then();
+      requestAnimationFrame(function () { requestAnimationFrame(then); });
     }
     map.on("moveend", once);
     timer = setTimeout(once, 1500);
@@ -1003,7 +1071,29 @@
     room.width = Math.max(180, box.width - room.left - room.right - 34); // 34: the card's own margins and border
     return room;
   }
+  // Room the pin card will need around its number (#150), measured in a hidden copy as the
+  // markers are: its height above the number, half its width on either side. Never more than the
+  // chart can give; then the card's own auto-pan does the rest.
+  function cardPadding(rank) {
+    var room = cardRoom(), width = Math.min(300, room.width), size = map.getSize();
+    var copy = L.DomUtil.create("div", "leaflet-popup chart-popup chart-card", map.getPane("popupPane"));
+    copy.setAttribute("aria-hidden", "true");
+    copy.style.cssText = "position:absolute;left:0;top:0;visibility:hidden";
+    copy.innerHTML = '<div class="leaflet-popup-content-wrapper"><div class="leaflet-popup-content" style="width:' +
+      width + 'px">' + pinGeometry.cardHtml(callouts[rank].data, rank) + "</div></div>";
+    var height = Math.min(room.height, copy.firstChild.getBoundingClientRect().height);
+    copy.parentNode.removeChild(copy);
+    // Below: what the card's auto-pan asks for under the card (room.bottom, from its tip down past
+    // the number and the attribution), less the 20 px the card sits above its number.
+    var bottom = Math.max(64, room.bottom - 20 + 8);
+    var top = Math.min(room.top + height + 40 + NUM_HALF, size.y - bottom - 2 * NUM_HALF - 8);
+    return { top: top, left: room.left + width / 2 + 16, right: room.right + width / 2 + 16, bottom: bottom };
+  }
   function openCard(rank) {
+    var started = performance.now();
+    try { showCard(rank); } finally { timing("card", started); }
+  }
+  function showCard(rank) {
     var callout = callouts[rank];
     if (!callout) return;
     closeCard(false);

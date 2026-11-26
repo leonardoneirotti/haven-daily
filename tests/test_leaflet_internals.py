@@ -1,7 +1,9 @@
 """Safeguard for decision 6 of PR #91 (spec §8.5): the home view uses two of Leaflet's internal
 map methods, `_getBoundsCenterZoom` and `_limitCenter`, to work out a view without moving the
 chart. They are not public API, so they are only trusted in the bundled Leaflet 1.9.4.
-Confirmed by the owner, 3 Nov 2026 (PR #91).
+Confirmed by the owner, 3 Nov 2026 (PR #91). Since #150 the glide to a selected item also uses
+the steps of Leaflet's own flyTo: `_moveStart`, `_move`, `_moveEnd`, `_stop`, and the
+`_flyToFrame` property that `_stop` cancels.
 
 Leaflet needs a browser, so the bundled (minified) file is read as text.
 """
@@ -14,9 +16,10 @@ LEAFLET_JS = ROOT / "static" / "vendor" / "leaflet" / "leaflet.js"
 MAP_JS = ROOT / "static" / "map.js"
 
 VERSION = "1.9.4"
-INTERNALS = {"_getBoundsCenterZoom", "_limitCenter"}
-RECHECK = ("Recheck decision 6 (spec §8.5, PR #91) before updating Leaflet: the home view in "
-           "static/map.js uses Leaflet's internal map methods _getBoundsCenterZoom and _limitCenter.")
+INTERNALS = {"_getBoundsCenterZoom", "_limitCenter", "_moveStart", "_move", "_moveEnd", "_stop"}
+PROPERTIES = {"_flyToFrame"}  # set by the glide, cancelled by _stop (#150)
+RECHECK = ("Recheck decision 6 (spec §8.5, PR #91, #150) before updating Leaflet: static/map.js uses "
+           "Leaflet's internal map methods " + ", ".join(sorted(INTERNALS)) + " and the _flyToFrame property.")
 
 
 def leaflet_problems(source: str) -> list[str]:
@@ -28,6 +31,9 @@ def leaflet_problems(source: str) -> list[str]:
     for name in sorted(INTERNALS):
         if not re.search(rf"\b{name}\s*:\s*function\s*\(", source):
             problems.append(f"Leaflet's map method {name} is missing")
+    for name in sorted(PROPERTIES):
+        if name not in source:
+            problems.append(f"Leaflet's map property {name} is missing")
     return problems
 
 
@@ -39,13 +45,16 @@ def test_the_bundled_leaflet_is_1_9_4_with_the_internals_the_home_view_uses():
 def test_map_js_uses_no_other_leaflet_internals():
     # A new internal call would not be covered by this safeguard: add it to INTERNALS and to
     # decision 6 in the spec first.
-    used = set(re.findall(r"\bmap\.(_[A-Za-z]\w*)\s*\(", MAP_JS.read_text(encoding="utf-8")))
+    # Any `._name(` call, chained ones included (`map._move(...)._moveEnd(...)`, #150).
+    used = set(re.findall(r"\.(_[A-Za-z]\w*)\s*\(", MAP_JS.read_text(encoding="utf-8")))
     assert used == INTERNALS, f"map.js calls Leaflet internals {sorted(used)}. " + RECHECK
 
 
 # ---------- The safeguard itself fails when it should ----------
 
-GOOD = 't.version="1.9.4",x={_getBoundsCenterZoom:function(t,e){},_limitCenter:function(t,e,i){}}'
+GOOD = ('t.version="1.9.4",x={_getBoundsCenterZoom:function(t,e){},_limitCenter:function(t,e,i){},'
+        '_moveStart:function(t,e){},_move:function(t,e,i){},_moveEnd:function(t){},'
+        '_stop:function(){cancelAnimFrame(this._flyToFrame)}}')
 
 
 def test_a_build_like_the_bundled_one_passes():

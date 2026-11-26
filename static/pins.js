@@ -44,6 +44,19 @@
     return null;
   }
 
+  // The chart's movement to a selected item (#150): one ease-in-out curve over the whole movement
+  // (zoom and position together), gentle at both ends. t and the result run from 0 to 1.
+  function glideEase(t) {
+    t = Math.max(0, Math.min(1, t));
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  // How long that movement takes, in ms: longer for a longer way (`pixels` on screen at the start
+  // zoom) or more zoom levels, between 450 ms and 900 ms (Leaflet's flyTo took 900 ms for any way).
+  function glideDuration(pixels, zoomLevels) {
+    return Math.round(Math.max(450, Math.min(900, 450 + 0.25 * pixels + 120 * Math.abs(zoomLevels))));
+  }
+
   // A place on the chart's free area (edges included; left = right edge of the panel). Its marker
   // is shown with its whole number: nudgeInside moves it inward when it sticks out. The home view
   // uses this to decide which of the day's pins are on screen (owner, PR #91).
@@ -105,7 +118,8 @@
       original + text + '<p class="chart-card-links">' + links.join("") + "</p></div>";
   }
 
-  root.HavenPins = { boxAt: boxAt, overlaps: overlaps, separateSides: separateSides, onChart: onChart,
+  root.HavenPins = { boxAt: boxAt, overlaps: overlaps, separateSides: separateSides, glideEase: glideEase,
+    glideDuration: glideDuration, onChart: onChart,
     nudgeInside: nudgeInside, swipeTaker: swipeTaker,
     cardHtml: cardHtml };
 })(typeof window !== "undefined" ? window : globalThis);
