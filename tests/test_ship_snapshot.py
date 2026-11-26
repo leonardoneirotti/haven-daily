@@ -268,9 +268,7 @@ def test_a_ship_under_a_number_fades():
 
 def test_the_number_layout_never_looks_at_ships():
     plan = MAP_JS[MAP_JS.index("function planMarkers("):]
-    plan = plan[: plan.index("
-  }
-")]
+    plan = plan[: plan.index("\n  }\n")]
     assert "ship" not in plan.lower()
 
 
