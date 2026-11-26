@@ -1083,7 +1083,10 @@
       width + 'px">' + pinGeometry.cardHtml(callouts[rank].data, rank) + "</div></div>";
     var height = Math.min(room.height, copy.firstChild.getBoundingClientRect().height);
     copy.parentNode.removeChild(copy);
-    var bottom = 64, top = Math.min(room.top + height + 40 + NUM_HALF, size.y - bottom - 2 * NUM_HALF - 8);
+    // Below: what the card's auto-pan asks for under the card (room.bottom, from its tip down past
+    // the number and the attribution), less the 20 px the card sits above its number.
+    var bottom = Math.max(64, room.bottom - 20 + 8);
+    var top = Math.min(room.top + height + 40 + NUM_HALF, size.y - bottom - 2 * NUM_HALF - 8);
     return { top: top, left: room.left + width / 2 + 16, right: room.right + width / 2 + 16, bottom: bottom };
   }
   function openCard(rank) {
