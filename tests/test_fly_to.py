@@ -141,3 +141,11 @@ def test_the_free_chart_is_measured_once_per_plan():
     plan = map_function("planMarkers")
     assert "planChart = " in plan
     assert "planChart ||" in map_function("freeChart")
+
+
+def test_the_cards_room_below_matches_what_its_auto_pan_asks_for():
+    # The phone measurement (after the first fix): 64 px below the number was less than the card's
+    # auto-pan wants (attribution + number + gaps), so it still moved the chart after opening.
+    padding = map_function("cardPadding")
+    assert "room.bottom" in padding
+    assert "var bottom = 64" not in padding
