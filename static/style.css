@@ -1847,6 +1847,54 @@ html.chart-expanded {
   font-weight: 700;
 }
 
+/* Ship count badges (#156): one per place at the opening view, in the ships pane under the news
+   numbers. Teal like the ships; a place with a ship linked to a news item takes its severity edge.
+   A badge that would cover a number hides (map.js, pins.js coveredBadges). */
+.ship-badge {
+  width: 0;
+  height: 0;
+}
+.ship-badge-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.05rem 0.4rem 0.05rem 0.35rem;
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--ship);
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(15, 34, 49, 0.18);
+  color: var(--ink-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.ship-badge-inner::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--ship);
+}
+.ship-badge-inner b {
+  color: var(--ship);
+  font-weight: 800;
+}
+.ship-badge.is-linked .ship-badge-inner {
+  border-width: 2px;
+}
+.ship-badge.sev-high .ship-badge-inner { border-color: var(--high); }
+.ship-badge.sev-medium .ship-badge-inner { border-color: var(--medium); }
+.ship-badge.sev-low .ship-badge-inner { border-color: var(--low); }
+.ship-badge.is-covered {
+  display: none;
+}
+
 /* ---------- Port status ---------- */
 
 .status {

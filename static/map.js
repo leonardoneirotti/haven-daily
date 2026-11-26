@@ -630,16 +630,76 @@
     return html;
   }
 
+  // The badge view (#156, the `ships` switch or a sample preview): ships and their count badges
+  // in a pane of their own under the news numbers (Leaflet's marker pane, 600), so a number is
+  // never covered by a ship and its layout never looks at one. Without it, ships are drawn as before.
+  var badgeView = data.ship_view === "badges";
+  if (badgeView) map.createPane("ships").style.zIndex = 550;
   var shipLayer = L.layerGroup().addTo(map);
   var ships = (data.ships || []).map(function (ship) {
-    var marker = L.marker([ship.lat, ship.lon], {
-      icon: shipIcon(ship),
-      title: ship.name + ", " + ship.type_label + ", " + ship.status_label,
-      riseOnHover: true,
-    }).bindPopup(shipPopup(ship), { className: "chart-popup", maxWidth: 280, offset: [0, -6] });
-    marker.addTo(shipLayer);
-    return { ship: ship, marker: marker };
+    var options = { icon: shipIcon(ship), title: ship.name + ", " + ship.type_label + ", " + ship.status_label,
+      riseOnHover: true };
+    if (badgeView) options.pane = "ships";
+    var marker = L.marker([ship.lat, ship.lon], options)
+      .bindPopup(shipPopup(ship), { className: "chart-popup", maxWidth: 280, offset: [0, -6] });
+    if (!badgeView) marker.addTo(shipLayer); // the badge view adds a ship only when it is shown
+    return { ship: ship, marker: marker, hot: false };
   });
+
+  // ---------- Ship count badges (#156) ----------
+  // At the opening view one badge per place ("ECT Delta · 6"), at the centre of its ships; from
+  // zoom data.ship_zoom (12) the single ships instead. Ships linked to a selected item, or picked
+  // with "N at anchor", are shown at any zoom. A badge that would cover a news number hides.
+  var badgeLayer = L.layerGroup().addTo(map), shipKind = "all";
+  var badges = (data.ship_places || []).map(function (place) {
+    var marker = L.marker([place.lat, place.lon], { pane: "ships", keyboard: false, icon: L.divIcon({
+      className: "ship-badge" + (place.severity ? " is-linked sev-" + place.severity : ""), iconSize: [0, 0],
+      html: '<span class="ship-badge-inner">' + escapeHtml(place.label) + " <b></b></span>" }) });
+    marker.on("click", function () {
+      flyTo(ships.filter(function (s) { return s.ship.place === place.place; })
+        .map(function (s) { return [s.ship.lat, s.ship.lon]; }), 13);
+    });
+    return { place: place, marker: marker };
+  });
+  function badgeCount(place) {
+    return shipKind === "all" ? place.count : place.by_type[shipKind] || 0;
+  }
+  function showShipView() {
+    if (!badgeView) return;
+    var close = map.getZoom() >= data.ship_zoom;
+    ships.forEach(function (s) {
+      var show = (close || s.hot) && (shipKind === "all" || s.ship.type === shipKind);
+      if (show && !shipLayer.hasLayer(s.marker)) s.marker.addTo(shipLayer);
+      if (!show && shipLayer.hasLayer(s.marker)) shipLayer.removeLayer(s.marker);
+      if (show) markerEl(s.marker).classList.toggle("is-hot", s.hot);
+    });
+    badges.forEach(function (b) {
+      var count = badgeCount(b.place), show = !close && count > 0;
+      if (show && !badgeLayer.hasLayer(b.marker)) b.marker.addTo(badgeLayer);
+      if (!show && badgeLayer.hasLayer(b.marker)) badgeLayer.removeLayer(b.marker);
+      if (!show) return;
+      var badge = markerEl(b.marker);
+      badge.querySelector("b").textContent = count;
+      badge.setAttribute("title", count + (count === 1 ? " ship at " : " ships at ") + b.place.label);
+    });
+    hideCoveredBadges();
+  }
+  function hideCoveredBadges() {
+    if (!badgeView) return;
+    var shown = badges.filter(function (b) { return badgeLayer.hasLayer(b.marker); });
+    var boxes = shown.map(function (b) {
+      var badge = markerEl(b.marker);
+      badge.classList.remove("is-covered");
+      return badge.querySelector(".ship-badge-inner").getBoundingClientRect();
+    });
+    var numbers = Array.prototype.map.call(el.querySelectorAll(".leaflet-marker-pane .num"), function (n) {
+      return n.getBoundingClientRect();
+    });
+    pinGeometry.coveredBadges(boxes, numbers, MARKER_GAP).forEach(function (i) {
+      markerEl(shown[i].marker).classList.add("is-covered");
+    });
+  }
+  map.on("zoomend", showShipView);
 
   // ---------- Numbered items ----------
   // Each item with a place shows its number on the chart, with the place's name beside it.
@@ -822,6 +882,7 @@
   function showCallouts(remeasure) {
     var started = performance.now();
     try { placeCallouts(remeasure); } finally { timing("markers", started); }
+    hideCoveredBadges(); // the numbers moved: a badge that now covers one hides (#156)
   }
   function placeCallouts(remeasure) {
     if (!ranks.length) return;
@@ -901,7 +962,8 @@
 
   function clearFocus() {
     el.classList.remove("is-focused");
-    ships.forEach(function (s) { markerEl(s.marker).classList.remove("is-hot"); });
+    ships.forEach(function (s) { s.hot = false; markerEl(s.marker).classList.remove("is-hot"); });
+    showShipView();
     activeRank = null;
     markCallouts();
     var active = document.querySelectorAll(".item.is-active, .panel-item.is-active");
@@ -1007,8 +1069,10 @@
     var linked = ships.filter(function (s) { return s.ship.news_item === rank; });
     linked.forEach(function (s) {
       points.push([s.ship.lat, s.ship.lon]);
+      s.hot = true;
       markerEl(s.marker).classList.add("is-hot");
     });
+    showShipView();
     var detail = linked.length ? " · " + linked.length + " ships at this terminal" : "";
     showFocus(
       '<span class="num num-' + callout.data.severity + '">' + rank + "</span>" +
@@ -1142,7 +1206,8 @@
     if (!group.length) return;
     clearFocus();
     el.classList.add("is-focused");
-    group.forEach(function (s) { markerEl(s.marker).classList.add("is-hot"); });
+    group.forEach(function (s) { s.hot = true; markerEl(s.marker).classList.add("is-hot"); });
+    showShipView();
     var words = { anchored: "at anchor", underway: "under way" }[status];
     showFocus("<span><strong>" + group.length + " ships " + words + "</strong></span>", group.length + " ships " + words);
     revealChart();
@@ -1172,7 +1237,9 @@
 
   // ---------- Ship filter ----------
   function filterShips(kind) {
-    ships.forEach(function (s) {
+    shipKind = kind;
+    if (badgeView) showShipView();
+    else ships.forEach(function (s) {
       var show = kind === "all" || s.ship.type === kind;
       if (show && !shipLayer.hasLayer(s.marker)) s.marker.addTo(shipLayer);
       if (!show && shipLayer.hasLayer(s.marker)) shipLayer.removeLayer(s.marker);
@@ -1333,6 +1400,7 @@
   updateScale();
 
   // A link to #item-2 opens with the chart already on item 2.
+  showShipView(); // the badge view's first drawing, at the opening view (#156)
   var linked = /^#item-(\d+)$/.exec(location.hash);
   if (linked) selectItem(Number(linked[1]), { quiet: true });
 })();

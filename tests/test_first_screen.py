@@ -4,7 +4,7 @@
   short strip with one line saying no item has a place on it; days with pins are unchanged.
 - M2: the brief comes first: the panel (head, item list, mini status) is before the chart
   in the page, and phones no longer hide the panel's item list.
-- S4: in v1 (`AIS_SNAPSHOT_BUILT = False`) no box over the chart, one grey line under it;
+- S4: in v1 (the `ships` switch off) no box over the chart, one grey line under it;
   from v2 a failed snapshot is a note in the chart's corner, not over the port.
 
 Headlines are invented.
@@ -16,16 +16,19 @@ from pathlib import Path
 import pytest
 
 from haven import render
-from test_render_real import make_brief, news, render_day, render_days, text_of
+from test_render_real import switch_ships_on, make_brief, news, render_day, render_days, text_of
 
 CSS = (Path(__file__).resolve().parent.parent / "static" / "style.css").read_text(encoding="utf-8")
 
 PLACE = {"place": "ect-delta", "lat": 51.96, "lon": 4.03, "label": "ECT Delta"}
-SHIPS = {
+SHIPS = {  # the shared snapshot format (haven/ships.py, #156)
+    "source_id": "sample",
+    "kind": "positions",
+    "expected": None,
     "source_name": "Sample AIS data",
     "snapshot_start": "2026-11-20T06:00:00+01:00",
     "snapshot_end": "2026-11-20T06:12:00+01:00",
-    "vessels": [{"name": "INVENTED ONE", "type": "container", "status": "moored", "lat": 51.96, "lon": 4.03,
+    "vessels": [{"name": "INVENTED ONE", "type": "container", "status": "moored", "place": "ect-delta", "lat": 51.96, "lon": 4.03,
                  "heading": 90, "speed_kn": 0, "length_m": 300, "flag": "LR", "area": "Maasvlakte",
                  "destination": "Rotterdam", "destination_raw": "NLRTM"}],
 }
@@ -74,7 +77,8 @@ def test_chart_is_not_empty_when_an_item_has_a_place():
 
 
 def test_chart_is_not_empty_when_there_are_ships():
-    assert prepared(ships=SHIPS)["chart_empty"] is False
+    # Invented ships on a sample day: a real brief's ships are ignored while the ships switch is off (#156).
+    assert prepared(ships=SHIPS, sample=True)["chart_empty"] is False
 
 
 def test_an_item_with_a_place_beyond_the_five_shown_does_not_count():
@@ -101,7 +105,7 @@ def test_day_with_pins_keeps_the_full_chart(tmp_path):
 
 
 def test_day_with_ships_but_no_pins_keeps_the_full_chart(tmp_path):
-    html = render_day(tmp_path, make_brief(ships=SHIPS))
+    html = render_day(tmp_path, make_brief(ships=SHIPS, sample=True))
     assert "stage-empty" not in stage_tag(html)
 
 
@@ -151,7 +155,7 @@ def test_v1_day_with_ships_has_no_ships_line(tmp_path):
 
 
 def test_v2_failed_snapshot_shows_a_note_on_the_chart(tmp_path, monkeypatch):
-    monkeypatch.setattr(render, "AIS_SNAPSHOT_BUILT", True)
+    switch_ships_on(monkeypatch)
     html = render_day(tmp_path, make_brief(items=[news("medium", map=dict(PLACE))]))
     note = re.search(r'<p class="chart-note">(.*?)</p>', html)
     assert note and "The AIS snapshot failed" in note.group(1)
@@ -159,7 +163,7 @@ def test_v2_failed_snapshot_shows_a_note_on_the_chart(tmp_path, monkeypatch):
 
 
 def test_v2_with_ships_has_no_failure_note(tmp_path, monkeypatch):
-    monkeypatch.setattr(render, "AIS_SNAPSHOT_BUILT", True)
+    switch_ships_on(monkeypatch)
     assert "chart-note" not in render_day(tmp_path, make_brief(ships=SHIPS))
 
 

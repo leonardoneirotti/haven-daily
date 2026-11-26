@@ -115,7 +115,24 @@
       credit + text + '<p class="chart-card-links">' + links.join("") + "</p></div>";
   }
 
+  // Ship count badges that would cover a news number, or come closer to one than `gap` px (#156):
+  // the indices of `badges` to hide. A number never moves for a badge.
+  function coveredBadges(badges, numbers, gap) {
+    var hidden = [];
+    badges.forEach(function (b, i) {
+      for (var n = 0; n < numbers.length; n++) {
+        var a = numbers[n];
+        if (b.left < a.right + gap && a.left < b.right + gap && b.top < a.bottom + gap && a.top < b.bottom + gap) {
+          hidden.push(i);
+          return;
+        }
+      }
+    });
+    return hidden;
+  }
+
   root.HavenPins = { boxAt: boxAt, overlaps: overlaps, separateSides: separateSides, glideEase: glideEase,
+    coveredBadges: coveredBadges,
     glideDuration: glideDuration, onChart: onChart,
     nudgeInside: nudgeInside, swipeTaker: swipeTaker,
     cardHtml: cardHtml };

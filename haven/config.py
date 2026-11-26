@@ -485,6 +485,8 @@ def _check_permission(value, fail) -> Permission:
 # ---------- config/site.toml: the site's own addresses (spec §2.3, issue #28) ----------
 
 _SITE_FIELDS = ("base_url", "linkedin_url", "repo_url", "social_image", "social_image_alt")
+# The ships switch (#156): optional fields; off when left out.
+_SITE_SWITCHES = ("ships", "ships_permission")
 # One https web address: a host with a dot, no spaces.
 _HTTPS_URL = re.compile(r"^https://[^\s/]+\.[^\s/]+(/\S*)?$")
 # A PNG file name in static/: no folders, no spaces.
@@ -498,15 +500,20 @@ class SiteConfig:
     repo_url: str
     social_image: str  # file name of the 1200 x 630 PNG preview card in static/
     social_image_alt: str
+    # Ships on the chart (#156): off on the live site until a ship source gives written permission;
+    # on needs that permission's saved reply, a .md file in docs/permissions/.
+    ships: bool = False
+    ships_permission: str | None = None
 
 
 def load_site(path: Path = CONFIG_DIR / "site.toml") -> SiteConfig:
     """The site's own addresses and its preview image, checked. Raises ConfigError on the first problem."""
     path = Path(path)
     data = _read_toml(path)
-    unknown = sorted(set(data) - set(_SITE_FIELDS))
+    unknown = sorted(set(data) - set(_SITE_FIELDS) - set(_SITE_SWITCHES))
     if unknown:
-        raise ConfigError(f"{path.name}: unknown field {unknown[0]!r} (allowed: {', '.join(_SITE_FIELDS)})")
+        raise ConfigError(f"{path.name}: unknown field {unknown[0]!r} "
+                          f"(allowed: {', '.join(_SITE_FIELDS + _SITE_SWITCHES)})")
     for name in _SITE_FIELDS:
         if name not in data:
             raise ConfigError(f"{path.name}: missing {name!r}")
@@ -521,8 +528,27 @@ def load_site(path: Path = CONFIG_DIR / "site.toml") -> SiteConfig:
     alt = data["social_image_alt"]
     if not isinstance(alt, str) or not alt.strip() or "\n" in alt:
         raise ConfigError(f"{path.name}: social_image_alt must be one line of text")
+    ships, permission = _check_ships(data, path.name)
     return SiteConfig(**{name: data[name].strip() if name == "social_image_alt" else data[name]
-                         for name in _SITE_FIELDS})
+                         for name in _SITE_FIELDS}, ships=ships, ships_permission=permission)
+
+
+def _check_ships(data: dict, name: str) -> tuple[bool, str | None]:
+    """The ships switch (#156): true or false; true only with `ships_permission`, the saved written
+    permission of the ship source (docs/permissions/<file>.md, which must exist), as for RTV Rijnmond (#107)."""
+    ships = data.get("ships", False)
+    if not isinstance(ships, bool):
+        raise ConfigError(f"{name}: ships must be true or false, got {ships!r}")
+    permission = data.get("ships_permission")
+    if permission is not None and (not isinstance(permission, str) or not _PERMISSION_FILE.match(permission)):
+        raise ConfigError(f"{name}: ships_permission must be a .md file in docs/permissions/, "
+                          f"e.g. docs/permissions/2026-12-01-aisstream.md, got {permission!r}")
+    if ships and permission is None:
+        raise ConfigError(f"{name}: ships = true needs ships_permission, the ship source's written permission "
+                          f"(docs/permissions/<file>.md). Without one, ships stay off (#156).")
+    if ships and not (CONFIG_DIR.parent / permission).is_file():
+        raise ConfigError(f"{name}: ships = true, but the permission file {permission} doesn't exist")
+    return ships, permission
 
 
 def preview_image_size(path: Path) -> tuple[int, int] | None:

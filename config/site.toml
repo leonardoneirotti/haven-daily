@@ -18,3 +18,11 @@ repo_url = "https://github.com/leonardoneirotti/haven-daily"
 # change it when the script draws something else.
 social_image = "social-preview.png"
 social_image_alt = 'Light card with "Haven Daily" in large navy letters and, on the right, the logo: the signal flags H over D on a halyard; under it the line "What affects the Port of Rotterdam today, and what it means for logistics planners. Updated every morning." and, small at the bottom, "Independent portfolio project".'
+
+# Ships on the chart (#156): OFF on the live site until a ship source (Port of Rotterdam arrivals
+# and berths, or aisstream.io) has given written permission. Off: no ship source is contacted and
+# the pages show no ships (a real brief's ships are ignored); the sample site is unchanged. On is
+# refused without ships_permission, the saved reply in docs/permissions/ (as for RTV Rijnmond, #107):
+#   ships = true
+#   ships_permission = "docs/permissions/2026-12-01-<source>.md"
+ships = false

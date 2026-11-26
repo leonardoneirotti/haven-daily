@@ -77,7 +77,7 @@ Each indicator: **value, colour (green/amber/red), change vs yesterday, timestam
   - **Real-time issue, answered 23 Nov 2026:** the terms require real-time redistribution (max 10 min delay) for "operational" use; we update once a day. **MeteoAlarm agreed to the once-a-day snapshot** (`docs/permissions/2026-11-23-meteoalarm.md`, #115, §11) if it is **clearly a morning snapshot, not a live warning service**, with attribution to MeteoAlarm and KNMI, the disclaimer, a clear link to meteoalarm.org for the latest warnings, and no suggestion that Haven Daily is a MeteoAlarm or KNMI service. So the weather dial says **"Warnings at 06:45 · not live"** (the real read time), then the line **"Morning snapshot, not a live warning service. Haven Daily is not a MeteoAlarm or KNMI service. Latest warnings on meteoalarm.org ↗"**, then the disclaimer; How it works says the same in full.
 - Rhine water level — **Kaub** gauge (PEGELONLINE, WSV), shown with a small river-gauge graphic. **Lobith** (Rijkswaterstaat) is stored daily in `data/status/` for later trend charts, not shown.
 - Active strike flag — derived from strike details in kept items of the last 14 days (§5.7), linked to the item that decided it.
-- Ships in the port area — count from the AIS snapshot (v2), with "N at anchor / N under way". **Hidden until v2** *(owner, #138)*: no Ships dial and no Ships cell in the panel while `AIS_SNAPSHOT_BUILT` is false; from v2 a missing snapshot is shown again (hard rule 9). The ship filter over the chart is part of the same feature: it only exists on a day with ships, so v1 never shows it. **v1 says nothing about ships** (owner, review of PR #139): no "Ship positions are not collected yet." under the chart or on How it works.
+- Ships in the port area — count from the AIS snapshot (v2), with "N at anchor / N under way". **Hidden until v2** *(owner, #138)*: no Ships dial and no Ships cell in the panel while the **`ships` switch** in `config/site.toml` is off (#156; the code constant `AIS_SNAPSHOT_BUILT` until then); from v2 a missing snapshot is shown again (hard rule 9). The ship filter over the chart is part of the same feature: it only exists on a day with ships, so v1 never shows it. **v1 says nothing about ships** (owner, review of PR #139): no "Ship positions are not collected yet." under the chart or on How it works.
 
 **Later** (only once a clean, permitted automatic source exists): road (A15 closures, Rijkswaterstaat), rail (Betuweroute, ProRail), sea vessel waiting times (Port Authority "Port Performance"), barge waiting times (Barge Performance Monitor / operator notices).
 
@@ -1053,7 +1053,10 @@ Live run (2 Nov 2026, 13:31, from a desktop, nothing written): both read with no
 | `build.ai_unavailable` | `true` only on a **reduced brief** (§5.6): the AI was down until the last trigger, so all items are unrated and the page shows *"The AI step was unavailable this morning: headlines only, no summaries."* `false` otherwise; a missing field counts as `false`. *(Name proposed by Claude, confirmed by the owner 1 Nov 2026, PR #50.)* |
 | `items[].map.side` | `"left"` puts the label left of the number where the right is crowded |
 | `ships` | `null` when the AIS snapshot failed (page says so); always `null` in v1, where the page says ship positions are not collected yet (#23) |
-| `vessels[].type` | `container` / `tanker` / `bulk` only |
+| `ships.source_id`, `ships.kind` | which source (config id) and its kind: `berths` (Port of Rotterdam: where a ship is moored) or `positions` (AIS: where it was seen) (#156) |
+| `ships.expected` | ships due in the next 24 h, `{name, type, eta, place, length_m}` (berth data only), or `null` (#156) |
+| `vessels[].type` | `container` / `tanker` / `bulk`, or `cargo` (AIS can't tell container from bulk, owner, #156) |
+| `vessels[].place` | a place id from `config/places.toml` (terminal, anchorage or area) or `null` (most ships under way), set by the source's adapter: the count badges group by it, and "ships at the terminal in the news" is a lookup (§5.10, #156) |
 | `vessels[].status` | `underway` / `moored` / `anchored` |
 | `vessels[].destination_raw` | as typed on board (`"NL RTM"`, `"ANTWERP>HAMBURG"`, blank) |
 | `vessels[].destination` | cleaned, `null` = Unknown |
@@ -1181,7 +1184,7 @@ Principle: **fact vs interpretation in two typefaces** — the impact is the onl
 - **The panel comes before the chart in the page itself** (HTML order), at every width. Phones show it in that order; on wide screens the panel is positioned over the chart, so they look as before. The panel's item list now shows on phones too.
 - **Empty chart** = no shown item (of the 5) has a place and the day has no ships (`brief.chart_empty`, `render.prepare_briefs`). The stage gets the class `stage-empty` and, **on phones**, the chart becomes a **strip**: `30vh` (min 15rem, max 20rem). ~~Wide screens: the panel stops floating and sits in a 25rem column **beside** the strip, the strip as tall as the panel (min 18rem), and the panel's item list is left out because the full brief starts right below.~~ **Wide screens since #138** (owner, before merging PR #139): **no layout of their own**: the same full-width map, the same height and the panel floating over it with its item list, as on a day with pins, just without pins. The owner found the strip smaller and different from every other day; the map is meant to look the same every day. The strip's CSS is inside `@media (max-width: 63.99rem)`, so nothing about an empty day reaches a wide screen (`tests/test_launch_fixes.py`). Days with pins or ships look as before.
 - **Legend line under the chart**, grey: "No item has a place on the chart today." ("on this day" on an older day) on an empty day ~~, and in v1 "Ship positions are not collected yet." on every day without ships~~ *(removed, #138: nothing about ships until v2)*. **No box over the port in v1.**
-- **From v2 (#31, `AIS_SNAPSHOT_BUILT = True`)** a failed snapshot is still shown on the chart (hard rule 9): "No ship positions for this day. The AIS snapshot failed.", in the chart's **top-left corner** (where the ship filter would be; on wide screens right of the panel), amber edge, never over the Maasvlakte.
+- **From v2 (#31, the `ships` switch on, #156)** a failed snapshot is still shown on the chart (hard rule 9): "No ship positions for this day. The AIS snapshot failed.", in the chart's **top-left corner** (where the ship filter would be; on wide screens right of the panel), amber edge, never over the Maasvlakte.
 - `map.js` is unchanged: the strip (phones) opens on the same home views; with the panel not floating, `panelCover()` is 0, so no room is kept for it. On wide screens an empty day opens on the normal home view, clear of the floating panel.
 - Tests: `tests/test_first_screen.py`. Screenshots before/after (sample briefs only): `design/screenshots/issue-81/`.
 
@@ -1398,6 +1401,17 @@ Paint order:
 Culling: only shapes whose box (plus a margin) touches the canvas are traced; points closer than the tolerance to the previous point are skipped.
 
 ### 8.4 Ships
+
+**One morning snapshot, any source (#156, owner's plan of 26 Nov 2026).** `haven/ships.py` defines the format (§6 `ships`) and checks it (`check_snapshot`). Each source gets an adapter that returns it: the Port of Rotterdam's arrivals and departures with Spotlight berths, or about 10 minutes of aisstream.io inside the summary batch's wait (§5.5). **Neither adapter is built until the source gives written permission** (§11). A snapshot that breaks the format counts as failed (hard rule 9).
+
+**The `ships` switch** (`config/site.toml`, #156): **off on the live site**. Off: no ship source is contacted, a real brief's ships are ignored (`render.keep_ships`), and both sites, the real one and `sample/`, render exactly as before: every page byte for byte, checked against main in PR 1. On is refused without `ships_permission`, the source's saved written reply in `docs/permissions/` (as for RTV Rijnmond, #107).
+
+**The badge view** (switch on; or `python -m haven.render --briefs data/sample/briefs --preview-ships`, sample briefs only, for local trials and the speed run):
+- **At the opening view**, one count badge per place ("ECT Delta 6", `ships.by_place`), at the centre of its ships, so zooming in shows them where the badge was. Ships without a place (most under way) are in no badge. A badge whose place has a ship linked to a news item gets that item's severity edge. Clicking a badge flies to its ships.
+- **From zoom `SHIP_ZOOM` (12)**, the single ships (hulls below) instead of the badges. The ships linked to a selected item, and those picked with "N at anchor" / "N under way", show at any zoom.
+- **Ships and badges have their own pane (`ships`, z-index 550) under the news numbers** (Leaflet's marker pane, 600). The number layout (`planMarkers`) never looks at ships, so the hidden numbers stay 18 / 23. A badge that would cover a number, or come within 4 px of one, hides (`HavenPins.coveredBadges`).
+- **Checked in the speed run** (`speed.yml`): the pin check runs a second time with the sample day's ships in the badge view (`check_map_pins.py --ships`: hidden numbers unchanged, no `badge-over-number`). The speed measurement covers the badge view, plus a busy invented day of 250 ships (`tools/make_busy_ships.py`).
+- Without the badge view, ships are drawn one by one as before (the sample site today).
 
 Top-down hulls, bow up, 24 units long × 6 wide (shapes defined **once in `render.py`**, used by the legend macro and by `map.js`):
 

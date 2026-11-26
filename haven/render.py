@@ -25,8 +25,9 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 from haven import filter as haven_filter
 from haven import strike as haven_strike
 from haven import summarise
+from haven import ships as ship_snapshot
 from haven.clock import AMSTERDAM
-from haven.config import (CONFIG_DIR, RhineMeanings, RhineThresholds, SiteConfig, Source, load_rhine,
+from haven.config import (CONFIG_DIR, RhineMeanings, RhineThresholds, SiteConfig, Source, load_places, load_rhine,
                           load_rhine_meanings, load_site, load_sources, preview_image_size)
 from haven.feeds import LEAD_PARAGRAPH_FEEDS
 from haven.flags import FLAGS, SOURCE as FLAG_SOURCE
@@ -68,9 +69,11 @@ QUIET_DAY = "Nothing significant on this day. The port status still applies."
 PREVIEW_SIZE = (1200, 630)  # og:image, the size LinkedIn shows uncropped (§7.7)
 
 MAX_ITEMS = 5
-# Ship positions (the AIS snapshot) come in v2 (#31). Until then a brief without ships says
-# they are not collected yet, not that a snapshot failed. Set to True when #31 is built.
-AIS_SNAPSHOT_BUILT = False
+# Ships on the chart: the `ships` switch in config/site.toml (#156; the code constant
+# AIS_SNAPSHOT_BUILT until then). Off: a real brief's ships are ignored and both sites render as
+# before. The badge view (count badges per place, single ships from SHIP_ZOOM) runs with the switch
+# on, or for the sample site with `--preview-ships` (local trials and the speed run).
+SHIP_ZOOM = 12  # from this zoom the chart shows single ships instead of the count badges
 # MeteoAlarm's disclaimer, verbatim (its Terms §5, spec §2.2): shown with the weather dial.
 METEOALARM_DISCLAIMER = (
     "Time delays between this website and the www.meteoalarm.org website are possible. For the most "
@@ -124,6 +127,8 @@ SHIP_DECKS = {
     "tanker": "M-0.4,-9h0.8v15h-0.8zM-2.2,-1.8h4.4v1h-4.4zM-2.6,7.2h5.2v2.8h-5.2z",
     "bulk": "M-1.7,-8h3.4v2.6h-3.4zM-1.7,-4.6h3.4v2.6h-3.4zM-1.7,-1.2h3.4v2.6h-3.4z"
     "M-1.7,2.2h3.4v2.6h-3.4zM-2.6,7.2h5.2v2.8h-5.2z",
+    # Cargo (AIS, #156): two hatch groups with a crane post between, and the bridge.
+    "cargo": "M-1.7,-8h3.4v4.4h-3.4zM-0.4,-3.2h0.8v1.6h-0.8zM-1.7,-1.4h3.4v4.4h-3.4zM-2.6,7.2h5.2v2.8h-5.2z",
 }
 
 # Status colour as stored (the green/amber/red wording from CLAUDE.md)
@@ -166,7 +171,8 @@ LEVEL_ICONS = {
     "nodata": "circle-minus",
 }
 
-SHIP_TYPES = {"container": "Container ship", "tanker": "Tanker", "bulk": "Bulk carrier"}
+SHIP_TYPES = {"container": "Container ship", "tanker": "Tanker", "bulk": "Bulk carrier",
+              "cargo": "Cargo ship"}  # cargo: AIS can't tell container from bulk (#156)
 SHIP_TYPE_PLURALS = {"container": "Container", "tanker": "Tanker", "bulk": "Bulk"}
 SHIP_STATUS = {"underway": "Under way", "moored": "Moored", "anchored": "At anchor"}
 FLAG_NAMES = {
@@ -686,15 +692,16 @@ def prepare_ships(brief: dict) -> None:
         ship["news_severity"] = items[rank - 1]["severity_key"] if rank and rank <= len(items) else None
     vessels = ships["vessels"]
     ships["count"] = len(vessels)
-    ships["by_type"] = {kind: sum(1 for ship in vessels if ship["type"] == kind) for kind in SHIP_TYPES}
+    ships["by_type"] = {kind: sum(1 for ship in vessels if ship["type"] == kind) for kind in SHIP_TYPE_PLURALS}
     ships["at_anchor"] = sum(1 for ship in vessels if ship["status"] == "anchored")
     ships["underway"] = sum(1 for ship in vessels if ship["status"] == "underway")
     ships["linked"] = sum(1 for ship in vessels if ship["news_severity"])
     ships["vessels"] = sorted(vessels, key=lambda ship: (ship["area"], ship["name"]))
 
 
-def map_payload(brief: dict) -> dict:
-    """Everything static/map.js needs, embedded in the page as JSON."""
+def map_payload(brief: dict, ship_view: str | None = None) -> dict:
+    """Everything static/map.js needs, embedded in the page as JSON. `ship_view` "badges" (#156):
+    also each ship's place and the count badges; None: exactly as before the switch."""
     callouts = [
         {
             "rank": rank,
@@ -718,17 +725,29 @@ def map_payload(brief: dict) -> dict:
         "length_m", "flag_name", "area", "destination", "destination_raw", "news_item", "news_severity",
     )
     ships = brief["ships"]
-    return {
+    decks = SHIP_DECKS if ship_view else {kind: SHIP_DECKS[kind] for kind in SHIP_TYPE_PLURALS}
+    if ship_view:
+        ship_fields += ("place",)
+    payload = {
         "view_home": MAP_VIEW_HOME,
         "view_compact": MAP_VIEW_COMPACT,
-        "ship_shapes": {"hull": SHIP_HULL, "decks": SHIP_DECKS},
+        "ship_shapes": {"hull": SHIP_HULL, "decks": decks},
         "callouts": callouts,
-        "ships": [{key: ship[key] for key in ship_fields} for ship in ships["vessels"]] if ships else None,
+        "ships": [{key: ship.get(key) for key in ship_fields} for ship in ships["vessels"]] if ships else None,
         "ships_source": ships["source_name"] if ships else None,
     }
+    if ship_view:
+        items = brief["items"]
+        badges = ship_snapshot.by_place(ships["vessels"], load_places()) if ships else []
+        for badge in badges:
+            rank = badge["news_item"]
+            badge["severity"] = items[rank - 1]["severity_key"] if rank and rank <= len(items) else None
+        payload.update(ship_view=ship_view, ship_zoom=SHIP_ZOOM, ship_places=badges)
+    return payload
 
 
-def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.toml") -> list[dict]:
+def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.toml",
+                   ship_view: str | None = None) -> list[dict]:
     """Add the fields the templates need: edition number, ranked items, status changes and
     meanings, map data. The Rhine's thresholds and meanings come from `rhine_path`."""
     thresholds, meanings = load_rhine(rhine_path), load_rhine_meanings(rhine_path)
@@ -778,12 +797,28 @@ def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.to
         brief["counts"] = {
             key: sum(1 for item in brief["items"] if item["severity_key"] == key) for key in SEVERITY_KEYS
         }
+        keep_ships(brief, ship_view)
         prepare_ships(brief)
-        brief["map"] = map_payload(brief)
+        brief["map"] = map_payload(brief, ship_view)
         # Nothing to show on the chart (no shown item has a place, no ships): the page draws
         # it as a short strip instead of a full screen of empty map (#81, spec §7.4).
         brief["chart_empty"] = not brief["map"]["callouts"] and not brief["ships"]
     return briefs
+
+
+def keep_ships(brief: dict, ship_view: str | None) -> None:
+    """Which ships a brief may show (#156). Switch off (no `ship_view`): a real brief's ships are
+    dropped, whatever it holds, and the sample site's invented ships stay as before. Badge view: a
+    snapshot that breaks the shared format (haven/ships.py) counts as failed (hard rule 9)."""
+    ships = brief.get("ships")
+    if not ships:
+        return
+    if not ship_view:
+        if not brief.get("sample"):
+            brief["ships"] = None
+        return
+    if ship_snapshot.check_snapshot(ships, {place.id for place in load_places()}):
+        brief["ships"] = None
 
 
 def load_briefs(briefs_dir: Path) -> list[dict]:
@@ -941,7 +976,7 @@ def make_environment() -> Environment:
         ship_hull=SHIP_HULL,
         ship_decks=SHIP_DECKS,
         max_items=MAX_ITEMS,
-        ais_snapshot_built=AIS_SNAPSHOT_BUILT,
+        ais_snapshot_built=site.ships,  # the ships switch (#156)
         meteoalarm_disclaimer=METEOALARM_DISCLAIMER,
         signal_flags=FLAGS,  # the logo, the 404 page and the flag key (#117)
         flag_source=FLAG_SOURCE,
@@ -956,12 +991,18 @@ def write_page(env: Environment, template: str, path: Path, **context) -> None:
 
 
 def render_site(briefs_dir: Path, out_dir: Path, rhine_path: Path | None = None, *, sub_path: str = "",
-                link_sample: bool = False) -> int:
+                link_sample: bool = False, preview_ships: bool = False) -> int:
     """The site from `briefs_dir` into `out_dir`. `sub_path` is where it is published below the
     site's address (`base_url`): "" for the real site, "sample/" for the sample site, so each page's
     canonical and preview address is right. `link_sample`: How it works links the sample site."""
     rhine_path = rhine_path or CONFIG_DIR / "rhine.toml"
-    briefs = prepare_briefs(load_briefs(briefs_dir), rhine_path)
+    loaded = load_briefs(briefs_dir)
+    # `preview_ships`: the badge view on invented ships only, for local trials and the speed run (#156).
+    if preview_ships and not all(brief.get("sample") for brief in loaded):
+        raise ValueError("--preview-ships is only for the sample site (data/sample/briefs): no real ships "
+                         "are shown before a ship source gives written permission")
+    ship_view = "badges" if (load_site().ships or preview_ships) else None
+    briefs = prepare_briefs(loaded, rhine_path, ship_view)
     if not briefs:
         raise SystemExit(f"No briefs found in {briefs_dir}")
 
@@ -1052,9 +1093,14 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=PROJECT_DIR / "site")
     parser.add_argument("--with-sample", action="store_true",
                         help="also the sample site at sample/ (what GitHub Pages publishes)")
+    parser.add_argument("--preview-ships", action="store_true",
+                        help="sample briefs only: the new ship view (count badges, single ships zoomed in), #156")
     args = parser.parse_args()
     briefs = args.briefs if args.briefs is not None else default_briefs_dir()
-    count = render_published(briefs, args.out) if args.with_sample else render_site(briefs, args.out)
+    if args.preview_ships:
+        count = render_site(briefs, args.out, preview_ships=True)
+    else:
+        count = render_published(briefs, args.out) if args.with_sample else render_site(briefs, args.out)
     print(f"Rendered {count} briefs from {briefs} to {args.out}")
 
 

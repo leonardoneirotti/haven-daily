@@ -43,6 +43,15 @@ def make_brief(day=DAY, **fields):
     return brief
 
 
+def switch_ships_on(monkeypatch):
+    """The ships switch on (#156; the code constant AIS_SNAPSHOT_BUILT before), for a test only:
+    config/site.toml keeps it off until a ship source gives written permission."""
+    import dataclasses
+    site = render.load_site()
+    monkeypatch.setattr(render, "load_site", lambda *args, **kwargs: dataclasses.replace(
+        site, ships=True, ships_permission="docs/permissions/invented-for-a-test.md"))
+
+
 def render_days(tmp_path, *briefs):
     briefs_dir = tmp_path / "briefs"
     briefs_dir.mkdir(parents=True)
