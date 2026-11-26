@@ -151,7 +151,8 @@ def test_a_place_on_an_item_cut_from_the_five_does_not_bring_the_sentence_back(t
 
 
 def test_the_ship_list_header_shows_that_it_opens(tmp_path):
-    html = render_day(tmp_path, make_brief(ships=SHIPS))
+    # a sample day: a real brief's ships are ignored while the ships switch is off (#156)
+    html = render_day(tmp_path, make_brief(ships=SHIPS, sample=True))
     summary = re.search(r"<summary>(.*?)</summary>", html, flags=re.S).group(1)
     assert 'class="summary-marker"' in summary
     # it turns when the list is open

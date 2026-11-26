@@ -56,6 +56,6 @@ def test_the_speed_run_checks_the_pins_before_and_after_at_both_laptop_sizes():
     job = SPEED_YML[SPEED_YML.index("\n  pins:"):]
     assert re.search(r"size: \[laptop, laptop-1280\]", job)
     assert 'tools/check_map_pins.py "$RUNNER_TEMP/main/tools/check_map_pins.py"' in job  # the same tool on main
-    assert job.count("--only ${{ matrix.size }}") == 2
+    assert job.count("--only ${{ matrix.size }}") == 3  # before, after, and after with ships on (#156)
     assert "--compare" in job and "GITHUB_STEP_SUMMARY" in job
     assert "tools/check_map_pins.py" in SPEED_YML.split("paths:")[1].split("permissions")[0]
