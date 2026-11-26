@@ -113,10 +113,10 @@ def test_the_map_data_carries_what_the_card_shows():
         news("medium", "Invented headline-only story", source="NL Times", access="headline-only", summary=None,
              impact=None, map=dict(PLACE, label="Euromax")),
     )
-    assert one["title"] == "Invented: Botlek bridge back" and one["original"] == "Invented: Botlekbrug weer in bedrijf"
+    assert one["title"] == "Invented: Botlek bridge back" and one["credit"] == "Source: ECT news (in Dutch)"  # #153
     assert one["summary"] == "Own-words summary." and one["url"].startswith("https://news.test/")
     assert one["translate_url"] and one["note"] is None
-    assert two["original"] is None and two["summary"] is None
+    assert two["credit"] is None and two["summary"] is None
     assert two["note"].startswith("Headline only")  # the short card's line instead of a summary
 
 
@@ -124,7 +124,7 @@ def card(callout: dict, rank: int = 1) -> str:
     return js(f"P.cardHtml({json.dumps(callout)}, {rank})")
 
 
-CALLOUT = {"rank": 1, "severity": "high", "title": "Invented: Botlek bridge back", "original": "Invented: Botlekbrug",
+CALLOUT = {"rank": 1, "severity": "high", "title": "Invented: Botlek bridge back", "credit": "Source: RTV Rijnmond (in Dutch)",
            "summary": "Own-words summary.", "note": None, "url": "https://news.test/1",
            "translate_url": "https://translate.test/1", "label": "Botlekbrug"}
 
@@ -135,7 +135,7 @@ def test_the_card_has_number_severity_headline_summary_and_links():
     assert 'role="dialog"' in html and 'aria-labelledby="chart-card-title"' in html
     assert '<span class="num num-high">1</span>' in html and ">high<" in html
     assert 'id="chart-card-title"' in html and "Invented: Botlek bridge back" in html
-    assert "Headline translated by AI" in html and "Invented: Botlekbrug" in html
+    assert "Source: RTV Rijnmond (in Dutch)" in html and "translated" not in html  # #153
     assert "Own-words summary." in html
     assert 'href="https://news.test/1"' in html and "Read original" in html
     assert 'href="https://translate.test/1"' in html and "Read in English" in html
@@ -145,10 +145,10 @@ def test_the_card_has_number_severity_headline_summary_and_links():
 
 @needs_node
 def test_a_card_without_a_summary_shows_the_short_line_and_no_missing_links():
-    html = card(dict(CALLOUT, original=None, summary=None, note="Headline only (paywalled)", url=None,
+    html = card(dict(CALLOUT, credit=None, summary=None, note="Headline only (paywalled)", url=None,
                      translate_url=None))
     assert "Headline only (paywalled)" in html
-    assert "translated by AI" not in html
+    assert "Source:" not in html
     assert "Read original" not in html and "Read in English" not in html
     assert 'href="#item-1"' in html
 
