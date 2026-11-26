@@ -48,7 +48,12 @@
     }
   },
   "built_at": "2026-11-23T19:48:44+01:00",
-  "corrections": [],
+  "corrections": [
+    {
+      "at": "2026-11-26T06:04:31+01:00",
+      "note": "Dutch titles are no longer shown (#153): the RTV Rijnmond items got a short English title, written from Haven Daily's own summary when this correction was made (no AI call); the Dutch headline stays stored and the link still goes to the original article. The summary of the A16 Moerdijkbrug item now says the right lane was closed, not the road, as RTV Rijnmond's headline says."
+    }
+  ],
   "date": "2026-11-23",
   "items": [
     {
@@ -268,6 +273,7 @@
         "Hinterland"
       ],
       "headline": "Let op! Meerdere wegen gaan deze week dicht voor werkzaamheden",
+      "headline_en": "Road works bring closures and diversions on the A15, A20 and N59 this week",
       "impact": "Truck traffic to and from the port on the A15 and A20 may face closures and diversions this week, which could cause delays. Planners may want to allow extra time for pickups and deliveries.",
       "language": "nl",
       "map": null,
@@ -293,6 +299,7 @@
         "Truck pickups"
       ],
       "headline": "Rioolslib zorgt voor vertraging op A16 bij Moerdijkbrug, rechterrijstrook dicht",
+      "headline_en": "Truck loses part of its load on the A16 before the Moerdijkbrug; right lane closed",
       "impact": "Trucks heading to Rotterdam via the A16 could face delays, so planners may want to allow extra time for pickups and deliveries. The text does not say when the road reopens.",
       "language": "nl",
       "map": null,
@@ -305,7 +312,7 @@
       "severity": "low",
       "source": "RTV Rijnmond",
       "strike": null,
-      "summary": "A truck lost part of its load of sewage sludge on the A16 just before the Moerdijkbrug on Monday afternoon. The road was closed, causing delays towards Rotterdam and a bad smell.",
+      "summary": "A truck lost part of its load of sewage sludge on the A16 just before the Moerdijkbrug on Monday afternoon. The right lane was closed, causing delays towards Rotterdam and a bad smell.",
       "url": "https://www.rijnmond.nl/nieuws/2286787/rioolslib-zorgt-voor-vertraging-op-a16-bij-moerdijkbrug-rechterrijstrook-dicht",
       "written_by": {
         "api": "batch",
