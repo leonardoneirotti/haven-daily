@@ -812,10 +812,10 @@ DUTCH_NOT_SHOWN = ("Its headlines are in Dutch and it hasn't given permission fo
 
 def source_use(source: Source) -> str:
     """One line on how the pipeline uses a source, from its config (Method page, #24)."""
+    if source.verdict != "drop" and not source.enabled:  # paused (#138): said first, it is the state today
+        return PAUSED_USE
     if source.dutch_without_permission:  # #153
         return DUTCH_NOT_SHOWN
-    if source.verdict != "drop" and not source.enabled:  # paused (#138)
-        return PAUSED_USE
     if source.effective_verdict == "use" and source.permission is not None:  # #107
         permission = source.permission
         text = "the lead paragraph in its feed" if source.id in LEAD_PARAGRAPH_FEEDS else "the article"

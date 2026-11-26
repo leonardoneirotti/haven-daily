@@ -259,7 +259,8 @@ THREE = TWO + " Talks are planned."
 
 
 def rijnmond_answer(summary=TWO, **changes):
-    data = {"summary": summary, "severity": "high", "place": "none", "tags": ["Labour"], "strike": None}
+    data = {"summary": summary, "headline_en": "Invented Rijnmond title",  # every Dutch item has one (#153)
+            "severity": "high", "place": "none", "tags": ["Labour"], "strike": None}
     data.update(changes)
     return answer(json.dumps(data))
 
@@ -362,7 +363,8 @@ NOTE = "AI summary, with RTV Rijnmond's permission. Haven Daily is independent; 
 
 
 def rijnmond_news(**fields):
-    base = dict(source="RTV Rijnmond", language="nl", summary=TWO, impact=None, affects=["Labour"],
+    base = dict(source="RTV Rijnmond", language="nl", headline_en="Invented Rijnmond title", summary=TWO,
+                impact=None, affects=["Labour"],
                 permission={"granted": "2026-11-19", "max_sentences": 2, "impact": False})
     base.update(fields)
     return news("high", "Invented Rijnmond story", **base)

@@ -186,7 +186,8 @@ def test_any_other_link_is_refused(url):
 
 
 def test_an_item_with_a_bad_link_shows_its_headline_without_a_link(tmp_path):
-    item = news("medium", "Invented headline", url="javascript:alert(1)", language="nl")
+    item = news("medium", "Invented Dutch headline", url="javascript:alert(1)", language="nl",
+                headline_en="Invented headline")  # a Dutch item is shown with its English title (#153)
     html = render_day(tmp_path, make_brief(items=[item]))
     assert "javascript:" not in html
     assert "Invented headline" in text_of(html)
