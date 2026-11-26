@@ -257,5 +257,5 @@ def test_the_speed_run_measures_the_phone_and_the_laptop():
 def test_every_zoom_step_is_measured_and_the_laptop_target_is_100_ms():
     for step in ("zoom in (button)", "zoom in again (button)", "zoom out (button)"):
         assert f'phase("{step}"' in MEASURE
-    assert re.search(r'profile === "laptop" \? \{ zoom: 100 \}', COMPARE)
+    assert re.search(r'profile === "laptop" \? \{ zoom: 100\b', COMPARE)  # #150 added flyFrame: 50
     assert '"Zoom step: longest task"' in COMPARE
