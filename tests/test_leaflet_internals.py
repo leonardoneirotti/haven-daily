@@ -17,9 +17,11 @@ MAP_JS = ROOT / "static" / "map.js"
 
 VERSION = "1.9.4"
 INTERNALS = {"_getBoundsCenterZoom", "_limitCenter", "_moveStart", "_move", "_moveEnd", "_stop"}
-PROPERTIES = {"_flyToFrame"}  # set by the glide, cancelled by _stop (#150)
-RECHECK = ("Recheck decision 6 (spec §8.5, PR #91, #150) before updating Leaflet: static/map.js uses "
-           "Leaflet's internal map methods " + ", ".join(sorted(INTERNALS)) + " and the _flyToFrame property.")
+# Set by the glide, cancelled by _stop (#150); the ship layer's canvas hull overrides _updatePath and
+# reads the canvas renderer's _drawing and _ctx (#156).
+PROPERTIES = {"_flyToFrame", "_updatePath", "_drawing", "_ctx"}
+RECHECK = ("Recheck decision 6 (spec §8.5, PR #91, #150, #156) before updating Leaflet: static/map.js uses "
+           "Leaflet's internal map methods " + ", ".join(sorted(INTERNALS)) + " and " + ", ".join(sorted(PROPERTIES)) + ".")
 
 
 def leaflet_problems(source: str) -> list[str]:
@@ -54,7 +56,9 @@ def test_map_js_uses_no_other_leaflet_internals():
 
 GOOD = ('t.version="1.9.4",x={_getBoundsCenterZoom:function(t,e){},_limitCenter:function(t,e,i){},'
         '_moveStart:function(t,e){},_move:function(t,e,i){},_moveEnd:function(t){},'
-        '_stop:function(){cancelAnimFrame(this._flyToFrame)}}')
+        '_stop:function(){cancelAnimFrame(this._flyToFrame)}},'
+        'y={_updatePath:function(){this._renderer._updateCircle(this)}},z={_updateCircle:function(t){if(!this._drawing)'
+        'return;var e=this._ctx}}')
 
 
 def test_a_build_like_the_bundled_one_passes():

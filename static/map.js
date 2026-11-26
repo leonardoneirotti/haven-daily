@@ -651,11 +651,13 @@
   }
   // One ship on the canvas: the hull of spec 8.4 (24 units, bow up), turned to its heading and scaled
   // to its length in pixels (2 x the marker's radius). Leaflet's canvas renderer draws it, finds it
-  // under the pointer (within the radius) and opens its popup.
+  // under the pointer (within the radius) and opens its popup. It overrides Leaflet's internal
+  // _updatePath and reads the renderer's _drawing and _ctx: guarded by tests/test_leaflet_internals.py
+  // (decision 6, spec 8.5).
   var ShipMark = L.CircleMarker.extend({
     _updatePath: function () {
       var r = this._renderer;
-      if (!r._drawing || this._empty() || !hullPath) return;
+      if (!r._drawing || !hullPath) return; // a ship off the view is clipped by the canvas
       var ctx = r._ctx, p = this._point, o = this.options, k = (this._radius * 2) / 24;
       ctx.save();
       ctx.translate(p.x, p.y);
