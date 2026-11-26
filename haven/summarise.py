@@ -766,19 +766,31 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
           "strike": strike, "written_by": None}
     if impact_left_out:  # only then: the page shows no impact block, not "Not enough information"
         ai["impact_left_out"] = True
-    if english_headline:  # only then, and only a usable one; without it the page doesn't show the item (#153)
+    if english_headline:  # only then (#153). Never lost for want of a title (owner, 26 Nov 2026, #155):
         english, problem = _english_headline(data.get("headline_en"))
-        if english is not None:
-            ai["headline_en"] = english
-        else:
-            notes.append(f"English title left out, so the item is not shown: {problem}")
+        if english is None:  # the summary's first sentence instead, logged
+            english = title_from_summary(summary)
+            notes.append(f"English title {problem}: used the first sentence of the summary instead")
+        ai["headline_en"] = english
     return ai
+
+
+def title_from_summary(summary: str) -> str:
+    """The fallback title (#155): the first sentence of Haven Daily's own English summary, without its
+    full stop, shortened at a word to HEADLINE_EN_MAX characters (with "…") when it is longer."""
+    first = _SENTENCE_BREAK.split(summary.strip())[0].strip().rstrip(".!?").strip()
+    if len(first) <= HEADLINE_EN_MAX:
+        return first
+    cut = first[: HEADLINE_EN_MAX - 1]
+    if " " in cut:
+        cut = cut.rsplit(" ", 1)[0]
+    return cut.rstrip(" ,;:–-") + "…"
 
 
 def _english_headline(value) -> tuple[str | None, str | None]:
     """The English headline, whitespace tidied, or None and why. No retry: the Dutch one stays."""
     if not isinstance(value, str):
-        return None, "not text"
+        return None, "missing"
     text = " ".join(value.split())
     if not text:
         return None, "empty"

@@ -104,6 +104,25 @@ class Outcome:
     paths: tuple[Path, ...] = field(default=())
 
 
+# The run log's line for an item the page won't show (#155): every title on the site is English
+# (#153), and an item in Dutch without an English summary has nothing to write one from.
+HIDDEN = "English titles"
+
+
+def hidden_items(items: list[dict]) -> list[dict]:
+    """A failure line for every brief item not in English with no English title, which happens only
+    when it has no English summary (headline-only, article not read, unrated): render.has_english_title
+    leaves it off the page. An item with a summary always has a title (summarise.title_from_summary)."""
+    lines = []
+    for item in items:
+        language = item.get("language") or "en"
+        if language != "en" and not item.get("headline_en"):
+            where = "in Dutch" if language == "nl" else "not in English"
+            lines.append({"source": HIDDEN, "error": f"{item.get('url')}: an item {where} has no English summary, "
+                                                     f"so it is not shown"})
+    return lines
+
+
 def _outcome(result: str, message: str, brief: dict | None = None, paths=()) -> Outcome:
     return Outcome(result=result, exit_code=EXIT_CODES[result], message=message, brief=brief, paths=tuple(paths))
 
@@ -222,13 +241,14 @@ def run(*, last_trigger: bool = False, data_dir: Path = storage.DATA_DIR, utc_no
     status_failures.extend(weather.failures + rhine.failures + strike.failures)
 
     # 8. The brief, and the three files.
+    shown = [brief_item(items[n], sources) for n in shown_at]
     brief = {
         "date": today.isoformat(),
         "sample": False,
         "built_at": now().isoformat(),
         "corrections": [],
         "status": [weather.reading, *rhine.shown, strike.reading],
-        "items": [brief_item(items[n], sources) for n in shown_at],
+        "items": shown,
         "build": {
             "sources_checked": collected.sources_checked,
             "items_collected": len(collected.items),
@@ -237,7 +257,7 @@ def run(*, last_trigger: bool = False, data_dir: Path = storage.DATA_DIR, utc_no
             "summaries": summaries,
             "ai_unavailable": ai_down,
             "feeds_read_at": collected.feeds_read_at,
-            "failures": failures + status_failures,
+            "failures": failures + status_failures + hidden_items(shown),  # printed in the run log too
             "ai_usage": _usage(filtered, summary),
         },
         "ships": None,  # the AIS snapshot is v2 (#31)
