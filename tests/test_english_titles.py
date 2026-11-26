@@ -108,12 +108,36 @@ def test_the_title_is_tidied():
 
 
 @pytest.mark.parametrize("bad", ["", "   ", None, 42, "x" * (summarise.HEADLINE_EN_MAX + 1)])
-def test_a_bad_title_is_left_out_with_a_failure_line_and_no_retry(bad):
-    result, client = summarise_one(dutch(), good(headline_en=bad))
+def test_without_a_usable_title_the_summarys_first_sentence_is_the_title_and_it_is_logged(bad):
+    # Owner, 26 Nov 2026 (#155): an item with an English summary never disappears for want of a title.
+    summary = "Invented: the Botlek bridge works again after a fault. Traffic is back to normal."
+    result, client = summarise_one(dutch(), good(headline_en=bad, summary=summary))
     [done] = result.items
-    assert len(client.messages.calls) == 1
-    assert "headline_en" not in done.ai
-    assert any("English title left out" in f["error"] for f in result.failures)
+    assert len(client.messages.calls) == 1                                   # no retry
+    assert done.ai["headline_en"] == "Invented: the Botlek bridge works again after a fault"
+    assert any("first sentence of the summary" in f["error"] and dutch().url in f["error"] for f in result.failures)
+
+
+def test_a_long_first_sentence_is_shortened_to_the_title_length_at_a_word():
+    sentence = "Invented: " + " ".join(["closures"] * 40) + ". Second sentence."
+    title = summarise.title_from_summary(sentence)
+    assert len(title) <= summarise.HEADLINE_EN_MAX and title.endswith("…")
+    assert title[:-1].rstrip().split(" ")[-1] == "closures"                   # cut at a word, not inside one
+    assert summarise.title_from_summary("Short one. Two.") == "Short one"
+
+
+def test_only_a_dutch_item_with_no_english_summary_is_hidden_and_the_run_log_lists_it():
+    from haven import run as run_module
+    shown = [
+        {"url": "https://rijnmond.test/1", "language": "nl", "summary": None, "severity": "low"},           # hidden
+        {"url": "https://rijnmond.test/2", "language": "nl", "summary": "Own words.", "headline_en": "T"},  # shown
+        {"url": "https://ect.test/3", "language": "en", "summary": None},                                    # shown
+    ]
+    [line] = run_module.hidden_items(shown)
+    assert line["error"].startswith("https://rijnmond.test/1: ")
+    assert "no English summary" in line["error"] and "not shown" in line["error"]
+    source = Path(run_module.__file__).read_text(encoding="utf-8")
+    assert "hidden_items(" in source[source.index('"failures": '):][:200]     # in the brief's failures, so printed
 
 
 def test_brief_item_carries_the_title_only_when_there_is_one():
