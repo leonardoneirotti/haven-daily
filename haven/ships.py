@@ -112,22 +112,22 @@ def _check_expected(ship, place_ids: set[str]) -> list[str]:
 
 
 def by_place(vessels: Iterable[dict], places) -> list[dict]:
-    """The chart's count badges: one per place with ships, at the centre of its ships (so zooming in
-    shows them where the badge was, for berths and AIS positions alike), most ships first.
-    Ships without a place (most ships under way) are in no badge. `news_item`: the most severe
-    (lowest) item rank linked to a ship there, or None."""
+    """The ships counted per place (for the Ships dial's counts per terminal, PR 2 of #156; the map
+    shows every ship instead, owner's change on PR #157): one entry per place with ships, at the
+    centre of its ships, most ships first. Ships without a place (most under way) are counted in none.
+    `news_item`: the most severe (lowest) item rank linked to a ship there, or None."""
     labels = {place.id: place.label for place in places}
     groups: dict[str, list[dict]] = {}
     for ship in vessels:
         if ship.get("place"):
             groups.setdefault(ship["place"], []).append(ship)
-    badges = []
+    counts = []
     for place, group in groups.items():
         linked = [ship["news_item"] for ship in group if ship.get("news_item")]
         by_type: dict[str, int] = {}
         for ship in group:
             by_type[ship["type"]] = by_type.get(ship["type"], 0) + 1
-        badges.append({
+        counts.append({
             "place": place,
             "label": labels.get(place, place),
             "lat": round(sum(ship["lat"] for ship in group) / len(group), 5),
@@ -137,4 +137,4 @@ def by_place(vessels: Iterable[dict], places) -> list[dict]:
             "news_item": min(linked) if linked else None,
         })
     order = list(groups)  # ties keep the order the places first appear in
-    return sorted(badges, key=lambda badge: (-badge["count"], order.index(badge["place"])))
+    return sorted(counts, key=lambda entry: (-entry["count"], order.index(entry["place"])))

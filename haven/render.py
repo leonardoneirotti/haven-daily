@@ -71,9 +71,9 @@ PREVIEW_SIZE = (1200, 630)  # og:image, the size LinkedIn shows uncropped (§7.7
 MAX_ITEMS = 5
 # Ships on the chart: the `ships` switch in config/site.toml (#156; the code constant
 # AIS_SNAPSHOT_BUILT until then). Off: a real brief's ships are ignored and both sites render as
-# before. The badge view (count badges per place, single ships from SHIP_ZOOM) runs with the switch
-# on, or for the sample site with `--preview-ships` (local trials and the speed run).
-SHIP_ZOOM = 12  # from this zoom the chart shows single ships instead of the count badges
+# before. The ship layer (every ship at the opening view, coloured by type, under the news numbers;
+# owner's change on PR #157) runs with the switch on, or for the sample site with `--preview-ships`
+# (local trials and the speed run).
 # MeteoAlarm's disclaimer, verbatim (its Terms §5, spec §2.2): shown with the weather dial.
 METEOALARM_DISCLAIMER = (
     "Time delays between this website and the www.meteoalarm.org website are possible. For the most "
@@ -174,6 +174,8 @@ LEVEL_ICONS = {
 SHIP_TYPES = {"container": "Container ship", "tanker": "Tanker", "bulk": "Bulk carrier",
               "cargo": "Cargo ship"}  # cargo: AIS can't tell container from bulk (#156)
 SHIP_TYPE_PLURALS = {"container": "Container", "tanker": "Tanker", "bulk": "Bulk"}
+# The ship layer's legend (#156): every type, cargo too (AIS). The filter keeps SHIP_TYPE_PLURALS (PR 2).
+SHIP_LAYER_TYPES = {**SHIP_TYPE_PLURALS, "cargo": "Cargo"}
 SHIP_STATUS = {"underway": "Under way", "moored": "Moored", "anchored": "At anchor"}
 FLAG_NAMES = {
     "BS": "Bahamas", "CY": "Cyprus", "DK": "Denmark", "GR": "Greece", "HK": "Hong Kong",
@@ -693,6 +695,8 @@ def prepare_ships(brief: dict) -> None:
     vessels = ships["vessels"]
     ships["count"] = len(vessels)
     ships["by_type"] = {kind: sum(1 for ship in vessels if ship["type"] == kind) for kind in SHIP_TYPE_PLURALS}
+    # Every type, cargo too (the ship layer's legend, #156); by_type keeps the three filter types.
+    ships["type_counts"] = {kind: sum(1 for ship in vessels if ship["type"] == kind) for kind in SHIP_TYPES}
     ships["at_anchor"] = sum(1 for ship in vessels if ship["status"] == "anchored")
     ships["underway"] = sum(1 for ship in vessels if ship["status"] == "underway")
     ships["linked"] = sum(1 for ship in vessels if ship["news_severity"])
@@ -700,8 +704,8 @@ def prepare_ships(brief: dict) -> None:
 
 
 def map_payload(brief: dict, ship_view: str | None = None) -> dict:
-    """Everything static/map.js needs, embedded in the page as JSON. `ship_view` "badges" (#156):
-    also each ship's place and the count badges; None: exactly as before the switch."""
+    """Everything static/map.js needs, embedded in the page as JSON. `ship_view` "layer" (#156):
+    every ship on its own layer, with its place; None: exactly as before the switch."""
     callouts = [
         {
             "rank": rank,
@@ -737,12 +741,7 @@ def map_payload(brief: dict, ship_view: str | None = None) -> dict:
         "ships_source": ships["source_name"] if ships else None,
     }
     if ship_view:
-        items = brief["items"]
-        badges = ship_snapshot.by_place(ships["vessels"], load_places()) if ships else []
-        for badge in badges:
-            rank = badge["news_item"]
-            badge["severity"] = items[rank - 1]["severity_key"] if rank and rank <= len(items) else None
-        payload.update(ship_view=ship_view, ship_zoom=SHIP_ZOOM, ship_places=badges)
+        payload["ship_view"] = ship_view
     return payload
 
 
@@ -809,7 +808,7 @@ def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.to
 def keep_ships(brief: dict, ship_view: str | None) -> None:
     """Which ships a brief may show (#156). Switch off (no `ship_view`): a real brief's ships are
     dropped, whatever it holds, and the sample site's invented ships stay as before. Badge view: a
-    snapshot that breaks the shared format (haven/ships.py) counts as failed (hard rule 9)."""
+    snapshot that breaks the shared format (haven/ships.py) counts as failed (hard rule 9) in the ship layer."""
     ships = brief.get("ships")
     if not ships:
         return
@@ -973,6 +972,7 @@ def make_environment() -> Environment:
         level_icons=LEVEL_ICONS,
         language_names=LANGUAGE_NAMES,
         ship_type_plurals=SHIP_TYPE_PLURALS,
+        ship_layer_types=SHIP_LAYER_TYPES,
         ship_hull=SHIP_HULL,
         ship_decks=SHIP_DECKS,
         max_items=MAX_ITEMS,
@@ -997,11 +997,11 @@ def render_site(briefs_dir: Path, out_dir: Path, rhine_path: Path | None = None,
     canonical and preview address is right. `link_sample`: How it works links the sample site."""
     rhine_path = rhine_path or CONFIG_DIR / "rhine.toml"
     loaded = load_briefs(briefs_dir)
-    # `preview_ships`: the badge view on invented ships only, for local trials and the speed run (#156).
+    # `preview_ships`: the ship layer on invented ships only, for local trials and the speed run (#156).
     if preview_ships and not all(brief.get("sample") for brief in loaded):
         raise ValueError("--preview-ships is only for the sample site (data/sample/briefs): no real ships "
                          "are shown before a ship source gives written permission")
-    ship_view = "badges" if (load_site().ships or preview_ships) else None
+    ship_view = "layer" if (load_site().ships or preview_ships) else None
     briefs = prepare_briefs(loaded, rhine_path, ship_view)
     if not briefs:
         raise SystemExit(f"No briefs found in {briefs_dir}")
@@ -1094,7 +1094,7 @@ def main() -> None:
     parser.add_argument("--with-sample", action="store_true",
                         help="also the sample site at sample/ (what GitHub Pages publishes)")
     parser.add_argument("--preview-ships", action="store_true",
-                        help="sample briefs only: the new ship view (count badges, single ships zoomed in), #156")
+                        help="sample briefs only: the new ship layer (every ship, coloured by type), #156")
     args = parser.parse_args()
     briefs = args.briefs if args.briefs is not None else default_briefs_dir()
     if args.preview_ships:

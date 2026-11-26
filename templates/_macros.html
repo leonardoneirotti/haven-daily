@@ -54,6 +54,11 @@
   <path class="hull" d="{{ ship_hull }}"/><path class="deck" d="{{ ship_decks[type] }}"/></g></svg>
 {%- endmacro %}
 
+{# The ship layer's legend swatch (#156): the plain hull turned to point right, in its type's colour. #}
+{% macro ship_swatch(type, anchored=false) -%}
+<svg class="ship-swatch ship-type-{{ type }}{% if anchored %} is-anchored{% endif %}" viewBox="-13 -4 26 8" aria-hidden="true" focusable="false"><g transform="rotate(90) scale(0.62)"><path d="{{ ship_hull }}"/></g></svg>
+{%- endmacro %}
+
 {% macro dial(ind, root) -%}
 <li class="dial" data-key="{{ ind.key }}">
   <p class="dial-label">{{ icon(ind.icon) }}{{ ind.label }}</p>

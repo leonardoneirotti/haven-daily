@@ -1056,7 +1056,7 @@ Live run (2 Nov 2026, 13:31, from a desktop, nothing written): both read with no
 | `ships.source_id`, `ships.kind` | which source (config id) and its kind: `berths` (Port of Rotterdam: where a ship is moored) or `positions` (AIS: where it was seen) (#156) |
 | `ships.expected` | ships due in the next 24 h, `{name, type, eta, place, length_m}` (berth data only), or `null` (#156) |
 | `vessels[].type` | `container` / `tanker` / `bulk`, or `cargo` (AIS can't tell container from bulk, owner, #156) |
-| `vessels[].place` | a place id from `config/places.toml` (terminal, anchorage or area) or `null` (most ships under way), set by the source's adapter: the count badges group by it, and "ships at the terminal in the news" is a lookup (§5.10, #156) |
+| `vessels[].place` | a place id from `config/places.toml` (terminal, anchorage or area) or `null` (most ships under way), set by the source's adapter: the Ships dial counts by it (PR 2), and "ships at the terminal in the news" is a lookup (§5.10, #156) |
 | `vessels[].status` | `underway` / `moored` / `anchored` |
 | `vessels[].destination_raw` | as typed on board (`"NL RTM"`, `"ANTWERP>HAMBURG"`, blank) |
 | `vessels[].destination` | cleaned, `null` = Unknown |
@@ -1406,12 +1406,15 @@ Culling: only shapes whose box (plus a margin) touches the canvas are traced; po
 
 **The `ships` switch** (`config/site.toml`, #156): **off on the live site**. Off: no ship source is contacted, a real brief's ships are ignored (`render.keep_ships`), and both sites, the real one and `sample/`, render exactly as before: every page byte for byte, checked against main in PR 1. On is refused without `ships_permission`, the source's saved written reply in `docs/permissions/` (as for RTV Rijnmond, #107).
 
-**The badge view** (switch on; or `python -m haven.render --briefs data/sample/briefs --preview-ships`, sample briefs only, for local trials and the speed run):
-- **At the opening view**, one count badge per place ("ECT Delta 6", `ships.by_place`), at the centre of its ships, so zooming in shows them where the badge was. Ships without a place (most under way) are in no badge. A badge whose place has a ship linked to a news item gets that item's severity edge. Clicking a badge flies to its ships.
-- **From zoom `SHIP_ZOOM` (12)**, the single ships (hulls below) instead of the badges. The ships linked to a selected item, and those picked with "N at anchor" / "N under way", show at any zoom.
-- **Ships and badges have their own pane (`ships`, z-index 550) under the news numbers** (Leaflet's marker pane, 600). The number layout (`planMarkers`) never looks at ships, so the hidden numbers stay 18 / 23. A badge that would cover a number, or come within 4 px of one, hides (`HavenPins.coveredBadges`).
-- **Checked in the speed run** (`speed.yml`): the pin check runs a second time with the sample day's ships in the badge view (`check_map_pins.py --ships`: hidden numbers unchanged, no `badge-over-number`). The speed measurement covers the badge view, plus a busy invented day of 250 ships (`tools/make_busy_ships.py`).
-- Without the badge view, ships are drawn one by one as before (the sample site today).
+**The ship layer** (switch on; or `python -m haven.render --briefs data/sample/briefs --preview-ships`, sample briefs only, for local trials and the speed run). *Owner's change on PR #157 (26 Nov 2026), instead of the count badges first built there:*
+- **Every ship at the opening view**, no zoom needed, as a **simple hull** (the `HULL` below, no deck details) turned to its heading and **coloured by type** (`--ship-container`, `--ship-tanker`, `--ship-bulk`, `--ship-cargo` in `style.css`: a teal family, never a severity or the harbour blue). At anchor: hollow.
+- **About 1.5x the old minimum size**: at least 39 px long (28 px zoomed out, below z10.5) on a laptop, 32 px (24 px) on a phone, or the ship's real length when that is longer.
+- **Lighter than the news numbers**: fill 60 % (`SHIP_FILL_OPACITY`), thin outline; the ships of a selected item, or of "N at anchor", are drawn stronger and the others fainter.
+- **One canvas** (`L.canvas` in the pane `ships`, z-index 550) under the news numbers (Leaflet's marker pane, 600): light with 250 ships, and a number is never covered. The number layout (`planMarkers`) never looks at ships, so the hidden numbers stay 18 / 23. **A ship under a number, or within 4 px of one, fades** (`HavenPins.coveredBoxes`). The chart notes how many ships are still under a number (`data-ships-over-numbers`, always 0).
+- **No count badges on the map**: the counts per terminal go in the Ships dial (PR 2, `ships.by_place`).
+- The legend shows one swatch per type present and the hollow hull for "At anchor". A ship opens its popup when clicked; its name is also in the ship list.
+- **Checked in the speed run** (`speed.yml`): the pin check runs a second time with the sample day's ships in the layer (`check_map_pins.py --ships`: hidden numbers unchanged, no `ship-over-number`). The speed measurement covers the layer, plus a busy invented day of 250 ships (`tools/make_busy_ships.py`), and the zoom step.
+- Without the layer view, ships are drawn one by one as before (the sample site today).
 
 Top-down hulls, bow up, 24 units long × 6 wide (shapes defined **once in `render.py`**, used by the legend macro and by `map.js`):
 

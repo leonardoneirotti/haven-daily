@@ -56,8 +56,8 @@ EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 BROWSER = os.environ.get("HAVEN_BROWSER") or EDGE  # "google-chrome" on the GitHub runner
 BROWSER_ARGS = os.environ.get("HAVEN_BROWSER_ARGS", "").split()  # "--no-sandbox" on the runner
 SIZES = {"laptop": (1440, 900), "laptop-1280": (1280, 800), "phone": (390, 844)}
-# badge-over-number (#156, --ships only): a ship count badge left showing over a news number.
-KINDS = ("no-map", "lost", "overlap", "hidden", "label-cut", "badge-over-number", "timeout", "unfinished")
+# ship-over-number (#156, --ships only): a ship left unfaded under a news number.
+KINDS = ("no-map", "lost", "overlap", "hidden", "label-cut", "ship-over-number", "timeout", "unfinished")
 NOT_SHOWN = {"hidden", "lost"}  # an item's number isn't fully on the chart, right of the panel
 BLOCK = 20  # checks per browser process
 BLOCK_LIMIT_S = 180  # a browser still running after this is stopped; the run goes on with the next check
@@ -81,7 +81,7 @@ const FROM = Number(params.get("from")), TO = Number(params.get("to"));
 const CHECKS = __CHECKS__;
 const PLACES = __PLACES__;
 const CHECK_LIMIT_MS = __CHECK_LIMIT_MS__;
-const SHIPS = __SHIPS__; // --ships: the sample day's ships stay, in the badge view (#156)
+const SHIPS = __SHIPS__; // --ships: the sample day's ships stay, in the ship layer (#156)
 
 function pageFor(base, check) {
   const callouts = check.places.map((id, i) => Object.assign(
@@ -136,14 +136,12 @@ function measure(check, frame) {
     const numsShown = m.nums.every((n) => inside(n.box, free));
     if (numsShown && !inside(m.box, free)) problems.push({ kind: "label-cut", marker: m.text });
   });
-  // Ships on (#156): no count badge may be left showing over a number (map.js hides it).
-  const badges = Array.from(doc.querySelectorAll(".ship-badge:not(.is-covered) .ship-badge-inner"))
-    .filter((b) => b.getClientRects().length).map((b) => ({ box: box(b.getBoundingClientRect()), text: b.textContent.trim() }));
-  const numbers = markers.flatMap((m) => m.nums);
-  badges.forEach((b) => numbers.forEach((n) => {
-    const px = overlap(b.box, n.box);
-    if (px) problems.push({ kind: "badge-over-number", badge: b.text, rank: n.rank, px: px });
-  }));
+  // Ships on (#156): the ships are drawn on a canvas, so the chart counts the ships left unfaded under
+  // a number itself (data-ships-over-numbers, map.js fadeCoveredShips): it must be there, and 0.
+  if (SHIPS) {
+    const over = mapEl.getAttribute("data-ships-over-numbers");
+    if (over !== "0") problems.push({ kind: "ship-over-number", count: over === null ? "not counted" : over });
+  }
   return { name: check.name, problems: problems, reduced: win.matchMedia("(prefers-reduced-motion: reduce)").matches };
 }
 
@@ -190,7 +188,7 @@ function run(base, check) {
 
 def build_site(site: Path, ships: bool = False) -> str:
     """The day page every check starts from: a sample day with its pins, without ships (as in v1);
-    `ships`: with its invented ships, in the badge view (#156, the second check)."""
+    `ships`: with its invented ships, in the ship layer (#156, the second check)."""
     brief = json.loads(BASE_BRIEF.read_text(encoding="utf-8"))
     brief = copy.deepcopy(brief)
     if not ships:
@@ -360,8 +358,8 @@ def main() -> None:
     parser.add_argument("--site", type=Path, help="build the check page here and keep it (for screenshots)")
     parser.add_argument("--json", type=Path, help="also write every result to this file")
     parser.add_argument("--ships", action="store_true",
-                        help="the sample day's ships too, in the badge view: hidden numbers must not change, and no "
-                             "count badge may cover a number (#156)")
+                        help="the sample day's ships too, in the ship layer: hidden numbers must not change, and no "
+                             "ship may sit unfaded under a number (#156)")
     parser.add_argument("--compare", nargs=2, type=Path, metavar=("BEFORE", "AFTER"),
                         help="print what changed between two --json files, as Markdown, and stop")
     args = parser.parse_args()

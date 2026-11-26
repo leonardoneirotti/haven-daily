@@ -630,76 +630,112 @@
     return html;
   }
 
-  // The badge view (#156, the `ships` switch or a sample preview): ships and their count badges
-  // in a pane of their own under the news numbers (Leaflet's marker pane, 600), so a number is
-  // never covered by a ship and its layout never looks at one. Without it, ships are drawn as before.
-  var badgeView = data.ship_view === "badges";
-  if (badgeView) map.createPane("ships").style.zIndex = 550;
-  var shipLayer = L.layerGroup().addTo(map);
+  // The ship layer (#156, the `ships` switch or a sample preview; owner's change on PR #157): every
+  // ship at the opening view, as a simple hull coloured by its type and lighter than the news
+  // numbers, all on one canvas (light on a phone, also with 250 ships) in a pane of its own under
+  // Leaflet's marker pane (600), so a number is never covered and its layout never looks at a ship.
+  // A ship under a number fades. Without the layer view, ships are drawn one by one as before.
+  var layerView = data.ship_view === "layer";
+  if (layerView) map.createPane("ships").style.zIndex = 550;
+  var shipCanvas = layerView ? L.canvas({ pane: "ships", padding: 0.1 }) : null;
+  // Pixel length at least: the old view's 26 px (19 px zoomed out, below z10.5) x 1.5; a phone a little less.
+  var SHIP_LAPTOP_NEAR = 39, SHIP_LAPTOP_FAR = 28, SHIP_PHONE_NEAR = 32, SHIP_PHONE_FAR = 24;
+  var SHIP_FILL_OPACITY = 0.6; // the numbers are solid: a ship never competes with them
+  var phoneShips = window.matchMedia && window.matchMedia("(max-width: 40rem)").matches;
+  var hullPath = layerView && window.Path2D ? new Path2D(shapes.hull) : null;
+  var shipColours = null;
+  function shipColour(type) {
+    shipColours = shipColours || { container: token("--ship-container"), tanker: token("--ship-tanker"),
+      bulk: token("--ship-bulk"), cargo: token("--ship-cargo") };
+    return shipColours[type] || shipColours.cargo;
+  }
+  // One ship on the canvas: the hull of spec 8.4 (24 units, bow up), turned to its heading and scaled
+  // to its length in pixels (2 x the marker's radius). Leaflet's canvas renderer draws it, finds it
+  // under the pointer (within the radius) and opens its popup.
+  var ShipMark = L.CircleMarker.extend({
+    _updatePath: function () {
+      var r = this._renderer;
+      if (!r._drawing || this._empty() || !hullPath) return;
+      var ctx = r._ctx, p = this._point, o = this.options, k = (this._radius * 2) / 24;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(((o.heading || 0) * Math.PI) / 180);
+      ctx.scale(k, k);
+      ctx.globalAlpha = o.fillOpacity;
+      ctx.fillStyle = o.fillColor;
+      ctx.fill(hullPath);
+      ctx.globalAlpha = o.opacity;
+      ctx.lineWidth = o.weight / k;
+      ctx.strokeStyle = o.color;
+      ctx.stroke(hullPath);
+      ctx.restore();
+    },
+  });
+  function shipLength(ship) {
+    var near = map.getZoom() >= 10.5;
+    var least = phoneShips ? (near ? SHIP_PHONE_NEAR : SHIP_PHONE_FAR) : (near ? SHIP_LAPTOP_NEAR : SHIP_LAPTOP_FAR);
+    return Math.max(least, (ship.length_m || 200) * worldPerMetre * map.getZoomScale(map.getZoom(), 0));
+  }
+  var shipLayer = L.layerGroup().addTo(map), shipKind = "all";
   var ships = (data.ships || []).map(function (ship) {
-    var options = { icon: shipIcon(ship), title: ship.name + ", " + ship.type_label + ", " + ship.status_label,
-      riseOnHover: true };
-    if (badgeView) options.pane = "ships";
-    var marker = L.marker([ship.lat, ship.lon], options)
-      .bindPopup(shipPopup(ship), { className: "chart-popup", maxWidth: 280, offset: [0, -6] });
-    if (!badgeView) marker.addTo(shipLayer); // the badge view adds a ship only when it is shown
-    return { ship: ship, marker: marker, hot: false };
+    var marker;
+    if (layerView) {
+      marker = new ShipMark([ship.lat, ship.lon], { renderer: shipCanvas, pane: "ships", radius: shipLength(ship) / 2,
+        heading: ship.heading, color: shipColour(ship.type), fillColor: shipColour(ship.type), weight: 1 });
+    } else {
+      marker = L.marker([ship.lat, ship.lon], { icon: shipIcon(ship),
+        title: ship.name + ", " + ship.type_label + ", " + ship.status_label, riseOnHover: true });
+    }
+    marker.bindPopup(shipPopup(ship), { className: "chart-popup", maxWidth: 280, offset: [0, -6] });
+    marker.addTo(shipLayer);
+    return { ship: ship, marker: marker, hot: false, covered: false };
   });
 
-  // ---------- Ship count badges (#156) ----------
-  // At the opening view one badge per place ("ECT Delta · 6"), at the centre of its ships; from
-  // zoom data.ship_zoom (12) the single ships instead. Ships linked to a selected item, or picked
-  // with "N at anchor", are shown at any zoom. A badge that would cover a news number hides.
-  var badgeLayer = L.layerGroup().addTo(map), shipKind = "all";
-  var badges = (data.ship_places || []).map(function (place) {
-    var marker = L.marker([place.lat, place.lon], { pane: "ships", keyboard: false, icon: L.divIcon({
-      className: "ship-badge" + (place.severity ? " is-linked sev-" + place.severity : ""), iconSize: [0, 0],
-      html: '<span class="ship-badge-inner">' + escapeHtml(place.label) + " <b></b></span>" }) });
-    marker.on("click", function () {
-      flyTo(ships.filter(function (s) { return s.ship.place === place.place; })
-        .map(function (s) { return [s.ship.lat, s.ship.lon]; }), 13);
-    });
-    return { place: place, marker: marker };
-  });
-  function badgeCount(place) {
-    return shipKind === "all" ? place.count : place.by_type[shipKind] || 0;
+  // How each ship is drawn in the layer view: lighter when it isn't the focus, hollow at anchor,
+  // stronger when it belongs to the selected item, faded under a number.
+  function styleShip(s) {
+    var focused = el.classList.contains("is-focused"), fill = s.ship.status === "anchored" ? 0.08 : SHIP_FILL_OPACITY;
+    var line = 0.85;
+    if (s.hot) { fill = s.ship.status === "anchored" ? 0.2 : 0.9; line = 1; }
+    else if (focused) { fill *= 0.35; line *= 0.35; }
+    if (s.covered) { fill *= 0.2; line *= 0.2; }
+    s.marker.setStyle({ fillOpacity: fill, opacity: line, weight: s.hot ? 1.6 : 1 });
   }
   function showShipView() {
-    if (!badgeView) return;
-    var close = map.getZoom() >= data.ship_zoom;
+    if (!layerView) return;
     ships.forEach(function (s) {
-      var show = (close || s.hot) && (shipKind === "all" || s.ship.type === shipKind);
+      var show = shipKind === "all" || s.ship.type === shipKind;
       if (show && !shipLayer.hasLayer(s.marker)) s.marker.addTo(shipLayer);
       if (!show && shipLayer.hasLayer(s.marker)) shipLayer.removeLayer(s.marker);
-      if (show) markerEl(s.marker).classList.toggle("is-hot", s.hot);
+      if (show) styleShip(s);
     });
-    badges.forEach(function (b) {
-      var count = badgeCount(b.place), show = !close && count > 0;
-      if (show && !badgeLayer.hasLayer(b.marker)) b.marker.addTo(badgeLayer);
-      if (!show && badgeLayer.hasLayer(b.marker)) badgeLayer.removeLayer(b.marker);
-      if (!show) return;
-      var badge = markerEl(b.marker);
-      badge.querySelector("b").textContent = count;
-      badge.setAttribute("title", count + (count === 1 ? " ship at " : " ships at ") + b.place.label);
-    });
-    hideCoveredBadges();
   }
-  function hideCoveredBadges() {
-    if (!badgeView) return;
-    var shown = badges.filter(function (b) { return badgeLayer.hasLayer(b.marker); });
-    var boxes = shown.map(function (b) {
-      var badge = markerEl(b.marker);
-      badge.classList.remove("is-covered");
-      return badge.querySelector(".ship-badge-inner").getBoundingClientRect();
+  // A ship under a number, or within 4 px of one, fades (pins.js coveredBoxes): the numbers stay the
+  // clearest thing on the chart. The chart says how many ships still sit over a number (always 0;
+  // tools/check_map_pins.py --ships reads it).
+  function fadeCoveredShips() {
+    if (!layerView) return;
+    var frame = el.getBoundingClientRect();
+    var shown = ships.filter(function (s) { return shipLayer.hasLayer(s.marker); });
+    var boxes = shown.map(function (s) {
+      var p = map.latLngToContainerPoint(s.marker.getLatLng()), r = s.marker.getRadius();
+      return { left: frame.left + p.x - r, right: frame.left + p.x + r, top: frame.top + p.y - r, bottom: frame.top + p.y + r };
     });
     var numbers = Array.prototype.map.call(el.querySelectorAll(".leaflet-marker-pane .num"), function (n) {
       return n.getBoundingClientRect();
     });
-    pinGeometry.coveredBadges(boxes, numbers, MARKER_GAP).forEach(function (i) {
-      markerEl(shown[i].marker).classList.add("is-covered");
+    var covered = pinGeometry.coveredBoxes(boxes, numbers, MARKER_GAP);
+    shown.forEach(function (s, i) {
+      var now = covered.indexOf(i) >= 0;
+      if (now !== s.covered) { s.covered = now; styleShip(s); }
     });
+    var over = shown.filter(function (s, i) { return covered.indexOf(i) >= 0 && !s.covered; }).length;
+    el.setAttribute("data-ships-over-numbers", String(over));
   }
-  map.on("zoomend", showShipView);
+  map.on("zoomend", function () {
+    if (!layerView) return;
+    ships.forEach(function (s) { s.marker.setRadius(shipLength(s.ship) / 2); });
+  });
 
   // ---------- Numbered items ----------
   // Each item with a place shows its number on the chart, with the place's name beside it.
@@ -882,7 +918,7 @@
   function showCallouts(remeasure) {
     var started = performance.now();
     try { placeCallouts(remeasure); } finally { timing("markers", started); }
-    hideCoveredBadges(); // the numbers moved: a badge that now covers one hides (#156)
+    fadeCoveredShips(); // the numbers moved: a ship that is now under one fades (#156)
   }
   function placeCallouts(remeasure) {
     if (!ranks.length) return;
@@ -1238,7 +1274,7 @@
   // ---------- Ship filter ----------
   function filterShips(kind) {
     shipKind = kind;
-    if (badgeView) showShipView();
+    if (layerView) showShipView();
     else ships.forEach(function (s) {
       var show = kind === "all" || s.ship.type === kind;
       if (show && !shipLayer.hasLayer(s.marker)) s.marker.addTo(shipLayer);
@@ -1400,7 +1436,7 @@
   updateScale();
 
   // A link to #item-2 opens with the chart already on item 2.
-  showShipView(); // the badge view's first drawing, at the opening view (#156)
+  showShipView(); // the ship layer's first styling, at the opening view (#156)
   var linked = /^#item-(\d+)$/.exec(location.hash);
   if (linked) selectItem(Number(linked[1]), { quiet: true });
 })();
