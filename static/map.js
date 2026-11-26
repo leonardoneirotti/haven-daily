@@ -979,7 +979,7 @@
 
   // ---------- Pin card ----------
   // A number clicked or tapped on the chart opens a small card next to it (#134): number,
-  // severity, headline (the English one if the AI wrote one, the original below it), summary
+  // severity, headline (always English; a Dutch item's source credited below it, #153), summary
   // (or the short card's line) and links. Its close button, Escape, or a click outside it closes
   // it. The keyboard focus goes into the card, and back to the number when it closes. The HTML
   // comes from pins.js (cardHtml, escaped, tested in Node); Leaflet's popup holds it.

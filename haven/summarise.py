@@ -110,7 +110,7 @@ STRIKE_STATES = ("announced", "ongoing", "cancelled")
 MATCHES = ("same", "new", "unsure")
 SUMMARY_MAX = 320  # characters; the sample summaries are 156–172
 IMPACT_MAX = 400  # the sample impacts are 194–262
-HEADLINE_EN_MAX = 120  # characters: an English headline for a Dutch item (#134)
+HEADLINE_EN_MAX = 120  # characters: the English title of a Dutch item (#134, #153)
 LOCATION_MAX = 80
 PHRASE_MAX = 80  # characters of a date phrase ("from Thursday 5 to Saturday 7 November")
 COPY_RUN = 10  # this many words in a row from the article = copied, not own words
@@ -259,12 +259,13 @@ _STRIKE_SCHEMA = {
 def output_format(headline_only: bool, impact: bool = True, english_headline: bool = False) -> dict:
     """The structured-output schema: no summary or impact when only the headline is sent, and no
     impact when a publisher's permission doesn't cover one (`impact=False`, #107). With
-    `english_headline` (a Dutch item from a source with the setting on, #134) also `headline_en`."""
+    `english_headline` (a summarised Dutch item, #153) also `headline_en`, after the summary: the
+    title is written from it."""
     properties = {}
-    if english_headline and not headline_only:
-        properties["headline_en"] = {"type": "string"}
     if not headline_only:
         properties["summary"] = {"type": "string"}
+        if english_headline:
+            properties["headline_en"] = {"type": "string"}
         if impact:
             properties["impact"] = {"anyOf": [{"type": "string"}, {"type": "null"}]}
     properties["severity"] = {"type": "string", "enum": list(SEVERITIES)}
@@ -320,18 +321,20 @@ def _permission_line(permission: Permission) -> str:
                    "never as certain or confirmed (no \"will\").")
 
 
-# The English headline (#134): asked for in the item's own message, so items without one cost nothing.
+# The English title (#153, owner 26 Nov 2026; #134 before): asked for in the item's own message, so
+# items without one cost nothing. Part of Haven Daily's summary, never a translation of the headline.
 _ENGLISH_HEADLINE_LINE = (
-    "This item's headline is in Dutch. Also answer headline_en: an English headline for it, a short "
-    f"news headline in plain words (at most {HEADLINE_EN_MAX} characters). Keep the names of places, "
-    "terminals and companies as they are. Add nothing that the headline and the text don't say."
+    "This item is in Dutch, and every title on Haven Daily is in English. Also answer headline_en: a "
+    "short English title for this item that you write from your summary (not a translation of the "
+    f"Dutch headline), in plain words, at most {HEADLINE_EN_MAX} characters. Keep the names of places, "
+    "roads, terminals and companies as they are. Add nothing that your summary doesn't say."
 )
 
 
-def wants_english_headline(item: Item, sources_on: set[str]) -> bool:
-    """An English headline is asked for a Dutch item from a source with the setting on, never for a
-    headline-only one: its text isn't sent, and a headline-only source can't have the setting (#134)."""
-    return item.source in sources_on and item.language == "nl" and not _headline_only(item)
+def wants_english_headline(item: Item) -> bool:
+    """An English title is asked for every summarised item that isn't in English (#153). Never for a
+    headline-only one: there is no summary to write it from, and such an item is not shown."""
+    return (item.language or "en") != "en" and not _headline_only(item)
 
 
 def _request(item: Item, model: str, system: str, known: list[dict], today: date, read_at: datetime,
@@ -417,7 +420,6 @@ class _Run:
         sources = load_sources() if sources is None else sources
         # Written permissions by source id (#107): their limits apply to that source's items only.
         self.permissions = {s.id: s.permission for s in sources if s.permission is not None}
-        self.english_sources = {s.id for s in sources if s.english_headline}  # #134
         self.failures: list[dict] = []
         self.calls = self.input_tokens = self.output_tokens = 0
         self.batch_input_tokens = self.batch_output_tokens = 0
@@ -426,7 +428,7 @@ class _Run:
 
     def request(self, item: Item, model: str, retry_reason: str | None = None) -> dict:
         return _request(item, model, self.system, self.known, self.today, self.read_at, retry_reason,
-                        self.permissions.get(item.source), wants_english_headline(item, self.english_sources))
+                        self.permissions.get(item.source), wants_english_headline(item))
 
     def fail(self, item: Item, problem: str) -> Item:
         self.failures.append({"source": SUMMARISER, "error": f"{item.url}: {problem}"})
@@ -452,7 +454,7 @@ class _Run:
         try:
             ai = _checked(_answer(response), item, self.known_ids, self.today, self.places, self.tags, notes,
                           self.permissions.get(item.source), last_try=retry_reason is not None,
-                          english_headline=wants_english_headline(item, self.english_sources))
+                          english_headline=wants_english_headline(item))
         except _Rephrase as problem:
             if retry_reason is None:
                 return _Retry(str(problem))  # this answer's notes are dropped with it
@@ -764,12 +766,12 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
           "strike": strike, "written_by": None}
     if impact_left_out:  # only then: the page shows no impact block, not "Not enough information"
         ai["impact_left_out"] = True
-    if english_headline:  # only then, and only a usable one: a bad one never costs the item (#134)
+    if english_headline:  # only then, and only a usable one; without it the page doesn't show the item (#153)
         english, problem = _english_headline(data.get("headline_en"))
         if english is not None:
             ai["headline_en"] = english
         else:
-            notes.append(f"English headline left out: {problem}")
+            notes.append(f"English title left out, so the item is not shown: {problem}")
     return ai
 
 

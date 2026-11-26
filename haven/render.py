@@ -343,8 +343,19 @@ def strike_link(link: dict, ranks: dict[str, int] | None, today: str) -> dict:
     if link.get("day") and link["day"] != today and rank:
         day_link = {"href": f"days/{link['day']}.html#item-{rank}",
                     "label": f"In the {_day_month(date.fromisoformat(link['day']))} brief"}
-    return {"headline": link.get("headline"), "url": outside_url(link.get("url")), "role_label": label, "meta": meta,
+    return {"headline": link_title(link), "url": outside_url(link.get("url")), "role_label": label, "meta": meta,
             "day_link": day_link}
+
+
+def link_title(link: dict) -> str | None:
+    """A strike link's title, always English (#153): the item's own, its English title, or a plain
+    line naming the source (an item in Dutch without one, e.g. rated from its headline)."""
+    if (link.get("language") or "en") == "en":
+        return link.get("headline")
+    if link.get("headline_en"):
+        return link["headline_en"]
+    name = LANGUAGE_NAMES.get(link.get("language"), link.get("language"))
+    return f"An item from {link.get('source') or 'a source'} (in {name})"
 
 
 # Failure notes for readers (#138). The stored brief keeps the technical line ("<address>: HTTP 403"),
@@ -434,9 +445,16 @@ def rank_items(items: list[dict]) -> list[dict]:
     (owner, 24 Nov 2026, #123): a summary tells a planner more. The sort is stable, so otherwise
     items keep the order they came in.
     """
-    ranked = sorted(items, key=lambda item: (SEVERITY_KEYS.index(severity_key(item["severity"])),
-                                             not item.get("summary")))
+    ranked = sorted((item for item in items if has_english_title(item)),
+                    key=lambda item: (SEVERITY_KEYS.index(severity_key(item["severity"])), not item.get("summary")))
     return ranked[:MAX_ITEMS]
+
+
+def has_english_title(item: dict) -> bool:
+    """Every title on the site is English (#153, owner 26 Nov 2026): an item in another language is
+    shown only with the English title written from Haven Daily's summary. One without (a Dutch
+    headline-only or unrated item) is not shown at all."""
+    return (item.get("language") or "en") == "en" or bool(item.get("headline_en"))
 
 
 def describe_change(indicator: dict, previous: dict | None, is_first: bool) -> str | None:
@@ -592,7 +610,8 @@ def prepare_item(item: dict, brief_date: str) -> None:
     item.setdefault("access", "full")  # "headline-only" for paywalled sources
     item.setdefault("map", None)  # {"lat", "lon", "label"} when the item has a place on the map
     item.setdefault("permission", None)  # {"granted", "max_sentences", "impact"}: written permission (#107)
-    # An English headline the AI wrote for a Dutch item (#134) is the one shown; the original goes below it.
+    # The English title written from Haven Daily's summary of a Dutch item (#153) is the one shown;
+    # the card credits the source and its language instead of showing the Dutch headline.
     item.setdefault("headline_en", None)
     item["shown_headline"] = item["headline_en"] or item["headline"]
     item["permission_note"] = permission_note(item)
@@ -605,6 +624,7 @@ def prepare_item(item: dict, brief_date: str) -> None:
     item["impact_whose"] = IMPACT_WHOSE.format(source=item["source"]) if permission else "interpretation"
     item["severity_key"] = severity_key(item["severity"])
     item["language_name"] = LANGUAGE_NAMES.get(item["language"], item["language"])
+    item["credit"] = None if item["language"] == "en" else f"Source: {item['source']} (in {item['language_name']})"
     item["published_label"] = published_label(item["published"], brief_date)
     # A severity with no summary was rated from the headline alone (spec §2.1, §5.5 point 2): a
     # headline-only source, or a `use` item whose article couldn't be read.
@@ -680,9 +700,9 @@ def map_payload(brief: dict) -> dict:
             "rank": rank,
             "severity": item["severity_key"],
             "title": item["shown_headline"],
-            # What the pin card shows (#134): the original under an English headline, the summary
-            # (or the short card's line), and the same links as the card below.
-            "original": item["headline"] if item["headline_en"] else None,
+            # What the pin card shows (#134): the credit of a Dutch item (#153), the summary (or the
+            # short card's line), and the same links as the card below.
+            "credit": item["credit"],
             "language": item["language"],
             "summary": item["summary"],
             "note": item["headline_note"] if not item["summary"] else None,
@@ -785,8 +805,15 @@ def group_by_month(briefs: list[dict]) -> list[tuple[str, list[dict]]]:
 PAUSED_USE = "Paused for now: its website refuses Haven Daily's automated reader, so it isn't read."
 
 
+# A Dutch headline-only source (#153): every title on the site is English, written from a summary.
+DUTCH_NOT_SHOWN = ("Its headlines are in Dutch and it hasn't given permission for summaries, so it is not shown for now: "
+                   "Haven Daily writes English titles only from its own summaries.")
+
+
 def source_use(source: Source) -> str:
     """One line on how the pipeline uses a source, from its config (Method page, #24)."""
+    if source.dutch_without_permission:  # #153
+        return DUTCH_NOT_SHOWN
     if source.verdict != "drop" and not source.enabled:  # paused (#138)
         return PAUSED_USE
     if source.effective_verdict == "use" and source.permission is not None:  # #107
@@ -882,7 +909,7 @@ def day_preview(brief: dict) -> dict:
     if not items:
         return {"title": title, "description": QUIET_DAY}
     more = f" (and {len(items) - 1} more)" if len(items) > 1 else ""
-    return {"title": title, "description": items[0]["headline"] + more}
+    return {"title": title, "description": items[0]["shown_headline"] + more}
 
 
 def site_preview(path: str, page: str | None) -> dict:

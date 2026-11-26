@@ -33,7 +33,7 @@ INTRO_SENTENCE = '"Show on chart" moves the chart above the brief.'
 
 
 def headline_only(severity="medium", **fields):
-    return news(severity, "Invented headline-only story", source="NL Times", language="nl",
+    return news(severity, "Invented headline-only story", source="NL Times", language="en",
                 access="headline-only", summary=None, impact=None, affects=["Containers", "Labour"], **fields)
 
 
@@ -82,8 +82,8 @@ def test_the_short_line_is_grey(tmp_path):
 def test_the_headline_only_card_keeps_its_tags_and_links(tmp_path):
     text = text_of(card_of(tmp_path, headline_only()))
     assert "Affects Containers · Labour" in text
-    assert "Read original (Dutch)" in text
-    assert "Read in English" in text
+    assert "Read original" in text  # NL Times is English (#153: the fixture said Dutch)
+    assert "Read in English" not in text  # an English source; a Dutch headline-only item is never shown (#153)
 
 
 def test_the_unread_card_keeps_its_tags(tmp_path):

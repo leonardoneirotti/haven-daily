@@ -90,6 +90,7 @@
     {
       "severity": "high",
       "headline": "Dockworkers strike for 24 hours at a Maasvlakte container terminal",
+      "headline_en": "Dockworkers strike for 24 hours at a Maasvlakte container terminal",
       "url": "https://example.com/nl/staking-maasvlakte",
       "source": "Sample source A",
       "language": "nl",
@@ -123,6 +124,7 @@
     {
       "severity": "medium",
       "headline": "Weekend track works limit freight trains on the Betuweroute",
+      "headline_en": "Weekend track works limit freight trains on the Betuweroute",
       "url": "https://example.com/nl/betuweroute-werkzaamheden",
       "source": "Sample source C",
       "language": "nl",
