@@ -17,6 +17,8 @@ on:
       - static/**
       - templates/**
       - haven/render.py
+      - haven/ships.py
+      - tools/make_busy_ships.py
       - tools/measure_speed.mjs
       - tools/speed_compare.mjs
       - tools/check_map_input.mjs
@@ -35,7 +37,7 @@ concurrency:
 jobs:
   measure:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120  # three measured sites since #156
     env:
       HAVEN_BROWSER: google-chrome
       # Chrome's sandbox can't start on Ubuntu runners (AppArmor); the browser only ever
@@ -63,6 +65,10 @@ jobs:
           python -m haven.render --briefs data/sample/briefs --out "$RUNNER_TEMP/after"
           git worktree add "$RUNNER_TEMP/main" "$BEFORE"
           (cd "$RUNNER_TEMP/main" && python -m haven.render --briefs data/sample/briefs --out "$RUNNER_TEMP/before")
+          # The ship layer (#156), on the sample's invented ships and on a busy invented day (250 ships).
+          python -m haven.render --briefs data/sample/briefs --out "$RUNNER_TEMP/after-ships" --preview-ships
+          python tools/make_busy_ships.py "$RUNNER_TEMP/busy-briefs"
+          python -m haven.render --briefs "$RUNNER_TEMP/busy-briefs" --out "$RUNNER_TEMP/busy" --preview-ships
 
       # Node 22+ has WebSocket built in; an older Node on the image gets the "ws" package.
       - name: Check Node
@@ -81,10 +87,21 @@ jobs:
         timeout-minutes: 35
         run: node tools/measure_speed.mjs "$RUNNER_TEMP/after" --runs 3 --profiles phone,laptop --pages "$PAGES" --json "$RUNNER_TEMP/after.json"
 
+      - name: Measure the ship layer and the busy day (#156)
+        timeout-minutes: 35
+        run: |
+          node tools/measure_speed.mjs "$RUNNER_TEMP/after-ships" --runs 3 --profiles phone,laptop --pages today,day-ships --json "$RUNNER_TEMP/after-ships.json"
+          node tools/measure_speed.mjs "$RUNNER_TEMP/busy" --runs 3 --profiles phone,laptop --pages day-ships --json "$RUNNER_TEMP/busy.json"
+
       - name: Compare
         run: |
           node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" --profile phone | tee -a "$GITHUB_STEP_SUMMARY"
           node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" --profile laptop | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "### Ship layer (#156): main's ships vs the ship layer, then vs a busy day of 250 ships" | tee -a "$GITHUB_STEP_SUMMARY"
+          node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after-ships.json" --profile phone | tee -a "$GITHUB_STEP_SUMMARY"
+          node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after-ships.json" --profile laptop | tee -a "$GITHUB_STEP_SUMMARY"
+          node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/busy.json" --profile phone | tee -a "$GITHUB_STEP_SUMMARY"
+          node tools/speed_compare.mjs "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/busy.json" --profile laptop | tee -a "$GITHUB_STEP_SUMMARY"
 
       # How the chart takes the mouse, wheel, touchpad, keys and touch, before and after (#111).
       - name: Map input
@@ -133,5 +150,13 @@ jobs:
         timeout-minutes: 55
         run: python tools/check_map_pins.py --only ${{ matrix.size }} --json "$RUNNER_TEMP/after.json" > "$RUNNER_TEMP/after.log" || tail -n 40 "$RUNNER_TEMP/after.log"
 
+      # The second check (#156): the same, with the sample day's ships in the ship layer.
+      - name: Check after, ships on
+        timeout-minutes: 55
+        run: python tools/check_map_pins.py --ships --only ${{ matrix.size }} --json "$RUNNER_TEMP/after-ships.json" > "$RUNNER_TEMP/after-ships.log" || tail -n 40 "$RUNNER_TEMP/after-ships.log"
+
       - name: Compare
-        run: python tools/check_map_pins.py --compare "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" | tee -a "$GITHUB_STEP_SUMMARY"
+        run: |
+          python tools/check_map_pins.py --compare "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "#### Ships on (#156): main without ships vs this branch with the ship layer" | tee -a "$GITHUB_STEP_SUMMARY"
+          python tools/check_map_pins.py --compare "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after-ships.json" | tee -a "$GITHUB_STEP_SUMMARY"

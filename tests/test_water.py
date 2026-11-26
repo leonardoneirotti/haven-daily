@@ -249,7 +249,7 @@ MEASURE = (ROOT / "tools" / "measure_speed.mjs").read_text(encoding="utf-8")
 
 
 def test_the_speed_run_measures_the_phone_and_the_laptop():
-    assert SPEED_YML.count("--profiles phone,laptop") == 2
+    assert SPEED_YML.count("--profiles phone,laptop") == 4  # before, after, the ship badge view and the busy day (#156)
     assert "--profile phone" in SPEED_YML and "--profile laptop" in SPEED_YML
     assert '"issue-111-*"' in SPEED_YML
 

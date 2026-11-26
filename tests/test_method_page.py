@@ -16,6 +16,7 @@ import pytest
 
 from haven import filter as haven_filter
 from haven import render, summarise
+from test_render_real import switch_ships_on
 from haven.config import RhineThresholds, Source, load_rhine, load_sources
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
@@ -288,7 +289,7 @@ def test_the_chart_says_lines_are_decoration_and_nothing_about_ships_in_v1(about
 
 
 def test_once_the_ais_snapshot_is_built_the_chart_explains_it(monkeypatch):
-    monkeypatch.setattr(render, "AIS_SNAPSHOT_BUILT", True)
+    switch_ships_on(monkeypatch)
     text = text_of(section(render_method(), "chart"))
     assert "Ship positions are not collected yet" not in text
     assert "AIS snapshot" in text

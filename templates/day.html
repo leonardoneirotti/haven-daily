@@ -100,14 +100,18 @@
         <p class="visually-hidden" id="chart-announcer" aria-live="polite"></p>
       </div>
       <div class="chart-legend">
-        {% if ships %}
+        {% if ships and brief.map.get("ship_view") %}
+        {# The ship layer (#156): one colour per type present, and the hollow hull at anchor. #}
+        {% for kind, label in ship_layer_types.items() if ships.type_counts[kind] %}<span>{{ m.ship_swatch(kind) }}{{ label }}</span>{% endfor %}
+        {% if ships.at_anchor %}<span>{{ m.ship_swatch("container", true) }}At anchor</span>{% endif %}
+        {% elif ships %}
         <span>{{ m.ship_symbol("container") }}Container</span>
         <span>{{ m.ship_symbol("tanker") }}Tanker</span>
         <span>{{ m.ship_symbol("bulk") }}Bulk</span>
         <span>{{ m.ship_symbol("container", "underway") }}Under way</span>
         <span>{{ m.ship_symbol("container", "anchored") }}At anchor</span>
         {% endif %}
-        {% if ships and ships.linked %}<span>{{ m.ship_symbol("container", "moored", true) }}At a terminal in the news</span>{% endif %}
+        {% if ships and ships.linked and not brief.map.get("ship_view") %}<span>{{ m.ship_symbol("container", "moored", true) }}At a terminal in the news</span>{% endif %}
         {% if brief.map.callouts %}<span><span class="legend-num" aria-hidden="true">1</span>Item</span>{% endif %}
         {# How to move and zoom (#111): a mouse or touchpad, or a touch screen (style.css picks one). #}
         <span class="legend-how needs-map"><span class="how-fine">Drag to move · <span data-zoom-key>Ctrl</span> + scroll or pinch to zoom</span><span class="how-touch">Drag to move · pinch to zoom</span></span>

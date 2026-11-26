@@ -119,6 +119,11 @@
   --land-label: #23384a;
   --label-halo: rgba(255, 255, 255, 0.92);
   --ship: #0f8a7c;          /* deep teal */
+  /* The ship layer's colour per type (#156): container, tanker, bulk, cargo (AIS). */
+  --ship-container: #0f8a7c;
+  --ship-tanker: #1d5f8a;
+  --ship-bulk: #7a8a3c;
+  --ship-cargo: #5a7f86;
 
   /* Controls: one button set (.btn). The accent marks what is pressed or selected, nothing else. */
   --accent: #0f6e8c;        /* harbour blue */
@@ -1846,6 +1851,28 @@ html.chart-expanded {
   font-size: 0.875rem;
   font-weight: 700;
 }
+
+/* The ship layer (#156): every ship, coloured by type, lighter than the news numbers. map.js
+   reads these colours for its canvas; the legend uses the same swatches. Teal family, so ships
+   never look like a severity (red, amber, slate) or like what can be pressed (harbour blue). */
+.ship-swatch {
+  display: inline-block;
+  width: 1.6rem;
+  height: 0.55rem;
+  margin-right: 0.3rem;
+  vertical-align: middle;
+}
+.ship-swatch path {
+  fill: currentColor;
+  fill-opacity: 0.6;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+.ship-swatch.is-anchored path { fill-opacity: 0.08; }
+.ship-type-container { color: var(--ship-container); }
+.ship-type-tanker { color: var(--ship-tanker); }
+.ship-type-bulk { color: var(--ship-bulk); }
+.ship-type-cargo { color: var(--ship-cargo); }
 
 /* ---------- Port status ---------- */
 

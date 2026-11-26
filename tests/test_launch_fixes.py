@@ -1,7 +1,7 @@
 """Launch fixes from the owner's site review (issue #138; spec §2.1, §2.2, §4, §5.10.1, §7.4, §7.5, §7.8).
 
 1. The Ships dial (full dial and the panel's mini cell) is hidden until ship positions are collected
-   (v2, `render.AIS_SNAPSHOT_BUILT`). The ship filter is part of the same feature: it only exists
+   (v2, the `ships` switch, #156). The ship filter is part of the same feature: it only exists
    on a day with ships, so v1 never shows it.
 2. Roads on the chart: the 23 Nov A15/A20 road works got no pin because the place list had no
    roads, so "none" was the right answer. The A15 and A20 are on the list now (kind "road").
@@ -27,7 +27,7 @@ from haven import collect, render
 from haven.config import PLACE_KINDS, ConfigError, load_places, load_sources, load_tag_list
 from haven.places import pick
 from haven.summarise import system_prompt
-from test_render_real import make_brief, news, news_card, render_day, text_of
+from test_render_real import switch_ships_on, make_brief, news, news_card, render_day, text_of
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE_BRIEFS = ROOT / "data" / "sample" / "briefs"
@@ -70,7 +70,7 @@ def test_v1_day_has_no_ship_filter(tmp_path):
 
 def test_from_v2_a_failed_snapshot_still_shows_the_ships_dial(tmp_path, monkeypatch):
     """Hard rule 9: once ships are collected, a missing snapshot is a failure and is shown."""
-    monkeypatch.setattr(render, "AIS_SNAPSHOT_BUILT", True)
+    switch_ships_on(monkeypatch)
     html = render_day(tmp_path, make_brief(items=[news()]))
     assert 'data-key="ships"' in html
     assert "Ships in the port area" in panel_status(html)
@@ -342,7 +342,7 @@ def test_v1_says_nothing_about_ships_on_the_day_page_or_how_it_works(tmp_path):
 
 
 def test_from_v2_a_failed_snapshot_is_still_said_under_the_chart(tmp_path, monkeypatch):
-    monkeypatch.setattr(render, "AIS_SNAPSHOT_BUILT", True)
+    switch_ships_on(monkeypatch)
     html = render_day(tmp_path, make_brief(items=[news()]))
     assert "The AIS snapshot failed." in text_of(html)
 

@@ -20,7 +20,7 @@ import pytest
 import test_run
 from haven import collect, feeds, filter as haven_filter, pages, render, strike, summarise
 from test_first_screen import css_rules
-from test_render_real import kaub, make_brief, news, render_days, section, strike as strike_reading, text_of, weather
+from test_render_real import switch_ships_on, kaub, make_brief, news, render_days, section, strike as strike_reading, text_of, weather
 
 ROOT = Path(__file__).resolve().parent.parent
 CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
@@ -229,7 +229,7 @@ def test_v1_archive_rows_say_nothing_about_ships(tmp_path):
 
 
 def test_v2_archive_row_without_ships_says_no_ship_data(tmp_path, monkeypatch):
-    monkeypatch.setattr(render, "AIS_SNAPSHOT_BUILT", True)
+    switch_ships_on(monkeypatch)
     page = archive(tmp_path, make_brief(status=status_three()))
     assert "No ship data" in visible_text(page)
     assert "No AIS" not in visible_text(page)

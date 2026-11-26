@@ -162,9 +162,11 @@
     "failures": []
   },
   "ships": {
+    "source_id": "sample",
+    "source_name": "Sample AIS data",
+    "kind": "positions",
     "snapshot_start": "2026-10-29T06:28:00+01:00",
     "snapshot_end": "2026-10-29T06:40:00+01:00",
-    "source_name": "Sample AIS data",
     "vessels": [
       {
         "name": "Seline Express",
@@ -178,7 +180,8 @@
         "length_m": 350,
         "area": "Maas anchorage",
         "destination_raw": "",
-        "destination": null
+        "destination": null,
+        "place": "anchorage-emergency"
       },
       {
         "name": "Marlow Trader",
@@ -192,7 +195,8 @@
         "length_m": 280,
         "area": "Maas anchorage",
         "destination_raw": "",
-        "destination": null
+        "destination": null,
+        "place": "anchorage-emergency"
       },
       {
         "name": "Coral Ness",
@@ -206,7 +210,8 @@
         "length_m": 300,
         "area": "Maas anchorage",
         "destination_raw": "",
-        "destination": null
+        "destination": null,
+        "place": "anchorage-emergency"
       },
       {
         "name": "Halden",
@@ -220,7 +225,8 @@
         "length_m": 255,
         "area": "Maas anchorage",
         "destination_raw": "US HOU",
-        "destination": "Houston"
+        "destination": "Houston",
+        "place": "anchorage-4-east"
       },
       {
         "name": "Marram",
@@ -234,7 +240,8 @@
         "length_m": 265,
         "area": "Maas anchorage",
         "destination_raw": "NL RTM",
-        "destination": "Rotterdam"
+        "destination": "Rotterdam",
+        "place": "anchorage-emergency"
       },
       {
         "name": "Tarn Star",
@@ -248,7 +255,8 @@
         "length_m": 330,
         "area": "Maas anchorage",
         "destination_raw": "NL RTM",
-        "destination": "Rotterdam"
+        "destination": "Rotterdam",
+        "place": "anchorage-emergency"
       },
       {
         "name": "Amber Tide",
@@ -262,7 +270,8 @@
         "length_m": 200,
         "area": "Maas anchorage",
         "destination_raw": "FOR ORDERS",
-        "destination": null
+        "destination": null,
+        "place": "anchorage-emergency"
       },
       {
         "name": "Aster Bay",
@@ -276,7 +285,8 @@
         "length_m": 375,
         "area": "Maas anchorage",
         "destination_raw": "CN SHA",
-        "destination": "Shanghai"
+        "destination": "Shanghai",
+        "place": "anchorage-4-east"
       },
       {
         "name": "Linnea",
@@ -290,7 +300,8 @@
         "length_m": 210,
         "area": "Maas anchorage",
         "destination_raw": "NO MON",
-        "destination": "Mongstad"
+        "destination": "Mongstad",
+        "place": "anchorage-emergency"
       },
       {
         "name": "Kestrel Bridge",
@@ -305,7 +316,8 @@
         "area": "Maasvlakte 2",
         "destination_raw": "CN SHA",
         "destination": "Shanghai",
-        "news_item": 1
+        "news_item": 1,
+        "place": "rwg"
       },
       {
         "name": "Ortolan",
@@ -320,7 +332,8 @@
         "area": "Maasvlakte 2",
         "destination_raw": "GB FXT",
         "destination": "Felixstowe",
-        "news_item": 1
+        "news_item": 1,
+        "place": "maasvlakte-2"
       },
       {
         "name": "Pelagia",
@@ -335,7 +348,8 @@
         "area": "Maasvlakte 2",
         "destination_raw": "ANTWERP>HAMBURG",
         "destination": "Antwerp",
-        "news_item": 1
+        "news_item": 1,
+        "place": "rwg"
       },
       {
         "name": "Brisa Norte",
@@ -350,7 +364,8 @@
         "area": "Maasvlakte 2",
         "destination_raw": "BR SSZ",
         "destination": "Santos",
-        "news_item": 1
+        "news_item": 1,
+        "place": "rwg"
       },
       {
         "name": "Corvina Express",
@@ -365,7 +380,8 @@
         "area": "Maasvlakte 2",
         "destination_raw": "GB FXT",
         "destination": "Felixstowe",
-        "news_item": 1
+        "news_item": 1,
+        "place": "rwg"
       },
       {
         "name": "Halcyon Star",
@@ -380,7 +396,8 @@
         "area": "Maasvlakte 2",
         "destination_raw": "DEHAM",
         "destination": "Hamburg",
-        "news_item": 1
+        "news_item": 1,
+        "place": "maasvlakte-2"
       },
       {
         "name": "Ardent Ore",
@@ -394,7 +411,8 @@
         "length_m": 290,
         "area": "Maasvlakte",
         "destination_raw": "AU PHE",
-        "destination": "Port Hedland"
+        "destination": "Port Hedland",
+        "place": "mot"
       },
       {
         "name": "Sable Meridian",
@@ -408,7 +426,8 @@
         "length_m": 335,
         "area": "Maasvlakte",
         "destination_raw": "",
-        "destination": null
+        "destination": null,
+        "place": "mot"
       },
       {
         "name": "Flint Harbour",
@@ -422,7 +441,8 @@
         "length_m": 215,
         "area": "Maasvlakte",
         "destination_raw": "NL RTM",
-        "destination": "Rotterdam"
+        "destination": "Rotterdam",
+        "place": "maasvlakte"
       },
       {
         "name": "Northern Lark",
@@ -436,7 +456,8 @@
         "length_m": 265,
         "area": "Maasvlakte",
         "destination_raw": "CN SHA",
-        "destination": "Shanghai"
+        "destination": "Shanghai",
+        "place": "mot"
       },
       {
         "name": "Lumen Trader",
@@ -450,7 +471,8 @@
         "length_m": 345,
         "area": "Maasvlakte",
         "destination_raw": "SGSIN",
-        "destination": "Singapore"
+        "destination": "Singapore",
+        "place": "euromax"
       },
       {
         "name": "Tamsin",
@@ -464,7 +486,8 @@
         "length_m": 315,
         "area": "Maasvlakte",
         "destination_raw": "GB FXT",
-        "destination": "Felixstowe"
+        "destination": "Felixstowe",
+        "place": "mot"
       },
       {
         "name": "Wrenna",
@@ -478,7 +501,8 @@
         "length_m": 290,
         "area": "Europoort",
         "destination_raw": "US HOU",
-        "destination": "Houston"
+        "destination": "Houston",
+        "place": "europoort"
       },
       {
         "name": "Petrel Spirit",
@@ -492,7 +516,8 @@
         "length_m": 270,
         "area": "Europoort",
         "destination_raw": "US HOU",
-        "destination": "Houston"
+        "destination": "Houston",
+        "place": "maasvlakte"
       },
       {
         "name": "Ballast Point",
@@ -506,7 +531,8 @@
         "length_m": 200,
         "area": "Europoort",
         "destination_raw": "NL RTM",
-        "destination": "Rotterdam"
+        "destination": "Rotterdam",
+        "place": "europoort"
       },
       {
         "name": "Norrsken",
@@ -520,7 +546,8 @@
         "length_m": 230,
         "area": "Europoort",
         "destination_raw": "",
-        "destination": null
+        "destination": null,
+        "place": "ebs-europoort"
       },
       {
         "name": "Fenna",
@@ -534,7 +561,8 @@
         "length_m": 180,
         "area": "Europoort",
         "destination_raw": "FOR ORDERS",
-        "destination": null
+        "destination": null,
+        "place": "europoort"
       },
       {
         "name": "Iron Tern",
@@ -548,7 +576,8 @@
         "length_m": 275,
         "area": "Botlek",
         "destination_raw": "",
-        "destination": null
+        "destination": null,
+        "place": "botlek"
       },
       {
         "name": "Mira Polaris",
@@ -562,7 +591,8 @@
         "length_m": 205,
         "area": "Botlek",
         "destination_raw": "FOR ORDERS",
-        "destination": null
+        "destination": null,
+        "place": "vondelingenplaat"
       },
       {
         "name": "Kittiwake",
@@ -576,7 +606,8 @@
         "length_m": 245,
         "area": "Botlek",
         "destination_raw": "BR TUB",
-        "destination": "Tubarão"
+        "destination": "Tubarão",
+        "place": "vondelingenplaat"
       },
       {
         "name": "Granite Bay",
@@ -590,7 +621,8 @@
         "length_m": 270,
         "area": "Botlek",
         "destination_raw": "BR TUB",
-        "destination": "Tubarão"
+        "destination": "Tubarão",
+        "place": "botlek"
       },
       {
         "name": "Vega Horizon",
@@ -604,7 +636,8 @@
         "length_m": 225,
         "area": "Waalhaven / Eemhaven",
         "destination_raw": "US NYC",
-        "destination": "New York"
+        "destination": "New York",
+        "place": "pernis"
       },
       {
         "name": "Hollis Bridge",
@@ -618,7 +651,8 @@
         "length_m": 295,
         "area": "Waalhaven / Eemhaven",
         "destination_raw": "SGSIN",
-        "destination": "Singapore"
+        "destination": "Singapore",
+        "place": "waalhaven"
       },
       {
         "name": "Cormorant Bay",
@@ -632,7 +666,8 @@
         "length_m": 260,
         "area": "Waalhaven / Eemhaven",
         "destination_raw": "BR SSZ",
-        "destination": "Santos"
+        "destination": "Santos",
+        "place": "eemhaven"
       },
       {
         "name": "Delft Wave",
@@ -646,7 +681,8 @@
         "length_m": 215,
         "area": "Waalhaven / Eemhaven",
         "destination_raw": "CN SHA",
-        "destination": "Shanghai"
+        "destination": "Shanghai",
+        "place": "pernis"
       },
       {
         "name": "Sundew",
@@ -660,7 +696,8 @@
         "length_m": 210,
         "area": "Maasgeul (approach)",
         "destination_raw": "NLRTM",
-        "destination": "Rotterdam"
+        "destination": "Rotterdam",
+        "place": null
       },
       {
         "name": "Juno Horizon",
@@ -674,7 +711,8 @@
         "length_m": 285,
         "area": "Maasgeul (approach)",
         "destination_raw": "NLRTM",
-        "destination": "Rotterdam"
+        "destination": "Rotterdam",
+        "place": null
       },
       {
         "name": "Delft Spirit",
@@ -688,7 +726,8 @@
         "length_m": 330,
         "area": "Maasgeul (approach)",
         "destination_raw": "NLRTM",
-        "destination": "Rotterdam"
+        "destination": "Rotterdam",
+        "place": null
       },
       {
         "name": "Corran Trader",
@@ -702,7 +741,8 @@
         "length_m": 270,
         "area": "Maasgeul (approach)",
         "destination_raw": "GB FXT",
-        "destination": "Felixstowe"
+        "destination": "Felixstowe",
+        "place": null
       },
       {
         "name": "Dunlin",
@@ -716,7 +756,8 @@
         "length_m": 275,
         "area": "Nieuwe Waterweg",
         "destination_raw": "NL RTM",
-        "destination": "Rotterdam"
+        "destination": "Rotterdam",
+        "place": null
       },
       {
         "name": "Gael Star",
@@ -730,8 +771,10 @@
         "length_m": 290,
         "area": "Nieuwe Waterweg",
         "destination_raw": "NL RTM",
-        "destination": "Rotterdam"
+        "destination": "Rotterdam",
+        "place": null
       }
-    ]
+    ],
+    "expected": null
   }
 }

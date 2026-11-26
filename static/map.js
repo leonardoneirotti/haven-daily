@@ -630,15 +630,113 @@
     return html;
   }
 
-  var shipLayer = L.layerGroup().addTo(map);
+  // The ship layer (#156, the `ships` switch or a sample preview; owner's change on PR #157): every
+  // ship at the opening view, as a simple hull coloured by its type and lighter than the news
+  // numbers, all on one canvas (light on a phone, also with 250 ships) in a pane of its own under
+  // Leaflet's marker pane (600), so a number is never covered and its layout never looks at a ship.
+  // A ship under a number fades. Without the layer view, ships are drawn one by one as before.
+  var layerView = data.ship_view === "layer";
+  if (layerView) map.createPane("ships").style.zIndex = 550;
+  var shipCanvas = layerView ? L.canvas({ pane: "ships", padding: 0.1 }) : null;
+  // Pixel length at least: the old view's 26 px (19 px zoomed out, below z10.5) x 1.5; a phone a little less.
+  var SHIP_LAPTOP_NEAR = 39, SHIP_LAPTOP_FAR = 28, SHIP_PHONE_NEAR = 32, SHIP_PHONE_FAR = 24;
+  var SHIP_FILL_OPACITY = 0.6; // the numbers are solid: a ship never competes with them
+  var phoneShips = window.matchMedia && window.matchMedia("(max-width: 40rem)").matches;
+  var hullPath = layerView && window.Path2D ? new Path2D(shapes.hull) : null;
+  var shipColours = null;
+  function shipColour(type) {
+    shipColours = shipColours || { container: token("--ship-container"), tanker: token("--ship-tanker"),
+      bulk: token("--ship-bulk"), cargo: token("--ship-cargo") };
+    return shipColours[type] || shipColours.cargo;
+  }
+  // One ship on the canvas: the hull of spec 8.4 (24 units, bow up), turned to its heading and scaled
+  // to its length in pixels (2 x the marker's radius). Leaflet's canvas renderer draws it, finds it
+  // under the pointer (within the radius) and opens its popup. It overrides Leaflet's internal
+  // _updatePath and reads the renderer's _drawing and _ctx: guarded by tests/test_leaflet_internals.py
+  // (decision 6, spec 8.5).
+  var ShipMark = L.CircleMarker.extend({
+    _updatePath: function () {
+      var r = this._renderer;
+      if (!r._drawing || !hullPath) return; // a ship off the view is clipped by the canvas
+      var ctx = r._ctx, p = this._point, o = this.options, k = (this._radius * 2) / 24;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(((o.heading || 0) * Math.PI) / 180);
+      ctx.scale(k, k);
+      ctx.globalAlpha = o.fillOpacity;
+      ctx.fillStyle = o.fillColor;
+      ctx.fill(hullPath);
+      ctx.globalAlpha = o.opacity;
+      ctx.lineWidth = o.weight / k;
+      ctx.strokeStyle = o.color;
+      ctx.stroke(hullPath);
+      ctx.restore();
+    },
+  });
+  function shipLength(ship) {
+    var near = map.getZoom() >= 10.5;
+    var least = phoneShips ? (near ? SHIP_PHONE_NEAR : SHIP_PHONE_FAR) : (near ? SHIP_LAPTOP_NEAR : SHIP_LAPTOP_FAR);
+    return Math.max(least, (ship.length_m || 200) * worldPerMetre * map.getZoomScale(map.getZoom(), 0));
+  }
+  var shipLayer = L.layerGroup().addTo(map), shipKind = "all";
   var ships = (data.ships || []).map(function (ship) {
-    var marker = L.marker([ship.lat, ship.lon], {
-      icon: shipIcon(ship),
-      title: ship.name + ", " + ship.type_label + ", " + ship.status_label,
-      riseOnHover: true,
-    }).bindPopup(shipPopup(ship), { className: "chart-popup", maxWidth: 280, offset: [0, -6] });
+    var marker;
+    if (layerView) {
+      marker = new ShipMark([ship.lat, ship.lon], { renderer: shipCanvas, pane: "ships", radius: shipLength(ship) / 2,
+        heading: ship.heading, color: shipColour(ship.type), fillColor: shipColour(ship.type), weight: 1 });
+    } else {
+      marker = L.marker([ship.lat, ship.lon], { icon: shipIcon(ship),
+        title: ship.name + ", " + ship.type_label + ", " + ship.status_label, riseOnHover: true });
+    }
+    marker.bindPopup(shipPopup(ship), { className: "chart-popup", maxWidth: 280, offset: [0, -6] });
     marker.addTo(shipLayer);
-    return { ship: ship, marker: marker };
+    return { ship: ship, marker: marker, hot: false, covered: false };
+  });
+
+  // How each ship is drawn in the layer view: lighter when it isn't the focus, hollow at anchor,
+  // stronger when it belongs to the selected item, faded under a number.
+  function styleShip(s) {
+    var focused = el.classList.contains("is-focused"), fill = s.ship.status === "anchored" ? 0.08 : SHIP_FILL_OPACITY;
+    var line = 0.85;
+    if (s.hot) { fill = s.ship.status === "anchored" ? 0.2 : 0.9; line = 1; }
+    else if (focused) { fill *= 0.35; line *= 0.35; }
+    if (s.covered) { fill *= 0.2; line *= 0.2; }
+    s.marker.setStyle({ fillOpacity: fill, opacity: line, weight: s.hot ? 1.6 : 1 });
+  }
+  function showShipView() {
+    if (!layerView) return;
+    ships.forEach(function (s) {
+      var show = shipKind === "all" || s.ship.type === shipKind;
+      if (show && !shipLayer.hasLayer(s.marker)) s.marker.addTo(shipLayer);
+      if (!show && shipLayer.hasLayer(s.marker)) shipLayer.removeLayer(s.marker);
+      if (show) styleShip(s);
+    });
+  }
+  // A ship under a number, or within 4 px of one, fades (pins.js coveredBoxes): the numbers stay the
+  // clearest thing on the chart. The chart says how many ships still sit over a number (always 0;
+  // tools/check_map_pins.py --ships reads it).
+  function fadeCoveredShips() {
+    if (!layerView) return;
+    var frame = el.getBoundingClientRect();
+    var shown = ships.filter(function (s) { return shipLayer.hasLayer(s.marker); });
+    var boxes = shown.map(function (s) {
+      var p = map.latLngToContainerPoint(s.marker.getLatLng()), r = s.marker.getRadius();
+      return { left: frame.left + p.x - r, right: frame.left + p.x + r, top: frame.top + p.y - r, bottom: frame.top + p.y + r };
+    });
+    var numbers = Array.prototype.map.call(el.querySelectorAll(".leaflet-marker-pane .num"), function (n) {
+      return n.getBoundingClientRect();
+    });
+    var covered = pinGeometry.coveredBoxes(boxes, numbers, MARKER_GAP);
+    shown.forEach(function (s, i) {
+      var now = covered.indexOf(i) >= 0;
+      if (now !== s.covered) { s.covered = now; styleShip(s); }
+    });
+    var over = shown.filter(function (s, i) { return covered.indexOf(i) >= 0 && !s.covered; }).length;
+    el.setAttribute("data-ships-over-numbers", String(over));
+  }
+  map.on("zoomend", function () {
+    if (!layerView) return;
+    ships.forEach(function (s) { s.marker.setRadius(shipLength(s.ship) / 2); });
   });
 
   // ---------- Numbered items ----------
@@ -822,6 +920,7 @@
   function showCallouts(remeasure) {
     var started = performance.now();
     try { placeCallouts(remeasure); } finally { timing("markers", started); }
+    fadeCoveredShips(); // the numbers moved: a ship that is now under one fades (#156)
   }
   function placeCallouts(remeasure) {
     if (!ranks.length) return;
@@ -901,7 +1000,8 @@
 
   function clearFocus() {
     el.classList.remove("is-focused");
-    ships.forEach(function (s) { markerEl(s.marker).classList.remove("is-hot"); });
+    ships.forEach(function (s) { s.hot = false; markerEl(s.marker).classList.remove("is-hot"); });
+    showShipView();
     activeRank = null;
     markCallouts();
     var active = document.querySelectorAll(".item.is-active, .panel-item.is-active");
@@ -1007,8 +1107,10 @@
     var linked = ships.filter(function (s) { return s.ship.news_item === rank; });
     linked.forEach(function (s) {
       points.push([s.ship.lat, s.ship.lon]);
+      s.hot = true;
       markerEl(s.marker).classList.add("is-hot");
     });
+    showShipView();
     var detail = linked.length ? " · " + linked.length + " ships at this terminal" : "";
     showFocus(
       '<span class="num num-' + callout.data.severity + '">' + rank + "</span>" +
@@ -1142,7 +1244,8 @@
     if (!group.length) return;
     clearFocus();
     el.classList.add("is-focused");
-    group.forEach(function (s) { markerEl(s.marker).classList.add("is-hot"); });
+    group.forEach(function (s) { s.hot = true; markerEl(s.marker).classList.add("is-hot"); });
+    showShipView();
     var words = { anchored: "at anchor", underway: "under way" }[status];
     showFocus("<span><strong>" + group.length + " ships " + words + "</strong></span>", group.length + " ships " + words);
     revealChart();
@@ -1172,7 +1275,9 @@
 
   // ---------- Ship filter ----------
   function filterShips(kind) {
-    ships.forEach(function (s) {
+    shipKind = kind;
+    if (layerView) showShipView();
+    else ships.forEach(function (s) {
       var show = kind === "all" || s.ship.type === kind;
       if (show && !shipLayer.hasLayer(s.marker)) s.marker.addTo(shipLayer);
       if (!show && shipLayer.hasLayer(s.marker)) shipLayer.removeLayer(s.marker);
@@ -1333,6 +1438,7 @@
   updateScale();
 
   // A link to #item-2 opens with the chart already on item 2.
+  showShipView(); // the ship layer's first styling, at the opening view (#156)
   var linked = /^#item-(\d+)$/.exec(location.hash);
   if (linked) selectItem(Number(linked[1]), { quiet: true });
 })();
