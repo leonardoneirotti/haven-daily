@@ -255,6 +255,8 @@ def _shown(report: _Report, role: str, today: date, names: dict) -> dict:
     record = report.record
     return {
         "headline": record.get("headline"),
+        "headline_en": record.get("headline_en"),  # the English title of a Dutch item (#153)
+        "language": record.get("language"),
         "url": record.get("url"),
         "source": names.get(record.get("source"), record.get("source")),
         "published": record.get("published"),

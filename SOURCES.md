@@ -26,7 +26,7 @@ Tested from a desktop, not from GitHub Actions IPs. Some sites may still block t
 | Source | URL | Notes |
 |---|---|---|
 | NL Times | https://nltimes.nl/tags/port-rotterdam | Blocks AI crawlers. Use the port tag page (HTML), not the site-wide feed `rssfeed2`, which keeps only ~10 items. **Paused for launch** (#138): HTTP 403 from GitHub Actions every morning; `enabled = false` in `config/sources.toml`. |
-| Nieuwsblad Transport | https://www.nt.nl/havens/feed/ · https://www.nt.nl/tag/rotterdam/feed/ | Paywalled, blocks AI crawlers, `ai-train=no`. Ignore the body text in the feed. **Paused for launch** (#138): HTTP 403 from GitHub Actions every morning; `enabled = false` in `config/sources.toml`. |
+| Nieuwsblad Transport | https://www.nt.nl/havens/feed/ · https://www.nt.nl/tag/rotterdam/feed/ | Paywalled, blocks AI crawlers, `ai-train=no`. Ignore the body text in the feed. **Not read or shown while it is Dutch without summary permission (#153).** **Paused for launch** (#138): HTTP 403 from GitHub Actions every morning; `enabled = false` in `config/sources.toml`. |
 | PortsEurope | https://www.portseurope.com/category/rotterdam/feed/ | Subscription site, blocks AI crawlers. |
 | The Loadstar | https://theloadstar.com/feed/ | Main feed only (robots disallows tag/category pages). Terms allow RSS for links back. |
 | Kuehne+Nagel SeaNews | https://mykn.kuehne-nagel.com/news | HTML. The weekly port update only. Terms (https://www.seaexplorer.com/legal-notice, read by the owner 15 Nov 2026): a limited, non-transferable right to use the content as-is only. Headline-only until written permission (#98). |

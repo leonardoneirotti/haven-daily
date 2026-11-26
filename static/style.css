@@ -904,15 +904,6 @@ html.js .topbar {
   display: block;
 }
 
-/* An English headline the AI wrote for a Dutch item (#134): said right under it, always. */
-.panel-translated {
-  display: block;
-  margin-top: 0.125rem;
-  color: var(--ink-2);
-  font-size: 0.8125rem;
-  line-height: 1.4;
-}
-
 .panel-quiet {
   flex: 1;
   padding: 1.25rem;
@@ -1492,7 +1483,8 @@ html.chart-expanded {
   line-height: 1.25;
 }
 
-.chart-card-original {
+/* A Dutch item's source, under its English title (#153). */
+.chart-card-credit {
   margin-top: 0.25rem;
   color: var(--ink-2);
   font-size: 0.8125rem;
@@ -2222,8 +2214,8 @@ html.chart-expanded {
   max-width: var(--measure);
 }
 
-/* Under an English headline the AI wrote: who translated it, and the original (#134). */
-.item-original {
+/* A Dutch item's source, under its English title (#153): "Source: RTV Rijnmond (in Dutch)". */
+.item-credit {
   max-width: var(--measure);
   margin-top: 0.25rem;
   color: var(--ink-2);

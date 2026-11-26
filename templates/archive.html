@@ -26,7 +26,7 @@
             <span class="day-edition">No. {{ "%03d" % brief.edition }}</span>
           </span>
           {{ m.severity_strip(brief) }}
-          <span class="day-top{% if not items %} is-quiet{% endif %}">{% if items %}{{ items[0].headline }}{% else %}Nothing significant{% endif %}</span>
+          <span class="day-top{% if not items %} is-quiet{% endif %}">{% if items %}{{ items[0].shown_headline }}{% else %}Nothing significant{% endif %}</span>
           <span class="day-status">{{ m.status_marks(brief) }}
           {#- Ships: nothing in v1 (not collected yet); from v2 the count, or "No ship data" (#84). #}
           {%- if brief.ships %}<span class="day-ships">{{ brief.ships.count }} ships</span>{% elif ais_snapshot_built %}<span class="day-ships">No ship data</span>{% endif %}</span>

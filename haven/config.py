@@ -20,7 +20,7 @@ VERDICTS = ("use", "headline-only", "drop")
 ACCESS_TYPES = ("rss", "html")
 
 _SOURCE_FIELDS = {"id", "name", "verdict", "urls", "access", "language", "auto_keep", "note", "why", "home",
-                  "permission", "english_headline", "enabled"}
+                  "permission", "enabled"}
 _PERMISSION_FIELDS = ("file", "granted", "max_sentences", "impact")
 _PERMISSION_FILE = re.compile(r"^docs/permissions/[\w.-]+\.md$")
 _LANGUAGE = re.compile(r"^[a-z]{2}$")
@@ -70,8 +70,6 @@ class Source:
     why: str | None = None  # one public line on the Method page: why it is headline-only or dropped (#24)
     home: str | None = None  # the source's normal public page, linked from its name on the Method page (PR #76)
     permission: Permission | None = None  # written permission that lifts a headline-only source (#107)
-    # The AI writes an English headline for its Dutch items (#134). Only for a source it summarises.
-    english_headline: bool = False
     # false = paused: kept in the config with its verdict and URLs, but not read (#138)
     enabled: bool = True
 
@@ -83,9 +81,16 @@ class Source:
         return self.verdict
 
     @property
+    def dutch_without_permission(self) -> bool:
+        """A headline-only source in another language than English (Nieuwsblad Transport): nothing of it
+        is shown, because a title on the site is always English and only a summary gives Haven Daily
+        something to write one from (#153, owner 26 Nov 2026). Written permission lifts it."""
+        return self.effective_verdict == "headline-only" and (self.language or "en") != "en"
+
+    @property
     def fetched(self) -> bool:
-        """Dropped and paused sources are listed for the record but never fetched."""
-        return self.verdict != "drop" and self.enabled
+        """Dropped, paused and Dutch headline-only sources are listed for the record but never fetched."""
+        return self.verdict != "drop" and self.enabled and not self.dutch_without_permission
 
 
 @dataclass(frozen=True)
@@ -434,12 +439,6 @@ def _check_source(file: str, number: int, entry: dict) -> Source:
             fail("a permission only lifts a headline-only source (its own verdict stays headline-only)")
         permission = _check_permission(entry["permission"], fail)
 
-    english_headline = entry.get("english_headline", False)
-    if not isinstance(english_headline, bool):
-        fail("'english_headline' must be true or false")
-    if english_headline and (verdict != "use" and not (verdict == "headline-only" and permission is not None)):
-        fail("'english_headline' is only for a source that is summarised (verdict 'use', or written permission)")
-
     enabled = entry.get("enabled", True)
     if not isinstance(enabled, bool):
         fail("'enabled' must be true or false")
@@ -456,7 +455,6 @@ def _check_source(file: str, number: int, entry: dict) -> Source:
         why=why,
         home=home,
         permission=permission,
-        english_headline=english_headline,
         enabled=enabled,
     )
 

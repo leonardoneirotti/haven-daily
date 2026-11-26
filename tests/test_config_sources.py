@@ -100,7 +100,7 @@ def test_dropped_source_needs_no_url_and_is_never_fetched(tmp_path):
     sources = load_sources(write(tmp_path, GOOD))
     nos = sources[2]
     assert nos.urls == () and nos.access is None and nos.language is None
-    assert [s.id for s in sources if s.fetched] == ["ect-news", "nieuwsblad-transport"]
+    assert [s.id for s in sources if s.fetched] == ["ect-news"]  # a Dutch headline-only source is not read (#153)
 
 
 # --- bad files: one specific error each ----------------------------------------------

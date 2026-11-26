@@ -240,6 +240,8 @@ def test_deciding_item_details():
     result = flag((ago(4), [old]))
     assert result.items == [{
         "headline": "Dockers call strike at Maasvlakte",
+        "headline_en": None,  # #153: the English title of a Dutch item
+        "language": "en",
         "url": old["url"],
         "source": "RTV Rijnmond",
         "published": "2026-10-29T17:20:00+01:00",

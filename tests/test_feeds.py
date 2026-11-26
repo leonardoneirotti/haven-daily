@@ -152,10 +152,11 @@ def test_headline_only_item_carries_no_text_at_all():
     extra = f"<description>{SECRET_SNIPPET}</description><content:encoded><![CDATA[<p>{SECRET_SNIPPET}</p>]]></content:encoded>"
     fetcher, _ = fetcher_for({FEED: xml(rss(entry(extra=extra)))})
 
-    [item] = collect_feed(source(verdict="headline-only", language="nl"), fetcher).items
+    # English: a Dutch headline-only source isn't read at all since #153.
+    [item] = collect_feed(source(verdict="headline-only", language="en"), fetcher).items
 
     assert item.access == "headline-only"
-    assert item.language == "nl"
+    assert item.language == "en"
     assert item.snippet is None
     assert SECRET_SNIPPET not in repr(item)
     assert SECRET_SNIPPET not in json.dumps(item.record())
@@ -191,6 +192,8 @@ def test_use_source_that_opts_out_of_ai_becomes_headline_only_with_a_note():
 
 # Paused sources (#138) are switched on here, so their feed code stays tested.
 RSS_SOURCES = [replace(s, enabled=True) for s in load_sources() if s.verdict != "drop" and s.access == "rss"]
+# Read, once unpaused: not a Dutch headline-only source (#153, Nieuwsblad Transport).
+READ_RSS_SOURCES = [s for s in RSS_SOURCES if s.fetched]
 
 
 def test_the_five_rss_sources_of_issue_9_are_configured():
@@ -203,7 +206,7 @@ def test_the_five_rss_sources_of_issue_9_are_configured():
     }
 
 
-@pytest.mark.parametrize("configured", RSS_SOURCES, ids=lambda s: s.id)
+@pytest.mark.parametrize("configured", READ_RSS_SOURCES, ids=lambda s: s.id)
 def test_each_configured_feed_maps_with_the_right_access_and_language(configured):
     body = rss(entry(link="https://example.org/a/1", extra=f"<description>{SECRET_SNIPPET}</description>"))
     fetcher, _ = fetcher_for({url: xml(body) for url in configured.urls})

@@ -27,7 +27,12 @@
     }
   },
   "built_at": "2026-11-25T18:55:05+01:00",
-  "corrections": [],
+  "corrections": [
+    {
+      "at": "2026-11-26T06:04:31+01:00",
+      "note": "Dutch titles are no longer shown (#153): the RTV Rijnmond items got a short English title, written from Haven Daily's own summary when this correction was made (no AI call); the Dutch headline stays stored and the link still goes to the original article."
+    }
+  ],
   "date": "2026-11-25",
   "items": [
     {
@@ -190,6 +195,7 @@
         "A15"
       ],
       "headline": "Ongeluk in tunnel en vrachtwagen met pech vóór tunnel zorgen voor file",
+      "headline_en": "Accident and broken-down truck slow A15 traffic near the Noordtunnel",
       "impact": "Trucks collecting or delivering cargo on the A15 towards Ridderkerk could have faced delays of up to an hour. The item suggests the disruption was temporary, so later effects on pickups may be limited.",
       "language": "nl",
       "map": {
@@ -220,6 +226,7 @@
         "Truck pickups"
       ],
       "headline": "Opnieuw hoge vrachtwagen vast voor Drechttunnel: lange file tijdens ochtendspits",
+      "headline_en": "Over-height vehicle stuck before the Drechttunnel causes a long A16 jam",
       "impact": "Trucks heading for Rotterdam via the A16 could face delays on the approach. Planners may want to allow extra time for pickups and deliveries, though the item gives no information on how long the jam lasts.",
       "language": "nl",
       "map": null,
@@ -245,6 +252,7 @@
         "Truck pickups"
       ],
       "headline": "Petitie tegen tolchaos op A24 en hoge boetes: 'Je kan niet betalen achter het stuur'",
+      "headline_en": "Petition over confusion about paying the A24 tunnel toll",
       "impact": "Truck drivers and carriers using the tunnel could receive reminders or fines if toll payment is missed afterwards, which may add admin work and costs. The item does not say how freight is affected specifically.",
       "language": "nl",
       "map": null,
@@ -270,6 +278,7 @@
         "Truck pickups"
       ],
       "headline": "Ravage na botsing en vrachtwagen met pech: veel files door ongelukken op A13, A16 en A29",
+      "headline_en": "Crash and broken-down truck cause heavy congestion on the A13, A16 and A29",
       "impact": "Trucks heading to or from Rotterdam via the A13, A16 or A29 could face delays. However, the report dates from the morning of 24 November and does not say how long the disruption lasted, so planners may want to check current traffic.",
       "language": "nl",
       "map": null,

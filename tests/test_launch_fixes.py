@@ -16,6 +16,7 @@
 Headlines are invented.
 """
 
+import json
 import re
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -290,6 +291,7 @@ def test_the_headline_only_lines_are_short():
 
 def rijnmond(**fields):
     return news("medium", "Invented Rijnmond story", source="RTV Rijnmond", language="nl",
+                headline_en="Invented Rijnmond title",  # shown only with its English title (#153)
                 permission={"max_sentences": 2, "impact": True}, **fields)
 
 
@@ -389,8 +391,10 @@ def test_the_summariser_keeps_the_road_when_nothing_more_specific_is_named():
 def test_the_23_nov_brief_is_unchanged():
     brief = (ROOT / "data" / "briefs" / "2026-11-23.json").read_text(encoding="utf-8")
     road = [line for line in brief.splitlines() if "wegen gaan deze week dicht" in line]
-    assert road  # the item is still there, and the file has no correction about it
-    assert '"corrections": []' in brief
+    assert road  # the item is still there, and no correction about its place
+    # Its one correction since is #153's English titles (owner's OK, 26 Nov 2026).
+    corrections = json.loads(brief)["corrections"]
+    assert len(corrections) == 1 and "(#153)" in corrections[0]["note"]
 
 
 # --- 9. The one-liner is not on the page; the description for link previews stays ------------------

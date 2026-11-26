@@ -131,8 +131,8 @@
       </span>
     </p>
     <h3 class="item-title" id="item-{{ rank }}-title">{% if item.url %}<a href="{{ item.url }}">{{ item.shown_headline }}</a>{% else %}{{ item.shown_headline }}{% endif %}</h3>
-    {# An English headline for a Dutch item (#134): the original below it, smaller, and who translated it. #}
-    {% if item.headline_en %}<p class="item-original">Headline translated by AI · original ({{ item.language_name }}): <span lang="{{ item.language }}">{{ item.headline }}</span></p>{% endif %}
+    {# A Dutch item (#153): its English title is Haven Daily's, so the source is credited below it. #}
+    {% if item.credit %}<p class="item-credit">{{ item.credit }}</p>{% endif %}
     {% if item.headline_note %}
     {# The short card (S5, #82): no summary, so nothing to interpret either. One grey line says
        why (headline-only source, article not read, or unrated: the AI failed, spec §5.6). #}
