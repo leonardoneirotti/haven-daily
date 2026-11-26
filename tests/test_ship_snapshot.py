@@ -7,10 +7,12 @@ the `ships` switch, and count badges plus single ships on the chart.
 - **The switch** `ships` in config/site.toml: off on the live site; on is refused without a recorded
   written permission. Off: both sites (real and /sample/) render exactly as before, and a real
   brief's ships are ignored.
-- **The chart** (switch on, or a local preview of the sample site): at the opening view one count
-  badge per place, at the centre of its ships; single ships from zoom 12 or for a selected item.
-  Ships and badges have their own pane under the news numbers, which never move for them; a badge
-  that would cover a number hides.
+- **The chart** (switch on, or a local preview of the sample site; owner's change on PR #157):
+  **every ship at the opening view**, no zoom needed, about 1.5x the old minimum size (a little
+  less on a phone), as simple hull shapes coloured by type and lighter than the news numbers. They
+  are drawn on one canvas in their own pane under the numbers, which never move for them; a ship
+  under a number fades, so no ship hides a number. No count badges on the map: the counts per
+  terminal go in the Ships dial (PR 2, `ships.by_place`).
 
 All ships here are invented.
 """
@@ -184,7 +186,7 @@ def test_off_the_map_data_has_nothing_new(tmp_path):
     assert all("place" not in s for s in data["ships"])     # the ship list as before
 
 
-# --- the preview (and later the switch on): badges and single ships ----------------------------------
+# --- the preview (and later the switch on): every ship, on its own layer ------------------------------
 
 
 def preview_html(tmp_path, brief):
@@ -195,13 +197,20 @@ def preview_html(tmp_path, brief):
     return (tmp_path / "site" / "days" / f"{brief['date']}.html").read_text(encoding="utf-8")
 
 
-def test_the_preview_adds_the_badges_and_each_ships_place(tmp_path):
+def test_the_preview_shows_every_ship_with_its_place_and_no_badges(tmp_path):
     data = map_data(preview_html(tmp_path, make_brief(sample=True, ships=snapshot(vessel(), vessel(name="B")))))
-    assert data["ship_view"] == "badges"
-    assert data["ship_zoom"] == 12
-    [badge] = data["ship_places"]
-    assert (badge["place"], badge["count"]) == ("ect-delta", 2)
-    assert all(s["place"] == "ect-delta" for s in data["ships"])
+    assert data["ship_view"] == "layer"
+    assert "ship_places" not in data and "ship_zoom" not in data     # no count badges, no zoom gate
+    assert [s["place"] for s in data["ships"]] == ["ect-delta", "ect-delta"]
+
+
+def test_the_preview_legend_names_the_type_colours(tmp_path):
+    html = preview_html(tmp_path, make_brief(sample=True, ships=snapshot(vessel(), vessel(type="cargo", name="C"))))
+    legend = html[html.index('class="chart-legend"'):]
+    legend = legend[: legend.index("</div>")]
+    for kind in ("container", "cargo"):
+        assert f"ship-swatch ship-type-{kind}" in legend
+    assert "At a terminal in the news" not in legend
 
 
 def test_the_preview_is_only_for_the_sample_site(tmp_path):
@@ -219,37 +228,59 @@ def test_a_snapshot_that_breaks_the_format_shows_as_failed_not_half_drawn(tmp_pa
     assert map_data(html)["ships"] is None
 
 
-# --- the chart (static/map.js, static/pins.js) -------------------------------------------------------
+# --- the chart (static/map.js, static/pins.js, static/style.css) ---------------------------------------
+
+CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 
 
-def test_ships_have_their_own_pane_under_the_news_numbers():
+def test_ships_have_their_own_canvas_pane_under_the_news_numbers():
     pane = re.search(r'createPane\("ships"\)\.style\.zIndex = (\d+)', MAP_JS)
     assert pane and int(pane.group(1)) < 600                 # Leaflet's marker pane (the numbers) is 600
-    assert 'pane: "ships"' in MAP_JS
+    assert re.search(r'L\.canvas\(\{ pane: "ships"', MAP_JS)   # one canvas for all ships: light on a phone
 
 
-def test_the_badge_view_only_runs_when_the_data_asks_for_it():
-    assert 'data.ship_view === "badges"' in MAP_JS          # otherwise the ships are drawn as before
+def test_the_layer_view_only_runs_when_the_data_asks_for_it():
+    assert 'data.ship_view === "layer"' in MAP_JS           # otherwise the ships are drawn as before
 
 
-def test_single_ships_from_zoom_12_or_for_a_selected_item():
-    assert "data.ship_zoom" in MAP_JS
-    assert re.search(r"function showShipView\(", MAP_JS)
+def test_every_ship_is_shown_at_the_opening_view():
+    assert "ship_zoom" not in MAP_JS and "ship-badge" not in MAP_JS and "ship-badge" not in CSS
+    assert "L.CircleMarker.extend" in MAP_JS                 # a simple hull on the canvas, not a DOM marker
+
+
+def test_ships_are_about_one_and_a_half_times_the_old_size_and_a_little_less_on_a_phone():
+    sizes = dict(re.findall(r"SHIP_(LAPTOP_NEAR|LAPTOP_FAR|PHONE_NEAR|PHONE_FAR) = (\d+)", MAP_JS))
+    assert sizes == {"LAPTOP_NEAR": "39", "LAPTOP_FAR": "28", "PHONE_NEAR": "32", "PHONE_FAR": "24"}  # old: 26 / 19
+
+
+def test_ships_are_coloured_by_type_from_the_stylesheet_and_lighter_than_the_numbers():
+    for kind in ("container", "tanker", "bulk", "cargo"):
+        assert f"--ship-{kind}:" in CSS
+        assert f'token("--ship-{kind}")' in MAP_JS
+    opacity = re.search(r"SHIP_FILL_OPACITY = ([\d.]+)", MAP_JS)
+    assert opacity and float(opacity.group(1)) <= 0.7     # the numbers are solid
+
+
+def test_a_ship_under_a_number_fades():
+    assert "pinGeometry.coveredBoxes(" in MAP_JS
+    assert "data-ships-over-numbers" in MAP_JS             # 0 when every number is clear (the pin check reads it)
 
 
 def test_the_number_layout_never_looks_at_ships():
     plan = MAP_JS[MAP_JS.index("function planMarkers("):]
-    plan = plan[: plan.index("\n  }\n")]
+    plan = plan[: plan.index("
+  }
+")]
     assert "ship" not in plan.lower()
 
 
 @pytest.mark.skipif(NODE is None, reason="Node is not installed")
-def test_a_badge_that_would_cover_a_number_hides():
+def test_the_boxes_that_would_cover_a_number_are_found():
     numbers = [{"left": 100, "top": 100, "right": 124, "bottom": 124}]
-    badges = [{"left": 110, "top": 110, "right": 170, "bottom": 130},   # covers the number
-              {"left": 300, "top": 300, "right": 360, "bottom": 320},   # clear
-              {"left": 126, "top": 100, "right": 180, "bottom": 120}]   # 2 px gap: too close
-    assert js(f"P.coveredBadges({json.dumps(badges)}, {json.dumps(numbers)}, 4)") == [0, 2]
+    ships = [{"left": 110, "top": 110, "right": 170, "bottom": 130},    # under the number
+             {"left": 300, "top": 300, "right": 360, "bottom": 320},    # clear
+             {"left": 126, "top": 100, "right": 180, "bottom": 120}]    # 2 px gap: too close
+    assert js(f"P.coveredBoxes({json.dumps(ships)}, {json.dumps(numbers)}, 4)") == [0, 2]
 
 
 # --- the checks in Actions -----------------------------------------------------------------------------
@@ -260,12 +291,13 @@ SPEED_YML = (ROOT / ".github" / "workflows" / "speed.yml").read_text(encoding="u
 
 def test_the_pin_check_has_a_ships_on_run():
     assert '"--ships"' in PIN_CHECK
-    assert "badge-over-number" in PIN_CHECK
+    assert "ship-over-number" in PIN_CHECK and "data-ships-over-numbers" in PIN_CHECK
+    assert "badge" not in PIN_CHECK
     assert "check_map_pins.py --ships" in SPEED_YML
 
 
-def test_the_speed_run_measures_the_badge_view_and_a_busy_day():
+def test_the_speed_run_measures_the_ship_layer_and_a_busy_day():
     assert "--preview-ships" in SPEED_YML
     assert "make_busy_ships.py" in SPEED_YML
     busy = (ROOT / "tools" / "make_busy_ships.py").read_text(encoding="utf-8")
-    assert "250" in busy and "data/sample" not in busy.replace("data/sample/briefs\" (read only)", "")
+    assert "COUNT = 250" in busy
