@@ -255,3 +255,39 @@ def test_the_browser_check_clicks_a_second_number_with_a_card_open():
 def test_the_spec_records_the_fix():
     spec = (ROOT / "docs" / "SPEC.md").read_text(encoding="utf-8")
     assert re.search(r"#161[^\n]*same zoom", spec)
+
+
+# --- part 4: the landing side is chosen before the glide (#161, owner, 27 Nov 2026) -----------------
+# On a phone (25 Nov, item 4's card open, then 5) number 5's label switched from right to left at
+# landing, because 4 is next to it there (#148), moving the number 48 px as the chart stopped. The
+# owner: choose the landing side before the glide, so any shift happens at the start, not at the end.
+
+
+def test_the_glide_shows_the_markers_planned_for_where_it_lands_before_it_moves():
+    glide_src = map_function("glideTo")
+    plan = glide_src.index("showCallouts(false, { center: center, zoom: zoom })")
+    assert plan < glide_src.index("map._moveStart(")
+
+
+def test_planning_reads_every_place_through_one_point_function():
+    # pointOf: where a place is on the chart now, or once the chart stands at the planned view.
+    for name in ("placeMarker", "planMarkers"):
+        body = map_function(name)
+        assert "map.latLngToContainerPoint(" not in body, name
+        assert "pointOf(" in body, name
+    point = map_function("pointOf")
+    assert "planView" in point and "map.latLngToContainerPoint(" in point
+    # Leaflet's own sums after a move: the projected place rounded, less the rounded pixel origin.
+    assert "getPosition(map.getPane(\"mapPane\"))" in point and ".round()" in point
+
+
+def test_placing_the_markers_can_plan_for_another_view_and_then_forgets_it():
+    place = map_function("placeCallouts")
+    assert "planView = view" in place
+    assert "planView = null" in place
+
+
+def test_the_browser_check_tells_a_shift_at_the_start_from_a_jump_at_the_end():
+    check = (ROOT / "tools" / "check_map_input.mjs").read_text(encoding="utf-8")
+    assert "at the start" in check
+    assert "changes side at landing" in check and "keeps its side at landing" in check

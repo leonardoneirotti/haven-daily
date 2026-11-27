@@ -208,26 +208,36 @@ async function goFull(t, press) {
 async function followNumber(t, rank, press) {
   const p = await centre(t, numberOf(rank));
   if (!p) return `no number ${rank} on the chart`;
+  // The number's place is read when the chart starts to move: a label that changes side for the
+  // landing does it then (owner, 27 Nov 2026), and that shift is reported on its own ("at the start").
   await t.ev(`(() => { const m = window.__map, sel = ${JSON.stringify(numberOf(rank))};
     const at = (b) => { const r = b.getBoundingClientRect(), c = m.getContainer().getBoundingClientRect();
       return [r.x + r.width / 2 - c.left, r.y + r.height / 2 - c.top]; };
-    const place = m.containerPointToLatLng(at(document.querySelector(sel)));
-    const f = window.__follow = { during: 0, after: 0, ended: false, t0: performance.now() };
+    const side = (b) => b.closest(".leaflet-marker-icon").classList.contains("callout-left") ? "left" : "right";
+    const before = at(document.querySelector(sel));
+    const f = window.__follow = { start: 0, during: 0, after: 0, place: null, ended: false, t0: performance.now(),
+      sideAtStart: null, sideAtEnd: null };
+    m.once("movestart", () => { const b = document.querySelector(sel); if (!b) return; const n = at(b);
+      f.place = m.containerPointToLatLng(n); f.start = Math.hypot(n[0] - before[0], n[1] - before[1]); f.sideAtStart = side(b); });
     m.once("moveend", () => { f.ended = true; });
     (function frame() {
       const b = document.querySelector(sel);
-      if (b) { const n = at(b), q = m.latLngToContainerPoint(place), off = Math.hypot(n[0] - q.x, n[1] - q.y);
-        if (f.ended) f.after = Math.max(f.after, off); else f.during = Math.max(f.during, off); }
+      if (b && f.place) { const n = at(b), q = m.latLngToContainerPoint(f.place), off = Math.hypot(n[0] - q.x, n[1] - q.y);
+        if (f.ended) f.after = Math.max(f.after, off); else f.during = Math.max(f.during, off);
+        f.sideAtEnd = side(b); }
       if (performance.now() - f.t0 < 2600) requestAnimationFrame(frame);
     })();
     return 1; })()`);
   await press(t, p);
   await sleep(2900);
   const r = await t.ev(`(() => { const c = document.querySelector(".chart-card .leaflet-popup-content-wrapper");
-    const m = document.getElementById("port-map").getBoundingClientRect(), b = c && c.getBoundingClientRect();
-    return { during: Math.round(__follow.during), after: Math.round(__follow.after), card: !!c,
+    const m = document.getElementById("port-map").getBoundingClientRect(), b = c && c.getBoundingClientRect(), f = __follow;
+    return { start: Math.round(f.start), during: Math.round(f.during), after: Math.round(f.after), moved: !!f.place,
+      sameSide: f.sideAtStart === f.sideAtEnd, card: !!c,
       inside: !!c && b.top >= m.top - 0.5 && b.bottom <= m.bottom + 0.5 && b.left >= m.left - 0.5 && b.right <= m.right + 0.5 }; })()`);
-  return `number off its place by ≤ ${r.during} px while the chart moves, ≤ ${r.after} px after; ` +
+  if (!r.moved) return "the chart didn't move";
+  return `number shifts ${r.start} px at the start; off its place by ≤ ${r.during} px while the chart moves, ` +
+    `≤ ${r.after} px after; label ${r.sameSide ? "keeps its side at landing" : "changes side at landing"}; ` +
     (r.card ? (r.inside ? "card inside the chart" : "card runs past the chart's edge") : "no card");
 }
 async function secondNumber(t, first, second) {
