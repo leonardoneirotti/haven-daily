@@ -2,7 +2,7 @@
 
 The text, news and status come first and the chart after them: the 238 KB basemap is
 loaded by map.js once the page has painted, so the page no longer waits for it.
-The High marker's ping plays three times and stops. The pages show no character that
+The map's numbers and ships are static: no ping (#159; it played three times since #104). The pages show no character that
 would pull in an extra font file, and the font files stay within a budget (preloading the
 fonts was tried and made the first text later; see below). Moving the chart does less work on every move.
 
@@ -96,22 +96,29 @@ def test_if_the_chart_fails_to_load_the_page_falls_back_to_the_text():
     assert re.search(r'classList\.remove\("has-map"\)', LOADER_JS)
 
 
-# ---------- 4. The ping plays three times, then stops ----------
+# ---------- 4. No animation on the map's numbers and markers (#159) ----------
+# The owner (27 Nov 2026): no looping or attention animation; the numbers and ships are static.
+# The High number's ring pinged three times since #104; now it is only the still ring it ended as.
+# Moves in reply to the pointer (a short scale on hover, a fade on select), the fly-to and the
+# pin card stay.
 
-def test_the_high_marker_ping_is_not_endless():
+
+def test_the_stylesheet_has_no_keyframe_animation():
+    assert "@keyframes" not in CSS
+    animations = re.findall(r"animation:\s*([^;]+);", CSS)
+    assert all(value.startswith("none") for value in animations), animations
+
+
+def test_the_high_number_keeps_a_still_ring():
     rule = re.search(r"\.callout-item\.sev-high \.num::after\s*\{([^}]*)\}", CSS).group(1)
-    animation = re.search(r"animation:\s*([^;]+);", rule).group(1)
-    assert "infinite" not in animation
-    assert re.search(r"\bping\b", animation) and re.search(r"\b3\b", animation), animation
+    assert "border:" in rule and "animation" not in rule
 
 
-def test_the_ping_does_not_start_again_when_markers_are_rebuilt():
-    # Markers are rebuilt after a move; once the three pings are over, they stay still.
-    assert re.search(r"\.ping-done \.callout-item\.sev-high \.num::after\s*\{[^}]*animation:\s*none", CSS)
-    assert "ping-done" in MAP_JS
+def test_map_js_no_longer_stops_a_ping():
+    assert "ping-done" not in MAP_JS and "ping-done" not in CSS
 
 
-def test_no_ping_with_reduced_motion():
+def test_reduced_motion_still_turns_every_animation_off():
     motion = CSS[CSS.index("@media (prefers-reduced-motion: reduce)"):]
     assert re.search(r"\*::after\s*\{[^}]*animation:\s*none !important", motion)
 
