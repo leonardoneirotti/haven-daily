@@ -199,7 +199,8 @@ const map = { _zoom: %(z0)s, _lastCenter: { lat: 0, lng: 0 },
   _moveEnd(t) { if (t) this.fire('zoomend'); return this.fire('moveend'); } };
 let now = 0; const frames = [];
 const ctx = { map, pinGeometry: pins.HavenPins, performance: { now: () => now },
-  L: { Util: { requestAnimFrame(f) { frames.push(f); return frames.length; } } } };
+  showCallouts() { events.push(['plan for the landing', 0]); },  // part 4: planned before the chart moves
+  L:{ Util: { requestAnimFrame(f) { frames.push(f); return frames.length; } } } };
 vm.runInNewContext(glideSrc + '; glideTo({ lat: 0, lng: %(dx)s / Math.pow(2, %(z0)s) }, %(z1)s);', ctx);
 for (let i = 0; frames.length && i < 500; i++) { now += 16; frames.shift()(); }
 console.log(JSON.stringify(events));
@@ -238,7 +239,9 @@ def test_a_glide_at_the_same_zoom_ends_as_leaflets_flyto_does():
     # zoomstart before and zoomend after, as Leaflet's own flyTo always sends them: the water, the
     # scale bar and the ships' sizes settle on zoomend.
     events = [e[0] for e in glide(11.8, 11.8, 300)]
-    assert events[:2] == ["zoomstart", "movestart"]
+    # The markers are planned for the landing before anything moves (part 4).
+    assert events[:3] == ["plan for the landing", "zoomstart", "movestart"]
+    assert events.count("plan for the landing") == 1
     assert events[-2:] == ["zoomend", "moveend"]
 
 

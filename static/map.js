@@ -848,9 +848,19 @@
     var size = map.getSize();
     return planChart || { left: panelCover(), top: 0, right: size.x, bottom: size.y };
   }
+  // Where a place is on the chart: now, or, while planView is set, once the chart stands at that view
+  // (a glide's landing, #161), with Leaflet's own sums after a move: the projected place rounded, less
+  // the pixel origin (rounded), plus the map pane's offset.
+  var planView = null;
+  function pointOf(lat, lon) {
+    if (!planView) return map.latLngToContainerPoint([lat, lon]);
+    var pane = L.DomUtil.getPosition(map.getPane("mapPane")) || L.point(0, 0);
+    var origin = map.project(planView.center, planView.zoom).subtract(map.getSize().divideBy(2)).add(pane).round();
+    return map.project([lat, lon], planView.zoom).round().subtract(origin).add(pane);
+  }
   function placeMarker(marker, forced) {
     var anchor = callouts[marker.ranks[0]].data;
-    var point = map.latLngToContainerPoint([anchor.lat, anchor.lon]);
+    var point = pointOf(anchor.lat, anchor.lon);
     var chart = freeChart();
     var left = chart.left + MARKER_GAP, right = chart.right - MARKER_GAP;
     var had = marker.ranks.length === 1 ? lastSide[marker.ranks[0]] : null;
@@ -903,7 +913,7 @@
         separated[key] = true;
         var a = callouts[pair[0].ranks[0]].data, b = callouts[pair[1].ranks[0]].data;
         var sides = pinGeometry.separateSides(
-          map.latLngToContainerPoint([a.lat, a.lon]), map.latLngToContainerPoint([b.lat, b.lon]),
+          pointOf(a.lat, a.lon), pointOf(b.lat, b.lon),
           sizeOf(pair[0].ranks, false), sizeOf(pair[1].ranks, false), [pair[0].side, pair[1].side],
           freeChart(), CLEAR_GAP, MARKER_GAP, rest.map(function (m) { return m.box; }));
         if (sides) {
@@ -917,15 +927,19 @@
   }
 
   var shownPlan = null;
-  function showCallouts(remeasure) {
+  // `view`: plan for that view instead of the chart's current one (a glide's landing, #161).
+  function showCallouts(remeasure, view) {
     var started = performance.now();
-    try { placeCallouts(remeasure); } finally { timing("markers", started); }
+    try { placeCallouts(remeasure, view); } finally { timing("markers", started); }
     fadeCoveredShips(); // the numbers moved: a ship that is now under one fades (#156)
   }
-  function placeCallouts(remeasure) {
+  function placeCallouts(remeasure, view) {
     if (!ranks.length) return;
     if (remeasure) sizes = {};
-    var plan = planMarkers().sort(function (a, b) { return a.ranks[0] - b.ranks[0]; }); // keyboard order: item 1 first
+    planView = view || null;
+    var plan;
+    try { plan = planMarkers(); } finally { planView = null; }
+    plan.sort(function (a, b) { return a.ranks[0] - b.ranks[0]; }); // keyboard order: item 1 first
     plan.forEach(function (m) { if (m.ranks.length === 1) lastSide[m.ranks[0]] = m.side; }); // kept next time (#148)
     var key = plan.map(function (m) {
       return m.ranks.join(",") + m.side + (m.rows ? " rows" : "") + " " + m.nudge.x + "," + m.nudge.y;
@@ -1046,6 +1060,10 @@
     var z0 = map.getZoom(), from = map.project(map.getCenter(), z0), to = map.project(center, z0);
     var duration = pinGeometry.glideDuration(from.distanceTo(to), zoom - z0);
     var start = performance.now();
+    // The markers as they will be at the landing, shown before the chart moves (owner, 27 Nov 2026,
+    // #161): a label that has to change side (#148) or a nudge at the edge changes now, not as the
+    // chart stops, and the landing's own plan then finds nothing to change.
+    showCallouts(false, { center: center, zoom: zoom });
     // Always a zoom movement, as Leaflet's own flyTo (#161): the numbers, the ships and the water
     // follow the chart on its "zoom" event, which _move sends only when the zoom changes. Between two
     // items at the same zoom they stood still while the chart moved, then jumped. So each step moves
