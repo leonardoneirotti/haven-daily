@@ -1045,16 +1045,26 @@
     map._stop();
     var z0 = map.getZoom(), from = map.project(map.getCenter(), z0), to = map.project(center, z0);
     var duration = pinGeometry.glideDuration(from.distanceTo(to), zoom - z0);
-    var zoomChanged = Math.abs(zoom - z0) > 1e-6, start = performance.now();
-    map._moveStart(zoomChanged, false);
+    var start = performance.now();
+    // Always a zoom movement, as Leaflet's own flyTo (#161): the numbers, the ships and the water
+    // follow the chart on its "zoom" event, which _move sends only when the zoom changes. Between two
+    // items at the same zoom they stood still while the chart moved, then jumped. So each step moves
+    // the chart without its events (_move's last argument), then sends "zoom" and "move" itself, in
+    // the order of a flyTo frame.
+    map._moveStart(true, false);
+    function step(at, z, data) {
+      map._move(at, z, data, true);
+      map.fire("zoom", data).fire("move", data);
+    }
     function frame() {
       var t = Math.min(1, (performance.now() - start) / duration);
       if (t < 1) {
         var e = pinGeometry.glideEase(t);
         map._flyToFrame = L.Util.requestAnimFrame(frame, map);
-        map._move(map.unproject(from.add(to.subtract(from).multiplyBy(e)), z0), z0 + (zoom - z0) * e, { flyTo: true });
+        step(map.unproject(from.add(to.subtract(from).multiplyBy(e)), z0), z0 + (zoom - z0) * e, { flyTo: true });
       } else {
-        map._move(center, zoom)._moveEnd(zoomChanged);
+        step(center, zoom);
+        map._moveEnd(true);
       }
     }
     frame();
