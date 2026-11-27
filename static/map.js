@@ -990,8 +990,6 @@
   // Measured once more when the fonts the markers use have arrived, not after every font (#104).
   if (document.fonts) document.fonts.ready.then(function () { showCallouts(true); });
 
-  // The High marker pings three times (style.css); after that, rebuilt markers stay still.
-  setTimeout(function () { el.classList.add("ping-done"); }, 3 * 2600);
 
   // ---------- Focus: items, groups of ships, one ship ----------
   function markerEl(marker) {
