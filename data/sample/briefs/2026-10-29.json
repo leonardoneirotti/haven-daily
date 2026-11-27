@@ -164,7 +164,7 @@
   "ships": {
     "source_id": "sample",
     "source_name": "Sample AIS data",
-    "kind": "positions",
+    "kind": "berths",
     "snapshot_start": "2026-10-29T06:28:00+01:00",
     "snapshot_end": "2026-10-29T06:40:00+01:00",
     "vessels": [
@@ -775,6 +775,28 @@
         "place": null
       }
     ],
-    "expected": null
+    "expected": [
+      {
+        "name": "Invented Meridian",
+        "type": "container",
+        "eta": "2026-10-29T11:30:00+01:00",
+        "place": "euromax",
+        "length_m": 366
+      },
+      {
+        "name": "Invented Northwind",
+        "type": "tanker",
+        "eta": "2026-10-29T16:45:00+01:00",
+        "place": "botlek",
+        "length_m": 183
+      },
+      {
+        "name": "Invented Corvina",
+        "type": "bulk",
+        "eta": "2026-10-30T04:10:00+01:00",
+        "place": "europoort",
+        "length_m": 229
+      }
+    ]
   }
 }

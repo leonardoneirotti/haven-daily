@@ -1246,10 +1246,25 @@
     el.classList.add("is-focused");
     group.forEach(function (s) { s.hot = true; markerEl(s.marker).classList.add("is-hot"); });
     showShipView();
-    var words = { anchored: "at anchor", underway: "under way" }[status];
+    var words = { moored: "at a berth", anchored: "at anchor", underway: "under way" }[status];
     showFocus("<span><strong>" + group.length + " ships " + words + "</strong></span>", group.length + " ships " + words);
     revealChart();
     flyTo(group.map(function (s) { return [s.ship.lat, s.ship.lon]; }), 12.5);
+    setHash("");
+  }
+
+  // The Ships dial's counts per place (#156): a place's ships, shown and flown to.
+  function showPlace(place, label) {
+    var group = ships.filter(function (s) { return s.ship.place === place; });
+    if (!group.length) return;
+    clearFocus();
+    el.classList.add("is-focused");
+    group.forEach(function (s) { s.hot = true; markerEl(s.marker).classList.add("is-hot"); });
+    showShipView();
+    var words = group.length + (group.length === 1 ? " ship at " : " ships at ") + label;
+    showFocus("<span><strong>" + escapeHtml(words) + "</strong></span>", words);
+    revealChart();
+    flyTo(group.map(function (s) { return [s.ship.lat, s.ship.lon]; }), 13);
     setHash("");
   }
 
@@ -1398,6 +1413,7 @@
       else if (action === "show-item") selectItem(Number(target.getAttribute("data-rank")), { fromChart: el.contains(target) });
       else if (action === "show-ships") showShips(target.getAttribute("data-status"));
       else if (action === "show-ship") showShip(target.getAttribute("data-ship"));
+      else if (action === "show-place") showPlace(target.getAttribute("data-place"), target.getAttribute("data-label"));
       else if (action === "overview") overview();
       return;
     }

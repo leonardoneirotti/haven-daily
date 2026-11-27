@@ -1416,6 +1416,12 @@ Culling: only shapes whose box (plus a margin) touches the canvas are traced; po
 - **Checked in the speed run** (`speed.yml`): the pin check runs a second time with the sample day's ships in the layer (`check_map_pins.py --ships`: hidden numbers unchanged, no `ship-over-number`). The speed measurement covers the layer, plus a busy invented day of 250 ships (`tools/make_busy_ships.py`), and the zoom step.
 - Without the layer view, ships are drawn one by one as before (the sample site today).
 
+**The Ships dial and the filter in the ship layer** (#156, PR 2; with the switch off, the sample site keeps the dial and filter it had):
+- **Dial:** the number of ships, with where the snapshot comes from ("Seagoing cargo ships, from AIS positions" or "from the port's berth list"); "N at a berth · N at anchor · N under way", each showing those ships on the chart; "N expected in the next 24 h" when the source gives arrivals (berth data only); then the **counts per place** (`render.ship_places`, from `ships.by_place`), grouped as **At terminals**, **At anchorages** and **Elsewhere in the port**, most ships first. Each count flies to that place's ships ("6 ships at ECT Delta" in the focus box); a place with a ship linked to a news item links that item. Last, the snapshot time and source. No level colour until two weeks of real data give a normal to compare with (owner's choice in the plan).
+- **Filter:** All, then every type present that day in the order Container, Tanker, Bulk, Cargo, with its count. A morning of AIS data therefore shows All / Cargo / Tanker (owner, #156).
+- **Ship list:** a Place column (the place's name, or the ship's area without one) and, with berth data, a table of the ships expected in the next 24 h (name, type, expected time, place, length).
+- **Sample data:** 29 Oct is invented berth data with three invented expected arrivals; 28 Oct stays invented AIS positions.
+
 Top-down hulls, bow up, 24 units long × 6 wide (shapes defined **once in `render.py`**, used by the legend macro and by `map.js`):
 
 ```

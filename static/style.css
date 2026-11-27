@@ -1874,6 +1874,36 @@ html.chart-expanded {
 .ship-type-bulk { color: var(--ship-bulk); }
 .ship-type-cargo { color: var(--ship-cargo); }
 
+/* The Ships dial's counts per place (#156): terminals, anchorages, the rest; each finds its ships. */
+.dial-places {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+.dial-places-head {
+  margin-top: 0.4rem;
+  color: var(--ink-2);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dial-places ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.9rem;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.dial-places b {
+  color: var(--ship);
+  font-weight: 800;
+}
+.expected-title {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1rem;
+}
+
 /* ---------- Port status ---------- */
 
 .status {
