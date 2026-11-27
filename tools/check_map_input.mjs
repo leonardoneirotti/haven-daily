@@ -83,6 +83,11 @@ const DEVICES = {
 // A browser without full screen for a page element, as on an iPhone (#134): the chart expands instead.
 const NO_FULLSCREEN = `for (const name of ["fullscreenEnabled", "webkitFullscreenEnabled"])
   Object.defineProperty(Document.prototype, name, { get: () => false, configurable: true });`;
+// The page's Leaflet map as window.__map, so a check can ask where a place is on the chart (#161).
+// Reads only; the page runs as before.
+const MAP_HOOK = `Object.defineProperty(window, "L", { configurable: true, get() { return this.__L; }, set(v) { this.__L = v;
+  const init = v.Map.prototype.initialize;
+  v.Map.prototype.initialize = function () { window.__map = this; return init.apply(this, arguments); }; } });`;
 
 // A fresh tab on Today, the chart drawn and still.
 async function open(which, device, options = {}) {
@@ -97,6 +102,7 @@ async function open(which, device, options = {}) {
   await s("Emulation.setDeviceMetricsOverride", { width: d.width, height: d.height, deviceScaleFactor: d.dpr, mobile: d.mobile });
   if (d.mobile) await s("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
   await s("Page.addScriptToEvaluateOnNewDocument", { source: PROBE });
+  if (options.followNumber) await s("Page.addScriptToEvaluateOnNewDocument", { source: MAP_HOOK });
   if (options.noFullscreen) await s("Page.addScriptToEvaluateOnNewDocument", { source: NO_FULLSCREEN });
   await s("Page.navigate", { url: `${base}${which}/index.html` });
   for (let i = 0; i < 150; i++) {
@@ -184,6 +190,64 @@ async function swipe(t, from, dx, dy) {
 const zoomed = (a, b) => `${b.zoom - a.zoom >= 0 ? "+" : ""}${(b.zoom - a.zoom).toFixed(1)}`;
 async function scrollChartToTop(t, extra = 0) {
   await t.ev(`document.getElementById("chart").scrollIntoView({ block: "start" }); window.scrollBy(0, ${extra}); new Promise((r) => setTimeout(r, 600))`);
+}
+
+// #161: an item's number picked while the chart is full screen or expanded. Every frame, how far the
+// number is from its place on the chart (the point under it when picked, moved with the chart), while
+// the chart moves and after it stops; then whether the card opened inside the chart. Before the fix,
+// a glide that kept the zoom left the number where it was while the chart moved, then it jumped.
+const numberOf = (rank) => `${NUMBER}[data-rank="${rank}"]`;
+async function goFull(t, press) {
+  const b = await centre(t, ".chart-fullscreen");
+  if (!b) return false;
+  await press(t, b);
+  await sleep(1500);
+  const f = await fullState(t);
+  return f.full || f.expanded;
+}
+async function followNumber(t, rank, press) {
+  const p = await centre(t, numberOf(rank));
+  if (!p) return `no number ${rank} on the chart`;
+  // The number's place is read when the chart starts to move: a label that changes side for the
+  // landing does it then (owner, 27 Nov 2026), and that shift is reported on its own ("at the start").
+  await t.ev(`(() => { const m = window.__map, sel = ${JSON.stringify(numberOf(rank))};
+    const at = (b) => { const r = b.getBoundingClientRect(), c = m.getContainer().getBoundingClientRect();
+      return [r.x + r.width / 2 - c.left, r.y + r.height / 2 - c.top]; };
+    const side = (b) => b.closest(".leaflet-marker-icon").classList.contains("callout-left") ? "left" : "right";
+    const before = at(document.querySelector(sel));
+    const f = window.__follow = { start: 0, during: 0, after: 0, place: null, ended: false, t0: performance.now(),
+      sideAtStart: null, sideAtEnd: null };
+    m.once("movestart", () => { const b = document.querySelector(sel); if (!b) return; const n = at(b);
+      f.place = m.containerPointToLatLng(n); f.start = Math.hypot(n[0] - before[0], n[1] - before[1]); f.sideAtStart = side(b); });
+    m.once("moveend", () => { f.ended = true; });
+    (function frame() {
+      const b = document.querySelector(sel);
+      if (b && f.place) { const n = at(b), q = m.latLngToContainerPoint(f.place), off = Math.hypot(n[0] - q.x, n[1] - q.y);
+        if (f.ended) f.after = Math.max(f.after, off); else f.during = Math.max(f.during, off);
+        f.sideAtEnd = side(b); }
+      if (performance.now() - f.t0 < 2600) requestAnimationFrame(frame);
+    })();
+    return 1; })()`);
+  await press(t, p);
+  await sleep(2900);
+  const r = await t.ev(`(() => { const c = document.querySelector(".chart-card .leaflet-popup-content-wrapper");
+    const m = document.getElementById("port-map").getBoundingClientRect(), b = c && c.getBoundingClientRect(), f = __follow;
+    return { start: Math.round(f.start), during: Math.round(f.during), after: Math.round(f.after), moved: !!f.place,
+      sameSide: f.sideAtStart === f.sideAtEnd, card: !!c,
+      inside: !!c && b.top >= m.top - 0.5 && b.bottom <= m.bottom + 0.5 && b.left >= m.left - 0.5 && b.right <= m.right + 0.5 }; })()`);
+  if (!r.moved) return "the chart didn't move";
+  return `number shifts ${r.start} px at the start; off its place by ≤ ${r.during} px while the chart moves, ` +
+    `≤ ${r.after} px after; label ${r.sameSide ? "keeps its side at landing" : "changes side at landing"}; ` +
+    (r.card ? (r.inside ? "card inside the chart" : "card runs past the chart's edge") : "no card");
+}
+async function secondNumber(t, first, second) {
+  if (!(await goFull(t, click))) return "no full screen";
+  const a = await centre(t, numberOf(first));
+  if (!a) return `no number ${first} on the chart`;
+  await click(t, a);
+  await sleep(2800); // the chart flies to the first item, then its card opens
+  if (!(await cardState(t)).open) return `no card for item ${first}`;
+  return followNumber(t, second, click);
 }
 
 // ---------- The checks: each returns one cell of the table ----------
@@ -364,6 +428,17 @@ const CHECKS = [
     const off = await fullState(t);
     return `${on.expanded ? "expanded" : "nothing"}: chart ${on.size}; close button ${off.expanded ? "doesn't close it" : "closes it"}`;
   }, { noFullscreen: true }],
+  // #161 (owner, 27 Nov 2026): items 2 and 3 both land at zoom 11.8, so the chart glides between them.
+  ["Laptop, full screen: item 2's card open, then item 3's number", "laptop",
+    (t) => secondNumber(t, 2, 3), { followNumber: true }],
+  ["Laptop, expanded chart: item 2's card open, then item 3's number", "laptop",
+    (t) => secondNumber(t, 2, 3), { followNumber: true, noFullscreen: true }],
+  // On a phone the card's room keeps the zoom where it is, so even the first tap glides at one zoom.
+  ["Phone, expanded chart: tap item 1's number", "phone", async (t) => {
+    await scrollChartToTop(t, -150);
+    if (!(await goFull(t, tap))) return "no expanded chart";
+    return followNumber(t, 1, tap);
+  }, { followNumber: true, noFullscreen: true }],
   ["Phone: vertical swipe on the chart, opening view (finger up 240 px)", "phone", async (t) => {
     await scrollChartToTop(t, -150);
     const r = await swipe(t, await t.openPoint(0.5, 0.6), 0, -240);
