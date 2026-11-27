@@ -1820,23 +1820,14 @@ html.chart-expanded {
   box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
 }
 
+/* A still ring around a High number. It pinged three times when the map loaded until #159; the
+   owner wants the numbers static, so no animation on the chart's numbers or markers. */
 .callout-item.sev-high .num::after {
   content: "";
   position: absolute;
   inset: -2px;
   border: 2px solid var(--high);
   border-radius: 9px;
-  animation: ping 2.6s ease-out 3; /* three times, then a still ring (#104) */
-}
-
-/* map.js adds .ping-done after the three pings: markers rebuilt after a move don't ping again. */
-.ping-done .callout-item.sev-high .num::after {
-  animation: none;
-}
-
-@keyframes ping {
-  0% { transform: scale(1); opacity: 0.9; }
-  70%, 100% { transform: scale(2); opacity: 0; }
 }
 
 /* The item's label on its own small card, so it stays readable over place names and lines
