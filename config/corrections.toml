@@ -1,0 +1,26 @@
+# What the pages show of a brief's stored corrections (#173, owner, 28 Nov 2026; spec §6).
+#
+# The notes in data/briefs/ are never changed (hard rule 11). This file only chooses what the pages
+# show of them. Read by haven/render.py; every entry must match a stored note (tests check it), so a
+# typo can't silently show a note again or drop the short line.
+#
+#   [[hidden]]  a stored note the pages leave out: a site-wide change, not a correction of what the
+#               brief said. `date` = the brief, `at` = the note's time as stored.
+#   [[item]]    a short factual line shown on one item's card instead, matched by the item's link
+#               (`url`); `at` = the stored note it stands for (the page's "Corrected …" time).
+
+# #153: every title became English (owner, 26 Nov 2026). Kept in the data and the spec.
+[[hidden]]
+date = "2026-11-23"
+at = "2026-11-26T06:04:31+01:00"
+
+[[hidden]]
+date = "2026-11-25"
+at = "2026-11-26T06:04:31+01:00"
+
+# The same 23 Nov note also corrected the A16 Moerdijkbrug summary: that part is shown, on the item.
+[[item]]
+date = "2026-11-23"
+at = "2026-11-26T06:04:31+01:00"
+url = "https://www.rijnmond.nl/nieuws/2286787/rioolslib-zorgt-voor-vertraging-op-a16-bij-moerdijkbrug-rechterrijstrook-dicht"
+note = "Corrected 26 Nov: only the right lane was closed, not the whole road."

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import tomllib
 import re
 import shutil
 from datetime import date, datetime, timedelta
@@ -257,6 +258,18 @@ def correction_time(at: str, built_at: str) -> str:
 def latest_correction(corrections: list[dict]) -> dict | None:
     """The most recent correction by its time (not its place in the list), or None."""
     return max(corrections, key=lambda c: amsterdam_time(c["at"]), default=None)
+
+
+def load_correction_display(path: Path = CONFIG_DIR / "corrections.toml") -> dict:
+    """What the pages show of the stored corrections (#173): {"hidden": {(date, at)}, "item": {date: [rule]}}.
+    The stored notes never change; config/corrections.toml only chooses what the pages show."""
+    if not path.exists():
+        return {"hidden": set(), "item": {}}
+    rules = tomllib.loads(path.read_text(encoding="utf-8"))
+    items: dict[str, list[dict]] = {}
+    for rule in rules.get("item", []):
+        items.setdefault(rule["date"], []).append(rule)
+    return {"hidden": {(rule["date"], rule["at"]) for rule in rules.get("hidden", [])}, "item": items}
 
 
 def publication_line(built_at: str, corrections: list[dict]) -> str:
@@ -794,6 +807,7 @@ def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.to
     meanings, map data. The Rhine's thresholds and meanings come from `rhine_path`."""
     thresholds, meanings = load_rhine(rhine_path), load_rhine_meanings(rhine_path)
     reads = _source_reads()  # for the failure notes (#138)
+    display = load_correction_display()
     briefs.sort(key=lambda brief: brief["date"])
     # Items shown on each day's page, {date: {url: rank}}: the strike line links an earlier
     # item's card only if its day page really shows it (spec §5.7 point 10).
@@ -815,7 +829,16 @@ def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.to
         for fix in corrections:
             fix["when"] = correction_time(fix["at"], brief["built_at"])
         corrections.sort(key=lambda fix: amsterdam_time(fix["at"]))
-        brief["publication"] = publication_line(brief["built_at"], corrections)
+        # What the page shows of them (#173): a stored note may be left out (a site-wide change), and a
+        # short factual line may stand on the item it corrected instead.
+        brief["shown_corrections"] = [fix for fix in corrections if (brief["date"], fix["at"]) not in display["hidden"]]
+        ranks = {item["url"]: rank for rank, item in enumerate(brief["items"], start=1)}
+        item_notes = [rule for rule in display["item"].get(brief["date"], []) if rule["url"] in ranks]
+        for item in brief["items"]:
+            item["correction"] = next((rule["note"] for rule in item_notes if rule["url"] == item["url"]), None)
+        brief["publication"] = publication_line(brief["built_at"], brief["shown_corrections"] + item_notes)
+        brief["correction_link"] = (("#corrections", "See corrections") if brief["shown_corrections"] else
+                                    (f"#item-{ranks[item_notes[0]['url']]}", "See correction") if item_notes else None)
         build = brief.setdefault("build", {})
         for key in ("sources_checked", "items_collected", "items_kept"):
             build.setdefault(key, None)
