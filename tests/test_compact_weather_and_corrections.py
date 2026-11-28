@@ -52,9 +52,10 @@ def folded(html):
     return found.group(1)
 
 
-def test_one_short_visible_line_says_morning_snapshot_not_live_and_links_to_meteoalarm(weather_dial):
+def test_one_short_visible_line_says_snapshot_not_live_not_official_and_links_to_meteoalarm(weather_dial):
     line = re.search(r'<p class="dial-snapshot">(.*?)</p>', visible(weather_dial), re.S).group(1)
-    assert text_of(line) == "Morning snapshot, not live · Latest warnings on meteoalarm.org"
+    # "Not a MeteoAlarm or KNMI service" stays visible (owner, review of PR #174).
+    assert text_of(line) == "Morning snapshot, not live · Not a MeteoAlarm or KNMI service · Latest warnings on meteoalarm.org"
     assert re.search(rf'<a href="{re.escape(SITE)}">Latest warnings on meteoalarm\.org', line)
 
 
