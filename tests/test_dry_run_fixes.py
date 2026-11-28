@@ -68,7 +68,7 @@ def test_a_place_taken_from_the_text_is_recorded_and_logged():
     brief = summarise.brief_item(result.items[0], SOURCES)
     assert brief["place_from_text"] == "Botlek" and brief["map"]["label"] == "Botlek"
     lines = runner.log_lines({"items": [brief], "build": {"failures": []}})
-    assert lines == [f"Place from the item's text: {brief['url']}: Botlek (the AI picked none)"]
+    assert lines == [f"Place from the item's text: {brief['url']}: Botlek (the AI picked no listed place)"]
 
 
 def test_an_answer_off_the_place_list_falls_back_too():
@@ -137,7 +137,6 @@ def test_an_empty_impact_on_a_high_or_medium_item_is_retried_once(severity, empt
     note = user_text(client.messages.calls[1])
     assert f"no impact for an item rated {severity}" in note
     assert "based only on what the item says" in note
-    assert result.items[0].ai["written_by"]["why"].startswith(f"rephrase retry: no impact for an item rated {severity}")
 
 
 def test_empty_twice_keeps_the_item_and_says_so():
@@ -164,6 +163,8 @@ def test_a_batch_answer_without_impact_for_a_high_item_is_retried_outside_the_ba
                                    results={0: succeeded(answer(json.dumps(empty)))})
     ai = result.items[0].ai
     assert ai["impact"] == HEDGED and ai["written_by"]["api"] == "standard"
+    # The run log says why (#143): "Outside the batch: <url>: rephrase retry: no impact …".
+    assert ai["written_by"]["why"].startswith("rephrase retry: no impact for an item rated high")
 
 
 def test_a_source_whose_permission_has_no_impact_is_never_retried_for_one():

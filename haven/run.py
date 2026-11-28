@@ -123,6 +123,22 @@ def hidden_items(items: list[dict]) -> list[dict]:
     return lines
 
 
+def log_lines(brief: dict) -> list[str]:
+    """The run log's lines about the brief's items, then its failures: why an item was written outside
+    the batch (#143), and a pin taken from the item's own text because the AI picked no listed place
+    (#164)."""
+    lines = []
+    for item in brief["items"]:
+        written = item.get("written_by") or {}
+        if written.get("why"):
+            lines.append(f"Outside the batch: {item['url']}: {written['why']}")
+        if item.get("place_from_text"):
+            lines.append(f"Place from the item's text: {item['url']}: {item['place_from_text']} "
+                         f"(the AI picked no listed place)")
+    lines += [f"FAILURE  {failure['source']}: {failure['error']}" for failure in brief["build"]["failures"]]
+    return lines
+
+
 def _outcome(result: str, message: str, brief: dict | None = None, paths=()) -> Outcome:
     return Outcome(result=result, exit_code=EXIT_CODES[result], message=message, brief=brief, paths=tuple(paths))
 
@@ -334,12 +350,8 @@ def main(argv=None) -> int:
               f"{usage['summariser']['batch_input_tokens']:,} in / {usage['summariser']['batch_output_tokens']:,} out, "
               f"standard {usage['summariser']['standard_input_tokens']:,} in / "
               f"{usage['summariser']['standard_output_tokens']:,} out.")
-        for item in outcome.brief["items"]:  # why an item was written outside the batch (#143)
-            written = item.get("written_by") or {}
-            if written.get("why"):
-                print(f"Outside the batch: {item['url']}: {written['why']}")
-        for failure in build["failures"]:
-            print(f"FAILURE  {failure['source']}: {failure['error']}")
+        for line in log_lines(outcome.brief):
+            print(line)
         for path in outcome.paths:
             print(f"Wrote {path}")
     return outcome.exit_code

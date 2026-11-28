@@ -14,6 +14,10 @@ Nothing the AI writes reaches the brief unless it is on a list.
 `prefer_specific()` runs first (#138, owner's review of PR #139): a road (the A15, A20) is only a
 fallback. When the AI picks a road but the item names a more specific listed place (Maasvlakte,
 Botlek, Europoort, a terminal …), that place is used instead.
+
+`named_first()` is the place fallback (#164, owner, 28 Nov 2026): when the AI picks no listed place
+but the item's own text names one, the summariser pins the first one named (a road only when no
+other place is named) and logs it.
 """
 
 from __future__ import annotations
@@ -24,7 +28,7 @@ from typing import Iterable
 
 from haven.config import SHEET_BBOX, Place, load_places, load_tags
 
-__all__ = ["MAX_TAGS", "SHEET_BBOX", "Pick", "pick", "prefer_specific"]
+__all__ = ["MAX_TAGS", "SHEET_BBOX", "Pick", "named_first", "pick", "prefer_specific"]
 
 MAX_TAGS = 5
 NO_PLACE = "none"
@@ -119,12 +123,25 @@ def prefer_specific(place, text: str, places: tuple[Place, ...] | None = None):
     road = next((p for p in places if p.id == answer and p.kind == ROAD), None)
     if road is None or not text:
         return place
+    return _first_named(text, (p for p in places if p.kind != ROAD)) or place
+
+
+def named_first(text: str, places: tuple[Place, ...] | None = None) -> str | None:
+    """The id of the first listed place `text` names, or None (#164). Matched as `prefer_specific`
+    matches: whole words with their capitals, the first named wins, the longer name at the same
+    spot. A road (A15, A20) only when the text names no other listed place (#138)."""
+    places = load_places() if places is None else places
+    if not text:
+        return None
+    return (_first_named(text, (p for p in places if p.kind != ROAD))
+            or _first_named(text, (p for p in places if p.kind == ROAD)))
+
+
+def _first_named(text: str, candidates: Iterable[Place]) -> str | None:
     found: list[tuple[int, int, str]] = []
-    for candidate in places:
-        if candidate.kind == ROAD:
-            continue
+    for candidate in candidates:
         for name in _names(candidate):
             match = re.search(rf"(?<!\w){re.escape(name)}(?!\w)", text)
             if match:
                 found.append((match.start(), -len(name), candidate.id))
-    return min(found)[2] if found else place
+    return min(found)[2] if found else None
