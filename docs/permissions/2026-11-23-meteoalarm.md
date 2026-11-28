@@ -24,7 +24,7 @@
 | Attribution to MeteoAlarm and KNMI | "KNMI via MeteoAlarm" (linked) and KNMI's own level, e.g. "KNMI: Code yellow · Wind → Watch" | "issued by KNMI … from www.meteoalarm.org"; credits: "Weather warnings by KNMI via MeteoAlarm" |
 | The relevant disclaimer | MeteoAlarm's disclaimer, verbatim, always visible | the same, verbatim |
 | A clear link for the latest warnings | "Latest warnings on meteoalarm.org" → https://www.meteoalarm.org | "always check the latest warnings on www.meteoalarm.org" (linked) |
-| Not an official MeteoAlarm or KNMI service | under "Details": "Haven Daily is not a MeteoAlarm or KNMI service." (#173); the footer: "Personal, unofficial project" | "Haven Daily is an independent project, not a MeteoAlarm or KNMI service" (the word "official" never appears on How it works, so nothing on it reads as official) |
+| Not an official MeteoAlarm or KNMI service | in the short line: "Not a MeteoAlarm or KNMI service"; under "Details": "Haven Daily is not a MeteoAlarm or KNMI service." (#173) | "Haven Daily is an independent project, not a MeteoAlarm or KNMI service" (the word "official" never appears on How it works, so nothing on it reads as official) |
 
 The dial shows all of these also when there are no warnings and on "No data". Only the level and the hazard are shown, never the warning text (spec §2.2). Tests: `tests/test_meteoalarm_permission.py`.
 
