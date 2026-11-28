@@ -117,8 +117,11 @@
   {# MeteoAlarm's conditions for the daily snapshot (23 Nov 2026, #115): a morning snapshot, not a live
      warning service; not a MeteoAlarm or KNMI service; a clear link for the latest warnings. #}
   {% if ind.is_weather %}
-  <p class="dial-snapshot">Morning snapshot, not a live warning service. Haven Daily is not a MeteoAlarm or KNMI service. <a href="https://www.meteoalarm.org">Latest warnings on meteoalarm.org{{ icon("external") }}</a></p>
+  {# Compact since #173 (owner, 28 Nov 2026): one short line (with "Not a MeteoAlarm or KNMI service", owner, review of PR #174), MeteoAlarm's disclaimer still visible and
+     verbatim, the rest under Details (a native toggle: no JavaScript needed). #}
+  <p class="dial-snapshot">Morning snapshot, not live · Not a MeteoAlarm or KNMI service · <a href="https://www.meteoalarm.org">Latest warnings on meteoalarm.org{{ icon("external") }}</a></p>
   <p class="dial-disclaimer">{{ meteoalarm_disclaimer }}</p>
+  <details class="dial-details"><summary>Details</summary><p>Morning snapshot, not a live warning service. Haven Daily is not a MeteoAlarm or KNMI service.</p></details>
   {% endif %}
 </li>
 {%- endmacro %}
@@ -145,6 +148,8 @@
     {% if item.affects %}<p class="affects"><strong>Affects</strong> {{ item.affects | join(" · ") }}</p>{% endif %}
     {% else %}
     <p class="item-summary">{{ item.summary }}</p>
+    {# A short factual correction of this item, right under what it corrects (#173, config/corrections.toml). #}
+    {% if item.correction %}<p class="item-correction">{{ icon("pencil") }}<span>{{ item.correction }}</span></p>{% endif %}
     {# A publisher's written permission (#107): its note next to every summary written under it. #}
     {% if item.permission_note %}<p class="item-permission">{{ item.permission_note }}</p>{% endif %}
     {% if item.shows_impact %}

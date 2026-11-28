@@ -2093,6 +2093,31 @@ html.chart-expanded {
   line-height: 1.45;
 }
 
+/* The rest of MeteoAlarm's conditions, folded (#173): a native toggle, no JavaScript */
+.dial-details {
+  color: var(--ink-2);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.dial-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.dial-details p {
+  margin: 0.3rem 0 0;
+}
+
+/* A short factual correction on the item it corrected (#173) */
+.item-correction {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  color: var(--ink-2);
+  font-size: 0.875rem;
+}
+
 /* River gauge: a board with alternating marks on its left half, water rising from below, and
    lines at the Watch and Alert thresholds (design review S7, #83) labelled in cm beside it.
    Tall enough that the 80 and 150 cm labels don't touch on a 0-700 cm scale. */
