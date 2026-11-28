@@ -220,7 +220,7 @@ def test_bad_tags_are_rejected(tmp_path, text, message):
 
 def test_real_place_list_size_and_osm_ids():
     places = load_places()
-    assert 30 <= len(places) <= 43  # spec: ~30–40; 41st (Delta II) agreed by the owner, 2 Nov 2026; A15, A20 (#138)
+    assert 30 <= len(places) <= 51  # spec: ~30–40; 41st (Delta II) agreed by the owner, 2 Nov 2026; A15, A20 (#138); road tunnels, a bridge, a junction (#170)
     for place in places:
         assert re.fullmatch(r"(node|way|relation)/\d+", place.osm), place.id
 

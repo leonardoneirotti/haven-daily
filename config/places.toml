@@ -433,3 +433,87 @@ lat = 51.9253
 lon = 4.2672
 side = "right"
 osm = "node/322088946"
+
+# ---------- Road tunnels, bridges and junctions (#170) ----------
+# Owner, 28 Nov 2026, after the dry run of 28 Nov: the main road crossings around the port, more
+# specific than the A15/A20 (a road is only a fallback, #138). Positions from OpenStreetMap
+# (Overpass, 28 Nov 2026), the centre of the element in `osm`. Noordtunnel (4.653 E) and
+# Drechttunnel (4.648 E) are east of the chart sheet (to 4.62 E), so they are not listed.
+# Calandbrug is under Bridges above.
+
+[[place]]
+id = "beneluxtunnel"
+label = "Beneluxtunnel"
+kind = "tunnel"
+lat = 51.8993
+lon = 4.3736
+side = "right"
+osm = "relation/18813183"
+
+[[place]]
+# 250 m from the Botlekbrug, whose label is on the right
+id = "botlektunnel"
+label = "Botlektunnel"
+kind = "tunnel"
+lat = 51.8730
+lon = 4.3328
+side = "left"
+osm = "relation/19147166"
+
+[[place]]
+id = "heinenoordtunnel"
+label = "Heinenoordtunnel"
+kind = "tunnel"
+lat = 51.8324
+lon = 4.5127
+side = "right"
+osm = "relation/19147158"
+
+[[place]]
+id = "ketheltunnel"
+label = "Ketheltunnel"
+kind = "tunnel"
+lat = 51.9364
+lon = 4.3610
+side = "right"
+osm = "relation/19142968"
+
+[[place]]
+# The Maastunnel's site (road, cycle and foot tunnels)
+id = "maastunnel"
+label = "Maastunnel"
+kind = "tunnel"
+lat = 51.8999
+lon = 4.4686
+side = "right"
+osm = "relation/11840239"
+
+[[place]]
+# Next to the Calandbrug, whose label is on the left
+id = "thomassentunnel"
+label = "Thomassentunnel"
+kind = "tunnel"
+lat = 51.9003
+lon = 4.2272
+side = "right"
+osm = "relation/19142970"
+
+[[place]]
+# Near the chart's eastern edge: the label on the left
+id = "van-brienenoordbrug"
+label = "Van Brienenoordbrug"
+kind = "bridge"
+lat = 51.9039
+lon = 4.5434
+side = "left"
+osm = "relation/18645127"
+
+[[place]]
+# A4/A20 motorway junction
+id = "kethelplein"
+label = "Kethelplein"
+kind = "junction"
+lat = 51.9257
+lon = 4.3655
+side = "right"
+osm = "way/939303640"

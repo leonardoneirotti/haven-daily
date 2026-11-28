@@ -27,8 +27,9 @@ _LANGUAGE = re.compile(r"^[a-z]{2}$")
 
 # Place list (spec §5.10). "barrier" and "bridge" are Claude's additions to the
 # spec's five kinds, confirmed by the owner (spec §5.10.1, 2 Nov 2026). "road" since #138:
-# the A15/A20 road works of 23 Nov 2026 had no place to pick.
-PLACE_KINDS = ("terminal", "area", "anchorage", "lock", "barrier", "bridge", "fairway", "road")
+# the A15/A20 road works of 23 Nov 2026 had no place to pick. "tunnel" and "junction" since #170 (the
+# road tunnels and Kethelplein): neither is a road, so both are more specific than the A15/A20.
+PLACE_KINDS = ("terminal", "area", "anchorage", "lock", "barrier", "bridge", "fairway", "road", "tunnel", "junction")
 LABEL_SIDES = ("right", "left")
 # The chart sheet (south, west, north, east), spec §8.1: every place must be on it.
 SHEET_BBOX = (51.74, 3.40, 52.16, 4.62)
