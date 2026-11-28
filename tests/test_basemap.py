@@ -151,7 +151,7 @@ def test_tanks_decode_to_points_on_the_sheet_with_a_radius(basemap):
 # ---------- The 51 places ----------
 
 def test_there_are_51_places():
-    assert len(PLACES) == 51  # 41, plus the A15 and A20 since #138, plus 7 tunnels, a bridge and a junction since #170
+    assert len(PLACES) == 51  # 41, plus the A15 and A20 since #138, plus 6 tunnels, a bridge and a junction since #170
 
 
 @pytest.mark.parametrize("place", PLACES, ids=[p["id"] for p in PLACES])
