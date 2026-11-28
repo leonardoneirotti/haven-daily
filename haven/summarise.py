@@ -84,7 +84,7 @@ from haven.clock import AMSTERDAM
 from haven.config import Permission, Place, Source, Tag, load_places, load_sources, load_tag_list
 from haven.feeds import ARTICLE_TEXT_MAX, Item
 from haven.filter import BREAKER, NO_KEY, notice_ended
-from haven.places import pick, prefer_specific
+from haven.places import Pick, named_first, pick, prefer_specific
 
 __all__ = ["BATCH_WAIT", "BREAKER", "CANCEL_WAIT", "FALLBACK_MODEL", "SUMMARY_MODEL", "BatchRun", "SummaryResult",
            "brief_item", "finish_batch", "known_strikes", "phrase_in", "published_day", "resolve_phrase",
@@ -106,6 +106,9 @@ BATCH_UNREADABLE = ("the half-price batch's answers could not be read ({problem}
                     "so every item was summarised by the backup model")
 
 SEVERITIES = ("high", "medium", "low")
+# Always with an impact line (#164, owner, 28 Nov 2026): an empty one is retried once. A Low item may
+# have none (an incident already cleared).
+NEEDS_IMPACT = ("high", "medium")
 STRIKE_STATES = ("announced", "ongoing", "cancelled")
 MATCHES = ("same", "new", "unsure")
 SUMMARY_MAX = 320  # characters; the sample summaries are 156–172
@@ -753,6 +756,13 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
                 raise _Rephrase(f"impact {problem}")
             notes.append(f"impact left out: impact {problem} (after a retry)")
             impact, impact_left_out = None, True
+        # High and Medium always say what it means (#164): an empty impact is retried once, like the
+        # wording check; after that the item stays, with "Not enough information", and it is logged.
+        if impact is None and not impact_left_out and _impact_allowed(permission) and data["severity"] in NEEDS_IMPACT:
+            missing = f"no impact for an item rated {data['severity']}"
+            if not last_try:
+                raise _Rephrase(f"{missing}: write one, based only on what the item says")
+            notes.append(f"{missing} (after a retry)")
 
     if not isinstance(data["tags"], list):
         raise _ItemFailed("unreadable tags")
@@ -760,10 +770,22 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
     strike = _strike(data["strike"], source_text, known_ids, today, published_day(item.published), notes)
 
     # A road is a fallback: a more specific place the item names wins (#138, owner's review of #139).
-    place = prefer_specific(data["place"], f"{item.headline}\n{summary or ''}", places)
+    text = f"{item.headline}\n{summary or ''}"
+    place = prefer_specific(data["place"], text, places)
     picked = pick(place, data["tags"], places=places, tags_list=tags)
+    # No listed place from the AI, but the item's own text names one: the first one named (#164, owner,
+    # 28 Nov 2026; the dry run's low-water notice named Botlek, Waalhaven and Europoort and had no pin).
+    from_text = None
+    if picked.map is None:
+        named = named_first(text, places)
+        if named is not None:
+            fallback = pick(named, data["tags"], places=places, tags_list=tags)
+            from_text = fallback.map["label"]
+            picked = Pick(map=fallback.map, affects=fallback.affects, unlisted=picked.unlisted)
     ai = {"severity": data["severity"], "summary": summary, "impact": impact, **picked.record(),
           "strike": strike, "written_by": None}
+    if from_text is not None:  # recorded on the item and printed in the run log (run.log_lines)
+        ai["place_from_text"] = from_text
     if impact_left_out:  # only then: the page shows no impact block, not "Not enough information"
         ai["impact_left_out"] = True
     if english_headline:  # only then (#153). Never lost for want of a title (owner, 26 Nov 2026, #155):
@@ -1094,4 +1116,6 @@ def brief_item(item: Item, sources: tuple[Source, ...]) -> dict:
         **({"impact_left_out": True} if ai.get("impact_left_out") else {}),
         # Only when the AI wrote one for a Dutch item (#134): the page shows it as the main headline.
         **({"headline_en": ai["headline_en"]} if ai.get("headline_en") else {}),
+        # Only when the pin came from the item's own text, not from the AI's answer (#164).
+        **({"place_from_text": ai["place_from_text"]} if ai.get("place_from_text") else {}),
     }

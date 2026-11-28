@@ -536,7 +536,8 @@ def test_the_one_retry_is_shared_with_the_other_checks():
 
 
 def test_not_enough_information_stays_possible():
-    result, _ = run([rijnmond_item()], rijnmond_answer(impact=None), sources=(rijnmond(WITH_IMPACT),))
+    # On a Low item; a High or Medium one is retried once since #164 (test_dry_run_fixes.py).
+    result, _ = run([rijnmond_item()], rijnmond_answer(impact=None, severity="low"), sources=(rijnmond(WITH_IMPACT),))
     assert result.items[0].ai["impact"] is None and "impact_left_out" not in result.items[0].ai
     assert summarise.brief_item(result.items[0], (rijnmond(WITH_IMPACT),))["permission"] == {
         "granted": "2026-11-19", "max_sentences": 2, "impact": True}

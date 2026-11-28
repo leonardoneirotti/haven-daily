@@ -157,9 +157,10 @@ def test_a_valid_answer_fills_summary_impact_severity_tags_pin_strike_and_writte
 
 
 def test_impact_null_means_not_enough_information_and_is_accepted():
-    result, _ = run([item()], full(impact=None, strike=None))
+    # On a Low item; a High or Medium one is retried once since #164 (test_dry_run_fixes.py).
+    result, _ = run([item()], full(impact=None, strike=None, severity="low"))
     assert result.items[0].ai["impact"] is None
-    assert result.items[0].ai["severity"] == "high" and result.failures == []
+    assert result.items[0].ai["severity"] == "low" and result.failures == []
 
 
 def test_the_stored_record_has_the_ai_fields_but_never_the_article_text(tmp_path):
@@ -172,7 +173,11 @@ def test_the_stored_record_has_the_ai_fields_but_never_the_article_text(tmp_path
 
 
 def test_places_and_tags_off_the_lists_are_logged_not_used():
-    result, _ = run([item()], full(place="Invented Harbour", tags=["Containers", "Reefers"], strike=None))
+    # Text that names no listed place: one that does is pinned from the text since #164
+    # (test_dry_run_fixes.py).
+    result, _ = run([item(headline="Invented: dockworkers to strike")],
+                    full(place="Invented Harbour", tags=["Containers", "Reefers"], strike=None,
+                         summary="Invented: dock staff plan a one-day walkout after wage talks failed."))
     ai = result.items[0].ai
     assert ai["map"] is None and ai["affects"] == ["Containers"]
     assert ai["unlisted"] == {"places": ["Invented Harbour"], "tags": ["Reefers"]}

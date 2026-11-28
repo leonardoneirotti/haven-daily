@@ -465,25 +465,28 @@ def has_english_title(item: dict) -> bool:
     return (item.get("language") or "en") == "en" or bool(item.get("headline_en"))
 
 
-def describe_change(indicator: dict, previous: dict | None, is_first: bool) -> str | None:
-    """One line comparing today's status value with the previous brief."""
+def describe_change(indicator: dict, previous: dict | None, is_first: bool, previous_date: str | None) -> str | None:
+    """One line comparing today's status value with the previous brief, named by its date (#164, owner,
+    28 Nov 2026): "−3 cm vs 25 Nov", whatever day that brief is from. "since yesterday" until then,
+    which after a missing day only said "No reading yesterday"."""
     now = indicator["value"]
     if now is None:
         return None
-    if is_first:
-        return "First reading"
-    if previous is None or previous["value"] is None:
-        return "No reading yesterday"
+    if is_first or previous_date is None:
+        return "No earlier reading"
+    day = _day_month(date.fromisoformat(previous_date))
+    if previous is None or previous.get("value") is None:
+        return f"No reading on {day}"
     before = previous["value"]
     if isinstance(now, (int, float)) and isinstance(before, (int, float)):
         diff = now - before
         if diff == 0:
-            return "Unchanged since yesterday"
+            return f"Unchanged vs {day}"
         sign = "+" if diff > 0 else "−"
-        return f"{sign}{abs(diff):g} {indicator['unit']} since yesterday".replace("  ", " ")
+        return f"{sign}{abs(diff):g} {indicator['unit']} vs {day}".replace("  ", " ")
     if now == before:
-        return "Same as yesterday"
-    return f"Yesterday: {before}"
+        return f"Same as {day}"
+    return f"{day}: {before}"
 
 
 def gauge_percent(indicator: dict) -> float | None:
@@ -542,7 +545,7 @@ def gauge_label(indicator: dict, thresholds: RhineThresholds) -> str:
 
 def prepare_indicator(indicator: dict, previous: dict | None, is_first: bool, brief_date: str,
                       shown_ranks: dict[str, dict[str, int]], thresholds: RhineThresholds,
-                      meanings: RhineMeanings) -> None:
+                      meanings: RhineMeanings, previous_date: str | None = None) -> None:
     indicator.setdefault("value", None)
     indicator.setdefault("unit", "")
     indicator.setdefault("place", None)
@@ -555,7 +558,7 @@ def prepare_indicator(indicator: dict, previous: dict | None, is_first: bool, br
     value = indicator["value"]
     indicator["is_number"] = isinstance(value, (int, float))
     indicator["display_value"] = f"{value:g}" if indicator["is_number"] else value
-    indicator["change"] = describe_change(indicator, previous, is_first)
+    indicator["change"] = describe_change(indicator, previous, is_first, previous_date)
     indicator["gauge_pct"] = gauge_percent(indicator)
     indicator["meaning"] = status_meaning(indicator, thresholds, meanings)
     indicator["gauge_marks"] = gauge_marks(indicator, thresholds)
@@ -802,7 +805,7 @@ def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.to
         brief["date"]: {item["url"]: rank for rank, item in enumerate(brief["items"], start=1)} for brief in briefs
     }
     previous_status: dict[str, dict] = {}
-    previous_day: date | None = None
+    previous_date: str | None = None
     for number, brief in enumerate(briefs, start=1):
         brief["day"] = date.fromisoformat(brief["date"])
         brief["edition"] = number
@@ -823,13 +826,12 @@ def prepare_briefs(briefs: list[dict], rhine_path: Path = CONFIG_DIR / "rhine.to
         build.setdefault("summaries", None)
         brief["failure_lines"] = failure_lines(build["failures"], reads)
 
-        # "Since yesterday" only against the day before: after a missing day there is no yesterday.
-        yesterday = previous_status if previous_day == brief["day"] - timedelta(days=1) else {}
+        # Against the previous brief, whatever day it is from, and the dial says which (#164).
         for indicator in brief["status"]:
-            prepare_indicator(indicator, yesterday.get(indicator["key"]), number == 1, brief["date"], shown_ranks,
-                              thresholds, meanings)
+            prepare_indicator(indicator, previous_status.get(indicator["key"]), number == 1, brief["date"],
+                              shown_ranks, thresholds, meanings, previous_date)
         previous_status = {indicator["key"]: indicator for indicator in brief["status"]}
-        previous_day = brief["day"]
+        previous_date = brief["date"]
 
         for item in brief["items"]:
             prepare_item(item, brief["date"])

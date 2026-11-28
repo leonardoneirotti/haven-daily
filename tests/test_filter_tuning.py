@@ -267,8 +267,9 @@ def test_a_hedged_impact_is_kept_without_a_retry_and_records_nothing_extra():
     assert "impact_left_out" not in summarise.brief_item(result.items[0], SOURCES)
 
 
-def test_not_enough_information_needs_no_retry():
-    result, client = run([item()], full(impact=None))
+def test_not_enough_information_needs_no_retry_on_a_low_item():
+    # High and Medium items always get an impact line since #164 (test_dry_run_fixes.py).
+    result, client = run([item()], full(impact=None, severity="low"))
     assert len(client.messages.calls) == 1 and result.items[0].ai["impact"] is None
 
 
