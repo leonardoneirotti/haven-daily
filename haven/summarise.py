@@ -785,7 +785,7 @@ def _checked(data: dict, item: Item, known_ids: set[str], today: date, places, t
     ai = {"severity": data["severity"], "summary": summary, "impact": impact, **picked.record(),
           "strike": strike, "written_by": None}
     if from_text is not None:  # recorded on the item and printed in the run log (run.log_lines)
-        ai["place_from_text"] = from_text
+        ai["place_named"] = from_text
     if impact_left_out:  # only then: the page shows no impact block, not "Not enough information"
         ai["impact_left_out"] = True
     if english_headline:  # only then (#153). Never lost for want of a title (owner, 26 Nov 2026, #155):
@@ -1117,5 +1117,5 @@ def brief_item(item: Item, sources: tuple[Source, ...]) -> dict:
         # Only when the AI wrote one for a Dutch item (#134): the page shows it as the main headline.
         **({"headline_en": ai["headline_en"]} if ai.get("headline_en") else {}),
         # Only when the pin came from the item's own text, not from the AI's answer (#164).
-        **({"place_from_text": ai["place_from_text"]} if ai.get("place_from_text") else {}),
+        **({"place_named": ai["place_named"]} if ai.get("place_named") else {}),
     }

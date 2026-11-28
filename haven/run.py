@@ -132,8 +132,8 @@ def log_lines(brief: dict) -> list[str]:
         written = item.get("written_by") or {}
         if written.get("why"):
             lines.append(f"Outside the batch: {item['url']}: {written['why']}")
-        if item.get("place_from_text"):
-            lines.append(f"Place from the item's text: {item['url']}: {item['place_from_text']} "
+        if item.get("place_named"):
+            lines.append(f"Place from the item's text: {item['url']}: {item['place_named']} "
                          f"(the AI picked no listed place)")
     lines += [f"FAILURE  {failure['source']}: {failure['error']}" for failure in brief["build"]["failures"]]
     return lines

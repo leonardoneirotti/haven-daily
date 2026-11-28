@@ -64,9 +64,9 @@ def test_the_dry_runs_low_water_notice_gets_a_number_on_the_map():
 def test_a_place_taken_from_the_text_is_recorded_and_logged():
     result, _ = run([low_water_item()], low_water_answer())
     ai = result.items[0].ai
-    assert ai["place_from_text"] == "Botlek"
+    assert ai["place_named"] == "Botlek"
     brief = summarise.brief_item(result.items[0], SOURCES)
-    assert brief["place_from_text"] == "Botlek" and brief["map"]["label"] == "Botlek"
+    assert brief["place_named"] == "Botlek" and brief["map"]["label"] == "Botlek"
     lines = runner.log_lines({"items": [brief], "build": {"failures": []}})
     assert lines == [f"Place from the item's text: {brief['url']}: Botlek (the AI picked no listed place)"]
 
@@ -74,7 +74,7 @@ def test_a_place_taken_from_the_text_is_recorded_and_logged():
 def test_an_answer_off_the_place_list_falls_back_too():
     result, _ = run([low_water_item()], low_water_answer(place="harbour-somewhere"))
     ai = result.items[0].ai
-    assert ai["map"]["label"] == "Botlek" and ai["place_from_text"] == "Botlek"
+    assert ai["map"]["label"] == "Botlek" and ai["place_named"] == "Botlek"
     assert ai["unlisted"] == {"places": ["harbour-somewhere"], "tags": []}  # still listed for the owner
 
 
@@ -97,14 +97,14 @@ def test_a_text_that_names_no_listed_place_stays_off_the_map():
     summary = "Invented: a notice about low water somewhere in the port in the coming days."
     result, _ = run([low_water_item()], low_water_answer(summary=summary))
     ai = result.items[0].ai
-    assert ai["map"] is None and "place_from_text" not in ai
-    assert "place_from_text" not in summarise.brief_item(result.items[0], SOURCES)
+    assert ai["map"] is None and "place_named" not in ai
+    assert "place_named" not in summarise.brief_item(result.items[0], SOURCES)
 
 
 def test_a_place_the_ai_picked_is_kept_and_nothing_is_recorded():
     result, _ = run([low_water_item()], low_water_answer(place="europoort"))
     ai = result.items[0].ai
-    assert ai["map"]["label"] == "Europoort" and "place_from_text" not in ai
+    assert ai["map"]["label"] == "Europoort" and "place_named" not in ai
 
 
 def test_names_are_matched_as_proper_nouns_only():
@@ -227,3 +227,33 @@ def test_no_page_of_the_sample_site_says_yesterday(tmp_path):
 def test_the_spec_describes_the_dates_on_the_dials():
     assert "**The dials name the date they compare with** *(#164" in SPEC
     assert "vs 25 Nov" in SPEC and "No earlier reading" in SPEC
+
+
+# --- #166: what the summariser records can be stored as the morning job stores it -----------------
+# The dry run of 28 Nov (run 46143609735) failed at the last step: the first name of the field,
+# `place_from_text`, has "text" in it, and storage refuses such field names (hard rule 13). The tests
+# above never wrote a brief through storage.
+
+
+def test_a_pin_from_the_items_wording_is_stored_by_the_morning_jobs_write(tmp_path):
+    from datetime import date
+
+    from haven import storage
+
+    result, _ = run([low_water_item()], low_water_answer())
+    done = result.items[0]
+    day = date(2026, 11, 2)
+    brief = {"date": day.isoformat(), "items": [summarise.brief_item(done, SOURCES)], "status": [],
+             "build": {"failures": []}}
+    storage.write_day(day, {"items": [done.record()], "status": [], "briefs": brief}, tmp_path)
+    assert storage.read("briefs", day, tmp_path)["items"][0]["place_named"] == "Botlek"
+    assert storage.read("items", day, tmp_path)[0]["place_named"] == "Botlek"  # the AI fields sit on the line itself
+
+
+def test_no_field_the_summariser_can_add_trips_the_hard_rule_13_guard():
+    # Every optional field of an item's AI fields and of its brief item, by name.
+    from haven import storage
+
+    names = set(summarise.unrated()) | {"place_named", "impact_left_out", "headline_en", "unlisted"}
+    for name in sorted(names):
+        assert not storage._TEXT_WORDS & storage._words(name), name
