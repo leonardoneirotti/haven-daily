@@ -59,3 +59,13 @@ def test_the_speed_run_checks_the_pins_before_and_after_at_both_laptop_sizes():
     assert job.count("--only ${{ matrix.size }}") == 3  # before, after, and after with ships on (#156)
     assert "--compare" in job and "GITHUB_STEP_SUMMARY" in job
     assert "tools/check_map_pins.py" in SPEED_YML.split("paths:")[1].split("permissions")[0]
+
+
+# --- the baseline since #171 (owner, 28 Nov 2026) ------------------------------------------------
+
+
+def test_the_spec_records_the_pin_check_baseline_and_its_rule():
+    spec = (Path(__file__).resolve().parent.parent / "docs" / "SPEC.md").read_text(encoding="utf-8")
+    assert "**Baseline since #171**" in spec
+    assert "34 hidden at 1440 × 900 and 42 at 1280 × 800" in spec
+    assert "no existing check gets worse" in spec
