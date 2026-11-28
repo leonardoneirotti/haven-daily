@@ -259,21 +259,23 @@ def test_failures_are_plain_sentences_in_first_seen_order():
     ]
 
 
-# --- change since yesterday ---------------------------------------------------------------
+# --- change against the previous brief, named by its date (#164; "since yesterday" until then) ---
 
 
-def test_rhine_change_is_against_yesterdays_brief(tmp_path):
+def test_rhine_change_is_against_the_previous_brief_named_by_date(tmp_path):
     pages = render_days(tmp_path, make_brief("2026-11-19", status=[kaub(24, "2026-11-19")]),
                         make_brief(DAY, status=[kaub(21)]))
-    assert "−3 cm since yesterday" in text_of(dial(pages[DAY], "rhine"))
+    assert "−3 cm vs 19 Nov" in text_of(dial(pages[DAY], "rhine"))
 
 
-def test_no_change_is_claimed_across_a_missing_day(tmp_path):
+def test_across_a_missing_day_the_change_names_the_older_brief(tmp_path):
+    # Until #164 the dial said "No reading yesterday" here (decision 1 of #23); the owner, 28 Nov
+    # 2026: compare with the brief actually there, and say which day it is.
     pages = render_days(tmp_path, make_brief("2026-11-18", status=[kaub(24, "2026-11-18")]),
                         make_brief(DAY, status=[kaub(21)]))
     card = text_of(dial(pages[DAY], "rhine"))
-    assert "No reading yesterday" in card
-    assert "since yesterday" not in card
+    assert "−3 cm vs 18 Nov" in card
+    assert "yesterday" not in card.lower()
 
 
 def test_kaub_dial_shows_the_gauge(tmp_path):
